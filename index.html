@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEXICA v12 — Neuro-Symbolic Ascension</title>
+<title>LEXICA 2.3</title>
 <script type="module">
   // Pre-declare module-loaded globals for non-module access
   window._transformersReady = false;
@@ -78,7 +78,15 @@ self.addEventListener('fetch', e => {
   --glass-bg:rgba(255,255,255,.04);--glass-border:rgba(255,255,255,.10);--glass-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
-body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+body{
+  font-family:'Syne',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  overflow:hidden;
+  display:flex;
+  position:relative;
+}
 
 /* ── STARFIELD BACKGROUND ── */
 body::before{
@@ -91,650 +99,169 @@ body::before{
 }
 body>*{position:relative;z-index:1;}
 
-/* ── SIDEBAR — collapsible ── */
-.sidebar{
-  width:360px;
-  background:rgba(7,7,16,.85);
+/* ═══════════════════════════════════════════════
+   LEXICA 2.3 — ICON RAIL + DRAWER LAYOUT
+   body = flex row: [icon-rail 48px] [drawer 0–340px] [chat flex-1]
+   Two icon buttons open drawers: Chats | Tools
+   ═══════════════════════════════════════════════ */
+
+/* ── ICON RAIL ── */
+.icon-rail{
+  width:48px;flex-shrink:0;
+  background:rgba(5,5,14,.96);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:12px 0;gap:4px;
+  position:relative;z-index:100;
+}
+.icon-rail::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(232,184,75,.5),transparent);
+}
+.rail-logo{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border-radius:10px;background:var(--gold-dim);border:1px solid rgba(232,184,75,.25);
+  margin-bottom:8px;flex-shrink:0;cursor:default;
+}
+.rail-logo span{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--gold);letter-spacing:.04em;}
+.rail-btn{
+  width:36px;height:36px;
+  border-radius:10px;border:1px solid transparent;
+  background:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-muted);font-size:16px;
+  transition:background .18s,border-color .18s,color .18s;
+  position:relative;
+}
+.rail-btn:hover{background:rgba(255,255,255,.06);color:var(--text-dim);}
+.rail-btn.active{background:rgba(110,168,255,.12);border-color:rgba(110,168,255,.25);color:var(--blue);}
+.rail-btn.active.tools{background:rgba(232,184,75,.1);border-color:rgba(232,184,75,.25);color:var(--gold);}
+.rail-spacer{flex:1;}
+.rail-version{
+  font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--text-muted);
+  letter-spacing:.08em;writing-mode:vertical-rl;transform:rotate(180deg);
+  padding-bottom:8px;opacity:.5;
+}
+
+/* ── DRAWER (shared panel that slides in) ── */
+.drawer{
+  width:0;flex-shrink:0;overflow:hidden;
+  background:rgba(7,7,16,.92);
   backdrop-filter:blur(20px);
   border-right:1px solid var(--border);
   display:flex;flex-direction:column;
-  overflow:hidden;position:relative;
-  transition:width .32s cubic-bezier(.4,0,.2,1), min-width .32s cubic-bezier(.4,0,.2,1);
-  flex-shrink:0;
+  transition:width .28s cubic-bezier(.4,0,.2,1);
+  position:relative;z-index:90;
 }
-.sidebar.collapsed{width:0;min-width:0;border-right:none;}
-.sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(232,184,75,.5),var(--cyan),transparent);opacity:.6}
-
-/* Sidebar toggle tab — always visible on the edge */
-.sidebar-toggle{
-  position:fixed;left:0;top:50%;transform:translateY(-50%);
-  z-index:200;
-  width:18px;height:52px;
-  background:rgba(7,7,16,.85);
-  backdrop-filter:blur(12px);
-  border:1px solid var(--border);
-  border-left:none;
-  border-radius:0 10px 10px 0;
-  cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  color:var(--text-dim);
-  font-size:10px;
-  transition:left .32s cubic-bezier(.4,0,.2,1), background .2s, color .2s;
+.drawer.open{width:320px;}
+.drawer::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(110,168,255,.4),rgba(176,148,255,.3),transparent);
+  opacity:.7;pointer-events:none;
 }
-.sidebar-toggle:hover{background:rgba(255,255,255,.07);color:var(--text)}
-/* JS will update left position based on sidebar width */
-
-.logo-area{padding:20px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-shrink:0}
-.logo-glyph{width:40px;height:40px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center}
-.logo-glyph::before{content:'';position:absolute;inset:0;border:1px solid rgba(232,184,75,.4);border-radius:12px;background:rgba(232,184,75,.05)}
-.logo-glyph::after{content:'';position:absolute;inset:0;border-radius:12px;background:radial-gradient(circle at 30% 30%, rgba(110,168,255,.15), transparent 70%)}
-.logo-glyph span{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--gold);z-index:1;letter-spacing:.05em}
-.logo-text h1{font-size:16px;font-weight:700;letter-spacing:.12em;color:var(--text)}
-.logo-text p{font-size:8px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-top:3px;letter-spacing:.06em}
-.version-dot{display:inline-flex;align-items:center;gap:4px;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--gold);background:var(--gold-dim);border:1px solid rgba(232,184,75,.2);border-radius:4px;padding:2px 6px;margin-left:6px}
-
-.tab-bar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:transparent}
-.tab-btn{flex:1;padding:10px 2px;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--text-dim);background:none;border:none;border-bottom:1.5px solid transparent;cursor:pointer;transition:all .2s;letter-spacing:.03em}
-.tab-btn:hover{color:var(--text)}.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
-
-.tab-pane{display:none;flex:1;overflow-y:auto;padding:18px 18px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent}
-.tab-pane.active{display:block}
-
-.lbl{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.2em;color:var(--text-dim);margin-bottom:9px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-.section{margin-bottom:24px}
-
-/* Liquid glass inputs */
-.wiki-input-wrap{position:relative}
-.wiki-input,.word-lookup-input{
-  width:100%;
-  background:var(--glass-bg);
-  border:1px solid var(--glass-border);
-  border-radius:12px;
-  padding:11px 46px 11px 14px;
-  color:var(--text);
-  font-family:'Syne',sans-serif;font-size:13px;
-  outline:none;
-  transition:all .25s;
-  backdrop-filter:blur(10px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 16px rgba(0,0,0,.3);
-}
-.wiki-input:focus,.word-lookup-input:focus{
-  border-color:rgba(232,184,75,.4);
-  background:rgba(255,255,255,.06);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 20px rgba(232,184,75,.08);
-}
-.wiki-input::placeholder,.word-lookup-input::placeholder{color:var(--text-muted)}
-.wiki-search-btn{
-  position:absolute;right:8px;top:50%;transform:translateY(-50%);
-  background:linear-gradient(135deg, rgba(232,184,75,.9), rgba(232,184,75,.7));
-  color:#000;border:none;border-radius:8px;width:28px;height:28px;
-  cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;
-  transition:all .2s;font-weight:700;
-  box-shadow:0 2px 8px rgba(232,184,75,.3);
-}
-.wiki-search-btn:hover{background:var(--gold2);box-shadow:0 4px 16px rgba(232,184,75,.5)}
-.wiki-suggestions{
-  background:rgba(13,13,26,.95);
-  backdrop-filter:blur(20px);
-  border:1px solid var(--glass-border);
-  border-radius:12px;margin-top:5px;overflow:hidden;
-  display:none;position:absolute;z-index:100;width:100%;
-  box-shadow:0 16px 48px rgba(0,0,0,.6);
-}
-.wiki-sug{padding:10px 14px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,.04)}.wiki-sug:last-child{border-bottom:none}.wiki-sug:hover{background:rgba(255,255,255,.05)}
-.s-title{font-size:12px;font-weight:600;color:var(--text)}.s-desc{font-size:10px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wiki-status{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);margin-top:7px;min-height:15px}
-
-/* Quick fetch chips — liquid glass pills */
-.quick-btns{display:flex;flex-wrap:wrap;gap:5px}
-.btn-sm{
-  background:var(--glass-bg);
-  color:var(--text-dim);
-  border:1px solid var(--glass-border);
-  border-radius:20px;
-  padding:5px 11px;font-size:9.5px;
-  font-family:'JetBrains Mono',monospace;
-  cursor:pointer;transition:all .25s;
-  backdrop-filter:blur(8px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
-}
-.btn-sm:hover{border-color:rgba(232,184,75,.4);color:var(--gold);background:rgba(232,184,75,.07);box-shadow:0 0 12px rgba(232,184,75,.1)}
-
-textarea{
-  width:100%;
-  background:var(--glass-bg);
-  border:1px solid var(--glass-border);
-  border-radius:12px;padding:12px 14px;
-  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;
-  resize:vertical;outline:none;transition:all .2s;line-height:1.6;
-  backdrop-filter:blur(10px);
-}
-textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var(--text-muted)}
-.file-drop{margin-top:8px;border:1px dashed rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--glass-bg)}
-.file-drop:hover{border-color:rgba(232,184,75,.3);background:var(--gold-dim)}.file-drop input{display:none}
-.file-drop p{font-size:10.5px;color:var(--text-dim)}.fi{font-size:16px;margin-bottom:3px}
-
-.btn-primary{
-  width:100%;
-  background:linear-gradient(135deg, var(--gold) 0%, rgba(255,209,102,.8) 100%);
-  color:#06060a;border:none;border-radius:12px;padding:12px;
-  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
-  cursor:pointer;transition:all .2s;margin-top:8px;letter-spacing:.04em;
-  box-shadow:0 4px 20px rgba(232,184,75,.25);
-}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 32px rgba(232,184,75,.4)}
-.btn-danger{width:100%;background:var(--red-dim);color:var(--red);border:1px solid rgba(255,85,120,.2);border-radius:10px;padding:10px;font-size:10.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;margin-top:6px}
-.btn-danger:hover{background:rgba(255,85,120,.15)}
-
-.source-item{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:9px;animation:fadeUp .2s ease-out;backdrop-filter:blur(8px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-.source-icon{font-size:15px;flex-shrink:0}.source-info{flex:1;min-width:0}
-.source-title{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.source-meta{font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-top:2px}
-.source-actions{display:flex;gap:5px;flex-shrink:0}
-.trust-btn{background:none;border:1px solid var(--glass-border);color:var(--text-dim);border-radius:6px;padding:3px 7px;font-size:8.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s}
-.trust-btn.trusted{border-color:var(--green);color:var(--green);background:var(--green-dim)}
-.trust-btn:hover{border-color:var(--green);color:var(--green)}
-.kg-view-btn{background:none;border:1px solid var(--glass-border);color:var(--text-dim);border-radius:6px;padding:3px 7px;font-size:8.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s}
-.kg-view-btn:hover{border-color:var(--purple);color:var(--purple)}
-.source-remove{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:2px 5px;border-radius:5px;transition:all .2s}
-.source-remove:hover{color:var(--red);background:var(--red-dim)}
-.no-sources{font-size:11px;color:var(--text-muted);text-align:center;padding:24px;font-family:'JetBrains Mono',monospace}
-
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
-.stat-card{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:11px 13px;backdrop-filter:blur(8px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-.stat-card .val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:400;color:var(--gold)}
-.stat-card .slbl{font-size:9.5px;color:var(--text-dim);margin-top:2px;font-family:'JetBrains Mono',monospace}
-.topic-cloud{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
-.topic-tag{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;padding:3px 10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:9.5px;display:inline-block;transition:all .2s;cursor:default;backdrop-filter:blur(6px)}
-.topic-tag:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
-
-/* Word Profile */
-.wp-word{font-size:24px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text);margin-bottom:8px}
-.wp-pos-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
-.pos-badge{padding:2px 8px;border-radius:8px;font-size:9.5px;font-family:'JetBrains Mono',monospace;font-weight:500;color:#000}
-.pos-NOUN{background:#5b8dee}.pos-PROPN{background:#9f7aea}.pos-VERB{background:#3ddc84}
-.pos-AUX{background:#1ab86a}.pos-ADJ{background:#f0c040}.pos-ADV{background:#22d3ee}
-.pos-DET{background:#64748b;color:#dde0f0}.pos-PREP{background:#475569;color:#dde0f0}
-.pos-CONJ{background:#374151;color:#dde0f0}.pos-PRON{background:#be185d}.pos-NUM{background:#fb923c}
-.wp-section{margin-bottom:13px}
-.wp-section-title{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim);margin-bottom:7px}
-.sem-neighbor{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px}
-.sem-neighbor-word{font-family:'JetBrains Mono',monospace;color:var(--text);min-width:90px;cursor:pointer}
-.sem-neighbor-word:hover{color:var(--gold)}
-.sem-bar-wrap{flex:1;background:rgba(255,255,255,.03);border-radius:3px;height:4px;overflow:hidden}
-.sem-bar{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .4s}
-.sem-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);min-width:28px;text-align:right}
-.wp-sample{background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:8px;padding:9px 11px;margin-bottom:5px;font-size:11px;line-height:1.65;color:var(--text-dim)}
-.wp-sample .hl{background:rgba(212,160,23,.15);color:var(--gold);border-radius:3px;padding:0 2px;font-weight:600}
-.wp-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:4px}
-.wp-ner{display:inline-block;padding:2px 8px;border-radius:7px;font-size:9.5px;font-family:'JetBrains Mono',monospace;background:var(--purple-dim);border:1px solid rgba(159,122,234,.25);color:var(--purple);margin-bottom:8px}
-.wp-not-found{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);text-align:center;padding:20px}
-.word-browse-tag{background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:20px;padding:2px 9px;font-size:9.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;display:inline-block;margin:2px}
-.word-browse-tag:hover{border-color:var(--gold);color:var(--gold)}
-
-/* Chat area */
-.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.chat-header{
-  background:rgba(7,7,16,.6);
-  backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);
-  padding:14px 24px;
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;position:relative;
-}
-.chat-header::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(110,168,255,.2),rgba(176,148,255,.2),transparent)}
-.model-info{display:flex;align-items:center;gap:13px}
-.model-avatar{
-  width:38px;height:38px;
-  background:linear-gradient(135deg,rgba(232,184,75,.15) 0%,rgba(110,168,255,.1) 100%);
-  border:1px solid rgba(232,184,75,.3);
-  border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:var(--gold);
-  position:relative;
-  box-shadow:0 0 20px rgba(232,184,75,.1);
-}
-.model-avatar::after{
-  content:'12';position:absolute;bottom:-4px;right:-4px;
-  width:14px;height:14px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(232,184,75,.3);
-  border-radius:50%;font-size:7px;font-family:'JetBrains Mono',monospace;
-  color:var(--gold);display:flex;align-items:center;justify-content:center;
-  line-height:14px;text-align:center;
-}
-.model-name{font-weight:700;font-size:14px;letter-spacing:.02em}
-.model-status{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;margin-top:3px}
-.model-status.active{color:var(--green)}
-.pulse{width:5px;height:5px;background:currentColor;border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.15}}
-.header-btns{display:flex;gap:7px}
-.btn-clear{
-  background:var(--glass-bg);
-  border:1px solid var(--glass-border);
-  color:var(--text-dim);border-radius:8px;padding:5px 12px;
-  font-size:10px;cursor:pointer;
-  font-family:'JetBrains Mono',monospace;transition:all .2s;
-  backdrop-filter:blur(8px);
-}
-.btn-clear:hover{border-color:rgba(255,85,120,.4);color:var(--red)}
-
-.messages{
-  flex:1;overflow-y:auto;padding:24px;
-  display:flex;flex-direction:column;gap:18px;
-  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent;
-  background:
-    radial-gradient(ellipse at 20% 0%, rgba(110,168,255,.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(176,148,255,.03) 0%, transparent 50%),
-    var(--bg);
-}
-.msg-row{display:flex;align-items:flex-start;gap:10px;animation:fadeUp .2s ease-out}
-.msg-row.user{flex-direction:row-reverse}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.msg-avatar{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-top:2px}
-.msg-avatar.ai{background:linear-gradient(135deg,rgba(232,184,75,.2),rgba(110,168,255,.15));border:1px solid rgba(232,184,75,.2);color:var(--gold)}
-.msg-avatar.user{background:rgba(110,168,255,.08);border:1px solid rgba(110,168,255,.15);color:var(--blue)}
-
-/* Bubble wrapper constrains max width; bubble itself is inline so it hugs content */
-.msg-bubble-wrap{max-width:78%;display:flex;flex-direction:column;min-width:0;}
-.msg-row.user .msg-bubble-wrap{align-items:flex-end;}
-
-.msg-bubble{
-  display:inline-block; /* hugs short content naturally */
-  padding:12px 16px;
-  border-radius:16px;
-  font-size:14px;line-height:1.75;
-  word-break:break-word;
-  width:fit-content;
-  max-width:100%;
-}
-.msg-bubble.ai{
-  background:rgba(255,255,255,.045);
-  border:1px solid rgba(255,255,255,.11);
-  border-top-left-radius:4px;cursor:pointer;
-  backdrop-filter:blur(28px);
-  -webkit-backdrop-filter:blur(28px);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,.13),
-    inset 0 -1px 0 rgba(0,0,0,.18),
-    inset 1px 0 0 rgba(255,255,255,.04),
-    0 8px 32px rgba(0,0,0,.28),
-    0 2px 8px rgba(0,0,0,.2);
-}
-.msg-bubble.ai::before{
-  content:'';
-  position:absolute;
-  inset:0;border-radius:inherit;
-  background:linear-gradient(135deg, rgba(255,255,255,.06) 0%, transparent 60%);
-  pointer-events:none;
-}
-.msg-bubble.ai{position:relative;overflow:hidden;}
-.msg-bubble.user{
-  background:rgba(110,168,255,.08);
-  border:1px solid rgba(110,168,255,.14);
-  border-top-right-radius:4px;color:#a8c8ff;
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 20px rgba(0,0,0,.2);
-  position:relative;overflow:hidden;
-}
-.msg-bubble.user::before{
-  content:'';position:absolute;inset:0;border-radius:inherit;
-  background:linear-gradient(135deg, rgba(110,168,255,.1) 0%, transparent 55%);
-  pointer-events:none;
-}
-.msg-bubble.system{
-  background:none;border:none;color:var(--text-dim);
-  font-size:10px;font-family:'JetBrains Mono',monospace;
-  text-align:center;display:block;width:100%;padding:2px;
+.drawer-inner{
+  width:320px;display:flex;flex-direction:column;height:100%;overflow:hidden;
 }
 
-.cursor{display:inline-block;color:var(--gold);animation:blink-c .75s infinite;font-weight:200}
-@keyframes blink-c{0%,100%{opacity:1}50%{opacity:0}}
-.msg-meta{font-size:9px;color:var(--text-muted);margin-top:5px;font-family:'JetBrains Mono',monospace;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.badge{padding:2px 7px;border-radius:8px;font-size:8px;font-family:'JetBrains Mono',monospace}
-.badge.synth{background:rgba(232,184,75,.1);border:1px solid rgba(232,184,75,.2);color:var(--gold)}
-.badge.kg{background:var(--purple-dim);border:1px solid rgba(176,148,255,.2);color:var(--purple)}
-.badge.fallback{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim)}
-.badge.refuted{background:var(--red-dim);border:1px solid rgba(255,85,120,.2);color:var(--red)}
-.badge.boolean{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
-.badge.conf-high{background:rgba(54,239,178,.08);border:1px solid rgba(54,239,178,.2);color:var(--green)}
-.badge.conf-med{background:rgba(255,144,82,.08);border:1px solid rgba(255,144,82,.2);color:var(--orange)}
-.badge.conf-low{background:var(--red-dim);border:1px solid rgba(255,85,120,.2);color:var(--red)}
-.badge.social{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
-.badge.auto{background:rgba(54,239,178,.08);border:1px solid rgba(54,239,178,.2);color:var(--green)}
-.badge.ctx{background:var(--blue-dim);border:1px solid rgba(110,168,255,.2);color:var(--blue)}
-.badge.cached{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim)}
-.badge.conflict{background:var(--orange-dim);border:1px solid rgba(255,144,82,.2);color:var(--orange)}
-.src-btn{background:none;border:1px solid var(--glass-border);color:var(--text-muted);border-radius:6px;padding:1px 7px;font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .2s}
-.src-btn:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
-.source-reveal{
-  margin-top:6px;
-  background:rgba(13,13,26,.8);
-  border:1px solid var(--glass-border);
-  border-left:2px solid var(--gold);
-  border-radius:10px;padding:9px 13px;
-  font-size:10.5px;color:var(--text-dim);
-  font-family:'JetBrains Mono',monospace;line-height:1.6;max-width:78%;
-  animation:fadeUp .15s ease-out;backdrop-filter:blur(10px);
+/* ── CHATS PANEL ── */
+.chats-panel{display:flex;flex-direction:column;height:100%;}
+.chats-head{
+  padding:14px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;gap:8px;
 }
-.source-title-line{font-size:8.5px;color:var(--gold);margin-bottom:4px;letter-spacing:.06em}
-.evidence-line{font-size:9px;color:var(--cyan);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.05)}
-.deduction-line{font-size:9px;color:var(--purple);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.05)}
-.feedback-row{display:flex;gap:5px;margin-top:5px}
-.fb-btn{background:none;border:1px solid var(--glass-border);color:var(--text-muted);border-radius:7px;padding:2px 9px;font-size:11px;cursor:pointer;transition:all .2s}
-.fb-btn.good:hover{border-color:var(--green);color:var(--green)}.fb-btn.bad:hover{border-color:var(--red);color:var(--red)}
-.fb-btn.voted-good{border-color:var(--green);color:var(--green);background:var(--green-dim)}
-.fb-btn.voted-bad{border-color:var(--red);color:var(--red);background:var(--red-dim)}
-
-.thinking{display:flex;align-items:center;gap:9px;color:var(--text-dim);font-size:11.5px;font-family:'JetBrains Mono',monospace}
-.dots span{display:inline-block;width:4px;height:4px;background:var(--gold);border-radius:50%;margin:0 2px;animation:blink 1.4s infinite}
-.dots span:nth-child(2){animation-delay:.22s}.dots span:nth-child(3){animation-delay:.44s}
-@keyframes blink{0%,80%,100%{opacity:.1}40%{opacity:1}}
-
-/* ── INPUT AREA with cosmic orb ── */
-.input-area{
-  background:rgba(7,7,16,.7);
-  backdrop-filter:blur(20px);
-  border-top:1px solid var(--border);
-  padding:14px 24px;flex-shrink:0;
-  position:relative;
+.chats-head-title{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;
+  color:var(--text-dim);text-transform:uppercase;flex:1;
 }
-.input-row{display:flex;gap:12px;align-items:center;position:relative;}
-
-/* Input wrapper for layering glow canvas behind the glass field */
-.input-wrap{flex:1;position:relative;}
-
-/* Glow canvas behind the input — filled by the stream animation */
-#inputGlowCanvas{
-  position:absolute;
-  inset:-5px;
-  border-radius:21px;
-  pointer-events:none;
-  z-index:0;
-  opacity:0;
-  transition:opacity .5s;
+.chats-new-btn{
+  width:26px;height:26px;flex-shrink:0;
+  background:rgba(110,168,255,.1);border:1px solid rgba(110,168,255,.25);
+  border-radius:8px;color:var(--blue);font-size:16px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .15s,border-color .15s;line-height:1;
 }
-#inputGlowCanvas.active{opacity:1;}
-
-/* Liquid glass input field */
-.input-field{
-  position:relative;z-index:1;
-  width:100%;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:16px;
-  padding:14px 20px;
-  font-family:'Syne',sans-serif;font-size:14px;
-  color:var(--text);outline:none;
-  transition:background .25s, border-color .25s, box-shadow .25s;
-  backdrop-filter:blur(24px);
-  -webkit-backdrop-filter:blur(24px);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,.10),
-    inset 0 -1px 0 rgba(0,0,0,.25),
-    0 4px 24px rgba(0,0,0,.35);
+.chats-new-btn:hover{background:rgba(110,168,255,.22);border-color:rgba(110,168,255,.5);}
+.chats-list{flex:1;overflow-y:auto;padding:6px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.05) transparent;}
+.chats-list::-webkit-scrollbar{width:3px}
+.chats-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.convo-item{
+  position:relative;padding:9px 28px 9px 10px;border-radius:10px;cursor:pointer;
+  transition:background .13s;border:1px solid transparent;margin-bottom:2px;
 }
-.input-field:focus{
-  border-color:rgba(255,255,255,.18);
-  background:rgba(255,255,255,.07);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,.14),
-    inset 0 -1px 0 rgba(0,0,0,.25),
-    0 8px 36px rgba(0,0,0,.4);
-}
-.input-field::placeholder{color:rgba(255,255,255,.18)}
+.convo-item:hover{background:rgba(255,255,255,.04);border-color:var(--border);}
+.convo-item.active{background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.2);}
+.convo-name{font-size:11.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+.convo-item.active .convo-name{color:var(--blue);}
+.convo-preview{font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.convo-date{font-size:8px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+.convo-del{position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:9px;cursor:pointer;padding:4px;border-radius:4px;opacity:0;transition:opacity .13s,color .13s;}
+.convo-item:hover .convo-del{opacity:1;}
+.convo-del:hover{color:var(--red);}
+.chats-foot{padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;}
+.knowledge-badge{display:flex;align-items:center;gap:6px;background:rgba(54,239,178,.05);border:1px solid rgba(54,239,178,.14);border-radius:8px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);}
+.knowledge-badge .kb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 6px rgba(54,239,178,.6);}
+.knowledge-badge .kb-lbl{color:var(--text-dim);}
 
-/* Gloss sheen on top of input — the glass highlight */
-.input-wrap::after{
-  content:'';
-  position:absolute;
-  top:2px;left:16px;right:16px;
-  height:35%;
-  border-radius:14px 14px 0 0;
-  background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,transparent 100%);
-  pointer-events:none;z-index:2;
+/* ── TOOLS PANEL (wiki/paste/etc) ── */
+.tools-panel{display:flex;flex-direction:column;height:100%;}
+.tools-head{
+  padding:14px 14px 0;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.tools-brand{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--text);margin-bottom:10px;}
+.tools-brand span{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--gold);background:var(--gold-dim);border:1px solid rgba(232,184,75,.2);border-radius:4px;padding:2px 5px;margin-left:6px;vertical-align:middle;}
+.tab-bar{display:flex;flex-wrap:wrap;flex-shrink:0;background:transparent;gap:0;}
+.tab-btn{flex:1;min-width:40px;padding:8px 2px;font-size:8.5px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);background:none;border:none;border-bottom:1.5px solid transparent;cursor:pointer;transition:all .18s;letter-spacing:.02em;white-space:nowrap;}
+.tab-btn:hover{color:var(--text-dim);}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold);}
+.tab-pane{display:none;flex:1;overflow-y:auto;padding:16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent;}
+.tab-pane.active{display:block;}
+
+/* ── CHAT AREA ── */
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+/* ── MISC SHARED ── */
+.lbl{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.18em;color:var(--text-dim);margin-bottom:9px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;}
+.section{margin-bottom:22px;}
+
+/* ── PATCH PREVIEW (self-modify) ── */
+.patch-preview{background:rgba(176,148,255,.06);border:1px solid rgba(176,148,255,.2);border-radius:12px;padding:14px;margin:8px 0;font-family:'JetBrains Mono',monospace;font-size:10px;}
+.patch-title{color:var(--purple);font-size:11px;font-weight:600;margin-bottom:8px;}
+.patch-desc{color:var(--text-dim);margin-bottom:10px;line-height:1.5;}
+.btn-apply-patch{background:rgba(176,148,255,.15);border:1px solid rgba(176,148,255,.4);border-radius:8px;color:var(--purple);padding:8px 14px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer;width:100%;transition:background .18s;}
+.btn-apply-patch:hover{background:rgba(176,148,255,.25);}
+
+.drawer-panel{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;}
+.drawer-panel .tab-pane{flex:1;overflow-y:auto;}
+
+/* ── OVERLAY FIX (required for rail + drawer) ── */
+.boot-overlay,
+.train-overlay,
+.kg-modal,
+.inner-monologue {
+  position:fixed !important;
+  inset:0 !important;
+  z-index:99999 !important;
+  display:none !important;
 }
 
-/* ── COSMIC ORB SEND BUTTON ── */
-.btn-send{
-  width:52px;height:52px;
-  border:none;cursor:pointer;
-  flex-shrink:0;
-  border-radius:50%;
-  position:relative;
-  background:transparent;
-  outline:none;
-  padding:0;
-  transition:transform .18s;
-}
-.btn-send:active{transform:scale(.9)}
-.btn-send:hover{transform:scale(1.06)}
-
-/* outer ambient glow — pure CSS, perfectly circular */
-.btn-send::before{
-  content:'';
-  position:absolute;
-  inset:-6px;
-  border-radius:50%;
-  background:radial-gradient(circle, rgba(176,148,255,.35) 0%, rgba(110,168,255,.2) 40%, transparent 70%);
-  animation:orbPulse 3s ease-in-out infinite;
-  pointer-events:none;
-}
-@keyframes orbPulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
-
-/* The canvas is the orb — perfectly round via CSS clip */
-#orbCanvas{
-  display:block;
-  border-radius:50%;
-  width:52px;height:52px;
-  position:relative;z-index:1;
-  /* glass sphere gloss overlay via pseudo on wrapper */
+.boot-overlay.show,
+.train-overlay.show,
+.kg-modal.show,
+.inner-monologue.show,
+.boot-overlay.active,
+.train-overlay.active,
+.kg-modal.active,
+.inner-monologue.active {
+  display:flex !important;
 }
 
-.orb-wrap{
-  position:relative;
-  width:52px;height:52px;
-  border-radius:50%;
-  overflow:hidden; /* CRITICAL: clips everything to circle */
-  pointer-events:none;
+.inner-monologue {
+  top:90px !important;
+  left:70px !important;
+  width:380px !important;
+  height:auto !important;
+  border-radius:14px !important;
 }
-
-/* glass specular highlight on top */
-.orb-wrap::after{
-  content:'';
-  position:absolute;
-  top:4px;left:7px;
-  width:18px;height:10px;
-  border-radius:50%;
-  background:radial-gradient(ellipse at center, rgba(255,255,255,.65) 0%, transparent 100%);
-  transform:rotate(-30deg);
-  pointer-events:none;
-  z-index:3;
-}
-
-/* typing state glow changes handled via JS speed */
-
-.input-hint{text-align:center;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-top:7px;letter-spacing:.06em}
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
-
-/* ── TRAIN OVERLAY ── */
-.train-overlay{position:fixed;inset:0;background:rgba(3,3,10,.92);backdrop-filter:blur(24px);z-index:2000;display:none;align-items:center;justify-content:center}
-.train-overlay.visible{display:flex}
-.train-panel{
-  width:480px;
-  background:rgba(13,13,26,.7);
-  backdrop-filter:blur(30px);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:20px;padding:36px 42px;position:relative;overflow:hidden;
-  box-shadow:0 0 80px rgba(110,168,255,.06), 0 0 40px rgba(176,148,255,.04), inset 0 1px 0 rgba(255,255,255,.08);
-}
-.train-panel::before{content:'LEXICA V12 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
-.tp-corner{position:absolute;width:16px;height:16px;border-color:rgba(110,168,255,.3)}
-.tp-corner.tl{top:8px;left:8px;border-top:1.5px solid;border-left:1.5px solid}
-.tp-corner.tr{top:8px;right:8px;border-top:1.5px solid;border-right:1.5px solid}
-.tp-corner.bl{bottom:8px;left:8px;border-bottom:1.5px solid;border-left:1.5px solid}
-.tp-corner.br{bottom:8px;right:8px;border-bottom:1.5px solid;border-right:1.5px solid}
-.scan-line{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(110,168,255,.5),rgba(176,148,255,.4),transparent);animation:scanMove 2.4s linear infinite;pointer-events:none}
-@keyframes scanMove{0%{top:-1%;opacity:0}5%{opacity:1}95%{opacity:.5}100%{top:101%;opacity:0}}
-.train-title{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:400;color:var(--text);margin:22px 0 4px;letter-spacing:.03em}
-.train-subtitle{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);margin-bottom:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.phases{display:flex;gap:0;margin-bottom:16px;border:1px solid rgba(255,255,255,.06);border-radius:8px;overflow:hidden}
-.phase-item{flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--text-muted);padding:7px 2px 5px;border-right:1px solid rgba(255,255,255,.05);letter-spacing:.06em;text-transform:uppercase;transition:all .35s;position:relative}
-.phase-item:last-child{border-right:none}.phase-dot{width:4px;height:4px;border-radius:50%;background:currentColor;margin:0 auto 4px}
-.phase-item.active{color:var(--cyan);background:rgba(34,211,238,.05)}.phase-item.done{color:var(--green);background:rgba(54,239,178,.04)}
-.phase-item.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5px;background:var(--cyan);animation:phaseG 1s ease-in-out infinite alternate}
-@keyframes phaseG{from{opacity:.4}to{opacity:1}}
-.progress-track{height:2px;background:rgba(255,255,255,.04);border-radius:1px;margin-bottom:18px;position:relative;overflow:visible}
-.progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple),var(--cyan));border-radius:1px;transition:width .25s ease;position:relative;box-shadow:0 0 12px rgba(110,168,255,.4)}
-.progress-fill::after{content:'';position:absolute;top:-2.5px;right:-4px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px rgba(34,211,238,.6)}
-.train-counters{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px}
-.train-counter{text-align:center;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:9px 4px;backdrop-filter:blur(8px)}
-.counter-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:400;color:var(--gold);display:block}
-.counter-lbl{font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;display:block}
-.train-log{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);min-height:14px;letter-spacing:.04em;text-align:center}
-
-/* KG Modal */
-.kg-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(16px);z-index:1500;display:none;align-items:center;justify-content:center}
-.kg-modal.visible{display:flex}
-.kg-modal-panel{
-  width:540px;max-height:65vh;
-  background:rgba(13,13,26,.85);
-  backdrop-filter:blur(24px);
-  border:1px solid var(--glass-border);
-  border-radius:16px;overflow:hidden;
-  display:flex;flex-direction:column;
-  box-shadow:0 24px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07);
-}
-.kg-modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.kg-modal-title{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--gold)}
-.kg-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px;transition:color .2s}.kg-close:hover{color:var(--red)}
-.kg-modal-body{overflow-y:auto;padding:14px 18px;flex:1}
-.triple-row{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-family:'JetBrains Mono',monospace;font-size:9.5px}
-.triple-s{color:var(--gold);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.triple-p{color:var(--purple);padding:1px 6px;background:var(--purple-dim);border-radius:4px;white-space:nowrap;flex-shrink:0}
-.triple-o{color:var(--text-dim);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.triple-conf{font-size:7.5px;color:var(--green);padding:1px 4px;background:var(--green-dim);border-radius:3px;flex-shrink:0}
-</style>
-<style>
-/* ── V10: INNER MONOLOGUE PANEL ── */
-.inner-monologue{position:fixed;bottom:90px;right:22px;width:340px;background:linear-gradient(135deg,rgba(6,6,10,.97),rgba(12,12,20,.97));border:1px solid rgba(212,160,23,.25);border-radius:14px;padding:14px 16px;z-index:500;animation:fadeUp .3s ease-out;box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 30px rgba(212,160,23,.04);display:none}
-.inner-monologue.visible{display:block}
-.im-label{font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.22em;color:rgba(212,160,23,.5);text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:6px}
-.im-label::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 1.5s infinite}
-.im-text{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);line-height:1.7;font-style:italic}
-.im-nodes{margin-top:8px;display:flex;gap:5px;flex-wrap:wrap}
-.im-node{font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--gold-dim);border:1px solid rgba(212,160,23,.2);color:var(--gold);border-radius:6px;padding:2px 8px}
-.im-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;transition:color .2s}
-.im-close:hover{color:var(--text)}
-
-/* ── V10: QUALIA STATE ── */
-.qualia-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan);transition:all .4s;margin-left:8px}
-.qualia-joy{background:rgba(212,160,23,.10);border-color:rgba(212,160,23,.3);color:var(--gold)}
-.qualia-pain{background:var(--red-dim);border-color:rgba(255,77,106,.3);color:var(--red)}
-.qualia-curiosity{background:var(--cyan-dim);border-color:rgba(34,211,238,.3);color:var(--cyan)}
-.qualia-confusion{background:var(--purple-dim);border-color:rgba(159,122,234,.3);color:var(--purple)}
-.qualia-neutral{background:var(--glass-bg);border-color:var(--glass-border);color:var(--text-dim)}
-
-/* ── V10: SOCIETY OF MIND DEBATE ── */
-.badge.skeptic{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);color:var(--red)}
-.badge.literal{background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.25);color:var(--green)}
-.badge.dreamer{background:rgba(212,160,23,.10);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
-.badge.society{background:var(--purple-dim);border:1px solid rgba(159,122,234,.25);color:var(--purple)}
-.badge.tms{background:var(--orange-dim);border:1px solid rgba(251,146,60,.25);color:var(--orange)}
-.badge.qualia{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.25);color:var(--cyan)}
-.badge.godel{background:rgba(159,122,234,.10);border:1px solid rgba(159,122,234,.3);color:var(--purple)}
-
-/* ── V10: COGNITION TAB ── */
-.cog-section{margin-bottom:18px}
-.cog-state-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.cog-state-card{flex:1;min-width:80px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:9px 10px;text-align:center}
-.cog-state-val{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--gold);display:block}
-.cog-state-lbl{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:.1em}
-.godel-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--purple);border-radius:8px;padding:9px 12px;margin-bottom:7px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);animation:fadeUp .2s ease-out}
-.godel-version{font-size:8px;color:var(--purple);margin-bottom:4px;letter-spacing:.08em}
-.godel-theorem{color:var(--text);font-size:10px;line-height:1.6}
-.debate-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:8px 11px;margin-bottom:6px;font-size:10.5px}
-.debate-winner{border-color:rgba(212,160,23,.3);background:var(--gold-dim)}
-.debate-agent{font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
-.debate-score{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-dim)}
-.hyper-badge{font-family:'JetBrains Mono',monospace;font-size:7.5px;padding:1px 6px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:4px;color:var(--cyan);vertical-align:middle;margin-left:4px}
-
-/* ── V10: TMS INDICATOR ── */
-.tms-cascade{background:var(--red-dim);border:1px solid rgba(255,77,106,.25);border-radius:9px;padding:8px 12px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--red);animation:fadeUp .2s ease-out}
-
-/* ── V12: NEURAL BOOT OVERLAY ── */
-.boot-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s ease,visibility .5s ease}
-.boot-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
-.boot-logo{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:transparent;background:linear-gradient(135deg,var(--gold),var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.2em;filter:drop-shadow(0 0 30px rgba(110,168,255,.4))}
-.boot-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:.22em;text-transform:uppercase}
-.boot-bar-wrap{width:340px;height:2px;background:rgba(255,255,255,.05);border-radius:4px;overflow:visible;position:relative}
-.boot-bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple),var(--cyan));border-radius:4px;transition:width .3s ease;width:0%;box-shadow:0 0 16px rgba(34,211,238,.5);position:relative}
-.boot-bar::after{content:'';position:absolute;right:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px rgba(34,211,238,.8)}
-.boot-status{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);max-width:340px;text-align:center;min-height:14px;letter-spacing:.04em}
-.boot-phase-list{display:flex;flex-direction:column;gap:5px;width:340px}
-.boot-phase{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)}
-.boot-phase.active{color:var(--gold)}.boot-phase.done{color:var(--green)}
-.boot-phase::before{content:'○';width:10px;flex-shrink:0}.boot-phase.done::before{content:'✓'}.boot-phase.active::before{content:'▶'}
-.boot-skip{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim);border-radius:8px;padding:6px 18px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer;margin-top:6px;transition:all .2s;backdrop-filter:blur(8px)}
-.boot-skip:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
-
-/* ── V12: NEURAL BADGES ── */
-.badge.n3{background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);color:var(--cyan)}
-.badge.slm{background:rgba(159,122,234,.12);border:1px solid rgba(159,122,234,.3);color:var(--purple)}
-.badge.graphrag{background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
-.badge.coref{background:rgba(61,220,132,.10);border:1px solid rgba(61,220,132,.25);color:var(--green)}
-
-/* ── V12: COREF LOG ── */
-.coref-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--green);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;animation:fadeUp .2s ease-out}
-.coref-nodes{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px}
-.coref-node{background:var(--green-dim);border:1px solid rgba(61,220,132,.2);border-radius:5px;padding:2px 7px;font-size:9px;color:var(--green)}
-.coref-arrow{color:var(--text-dim);font-size:10px}
-.coref-sim{font-size:8px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
-
-/* ── V12: SLM STATUS ── */
-.slm-status-bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;margin-bottom:10px;font-family:'JetBrains Mono',monospace;font-size:9px}
-.slm-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;transition:background .3s}
-.slm-dot.loading{background:var(--gold);animation:pulse 1.2s infinite}
-.slm-dot.ready{background:var(--green)}
-.slm-dot.error{background:var(--red)}
-.slm-label{color:var(--text-dim);flex:1}
-.slm-model-name{color:var(--text-muted);font-size:8px;margin-left:auto}
-
-/* ── V12: N3 ENTROPY QUERY ── */
-.n3-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--cyan);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;animation:fadeUp .2s ease-out}
-.n3-bridge{font-size:10px;color:var(--cyan);margin-bottom:3px}
-.n3-result{color:var(--text-dim);line-height:1.5}
-
-.centrality-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-family:'JetBrains Mono',monospace;font-size:9px}
-.centrality-label{color:var(--text);min-width:100px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.centrality-bar-bg{flex:1;height:5px;background:var(--glass-bg);border-radius:3px;overflow:hidden}
-.centrality-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--gold));border-radius:3px;transition:width .4s}
-.centrality-score{color:var(--text-muted);font-size:8px;min-width:36px;text-align:right}
-.centrality-user{color:var(--gold) !important}
-.centrality-user .centrality-bar-fill{background:linear-gradient(90deg,var(--gold),var(--gold2))}
-
-/* ── V11: ONTOLOGY DISPLAY ── */
-.ont-entry{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:7px 9px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:9px}
-.ont-node{color:var(--text);font-size:10px;min-width:80px}
-.ont-path{color:var(--text-muted);font-size:8px;line-height:1.5}
-.ont-category{display:inline-block;padding:1px 5px;background:var(--purple-dim);border:1px solid rgba(159,122,234,.2);border-radius:4px;color:var(--purple);font-size:7.5px;margin-top:2px}
-
-/* ── V11: INGESTION QUEUE ── */
-.ingestion-item{display:flex;align-items:center;gap:8px;padding:6px 9px;margin-bottom:4px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:9px}
-.ingestion-pending{color:var(--text-muted)}
-.ingestion-done{color:var(--green)}
-.ingestion-rejected{color:var(--red)}
-.ingestion-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.ingestion-dot.pending{background:var(--text-muted)}
-.ingestion-dot.done{background:var(--green)}
-.ingestion-dot.rejected{background:var(--red)}
-
-/* ── V11: CFG PARSE BADGE ── */
-.badge.cfg{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
-.badge.morph{background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.2);color:var(--green)}
-.badge.user-assert{background:var(--gold-dim);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
-.badge.levenshtein{background:var(--orange-dim);border:1px solid rgba(251,146,60,.2);color:var(--orange)}
-
 </style>
 </head>
 <body>
@@ -742,7 +269,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 <!-- V12 NEURAL BOOT OVERLAY -->
 <div class="boot-overlay" id="bootOverlay">
   <div class="boot-logo">LEXICA</div>
-  <div class="boot-sub">v12 · Neuro-Symbolic Ascension</div>
+  <div class="boot-sub">2.3 · Neuro-Symbolic Ascension</div>
   <div class="boot-bar-wrap"><div class="boot-bar" id="bootBar"></div></div>
   <div class="boot-status" id="bootStatus">Initializing symbolic core...</div>
   <div class="boot-phase-list">
@@ -798,157 +325,199 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
   </div>
 </div>
 
-<aside class="sidebar" id="sidebar">
-  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">‹</button>
-  <div class="logo-area">
-    <div class="logo-glyph"><span>Lx</span></div>
-    <div class="logo-text">
-      <h1>LEXICA <span class="version-dot">v12</span></h1>
-      <p>Neuro-Symbolic Ascension · The Absolute Limit</p>
-    </div>
-  </div>
-  <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('wiki')">🌐 Wiki</button>
-    <button class="tab-btn" onclick="switchTab('paste')">📝 Paste</button>
-    <button class="tab-btn" onclick="switchTab('sources')">📚 Sources</button>
-    <button class="tab-btn" onclick="switchTab('data')">💾 Data</button>
-    <button class="tab-btn" onclick="switchTab('words')">🔍 Words</button>
-    <button class="tab-btn" onclick="switchTab('cognition')">🧠 Mind</button>
-  </div>
-  <div class="tab-pane active" id="tab-wiki">
-    <div class="section">
-      <div class="lbl">Wikipedia Search</div>
-      <div class="wiki-input-wrap" style="position:relative">
-        <input class="wiki-input" id="wikiSearch" placeholder="Any topic..." autocomplete="off" oninput="onWikiInput(this.value)" onkeypress="if(event.key==='Enter')doWikiSearch()">
-        <button class="wiki-search-btn" onclick="doWikiSearch()">→</button>
-        <div class="wiki-suggestions" id="wikiSuggestions"></div>
+<div class="icon-rail" id="iconRail">
+  <div class="rail-logo"><span>Lx</span></div>
+  <button class="rail-btn" id="railBtnChats" onclick="railOpen('chats')" title="Conversations">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 3h14v10H2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5 16l2-3h4l2 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="rail-btn" id="railBtnTools" onclick="railOpen('tools')" title="Knowledge Tools">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 5v4l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+  <div class="rail-spacer"></div>
+  <div class="rail-version">2.3</div>
+</div>
+
+<div class="drawer" id="drawer">
+  <div class="drawer-inner">
+
+    <!-- CHATS PANEL -->
+    <div class="drawer-panel" id="panelChats">
+      <div class="chats-head">
+        <span class="chats-head-title">Conversations</span>
+        <button class="chats-new-btn" onclick="window.ConvoManager.createNew()" title="New chat">＋</button>
       </div>
-      <div class="wiki-status" id="wikiStatus"></div>
-    </div>
-    <div class="section">
-      <div class="lbl">Quick Fetch <span id="quickFetchRefresh" title="Refresh topics" style="cursor:pointer;opacity:.5;transition:opacity .2s;font-size:10px" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.5" onclick="refreshQuickTopics()">↻</span></div>
-      <div class="quick-btns" id="quickBtns"></div>
-    </div>
-    <div class="section" id="topicSection" style="display:none">
-      <div class="lbl">Learned Topics</div>
-      <div class="topic-cloud" id="topicCloud"></div>
-    </div>
-  </div>
-  <div class="tab-pane" id="tab-paste">
-    <div class="section">
-      <div class="lbl">Training Text <span id="charCount" style="color:var(--text-dim)"></span></div>
-      <textarea id="trainText" rows="10" placeholder="Paste any text to train Lexica..."></textarea>
-      <div class="file-drop" onclick="document.getElementById('fileUp').click()">
-        <input type="file" id="fileUp" accept=".txt,.md">
-        <div class="fi">📄</div><p>Drop .txt or .md file</p>
-      </div>
-      <div style="margin-top:8px"><input type="text" id="pasteTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
-      <button class="btn-primary" onclick="trainFromPaste()">⚡ Train on This</button>
-    </div>
-  </div>
-  <div class="tab-pane" id="tab-sources">
-    <div class="section">
-      <div class="lbl">Active Sources <span id="srcCount" style="color:var(--gold)">0</span></div>
-      <div id="srcList"><div class="no-sources">No sources yet.</div></div>
-    </div>
-    <div class="section" id="statsSection" style="display:none">
-      <div class="lbl">Knowledge Stats</div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="val" id="stSent">0</div><div class="slbl">Sentences</div></div>
-        <div class="stat-card"><div class="val" id="stTrip">0</div><div class="slbl">KG Triples</div></div>
-        <div class="stat-card"><div class="val" id="stVoc">0</div><div class="slbl">Vocabulary</div></div>
-        <div class="stat-card"><div class="val" id="stWord">0</div><div class="slbl">Word Profiles</div></div>
-        <div class="stat-card"><div class="val" id="stSynth">0</div><div class="slbl">Synthesized</div></div>
-        <div class="stat-card"><div class="val" id="stHyper">0</div><div class="slbl">HyperEdges</div></div>
+      <div class="chats-list" id="convoList"></div>
+      <div class="chats-foot">
+        <div class="knowledge-badge">
+          <div class="kb-dot"></div>
+          <span class="kb-lbl">Shared knowledge:&nbsp;</span>
+          <span id="kbCount">0 sentences</span>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="tab-pane" id="tab-data">
-    <div class="section">
-      <div class="lbl">Export</div>
-      <button class="btn-sm" style="width:100%;padding:11px" onclick="exportData()">⬇ Export lexica-v10.json</button>
-    </div>
-    <div class="section">
-      <div class="lbl">Import</div>
-      <div class="file-drop" onclick="document.getElementById('importFile').click()">
-        <input type="file" id="importFile" accept=".json">
-        <div class="fi">📥</div><p>Load .json export</p>
+
+    <!-- TOOLS PANEL -->
+    <div class="drawer-panel" id="panelTools" style="display:none">
+      <div class="tools-head">
+        <div class="tools-brand">LEXICA <span>2.3</span></div>
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
+          <button class="tab-btn" onclick="switchTab('paste')">📝</button>
+          <button class="tab-btn" onclick="switchTab('sources')">📚</button>
+          <button class="tab-btn" onclick="switchTab('data')">💾</button>
+          <button class="tab-btn" onclick="switchTab('words')">🔍</button>
+          <button class="tab-btn" onclick="switchTab('cognition')">🧠</button>
+          <button class="tab-btn" onclick="switchTab('graph')">⬡</button>
+        </div>
+      </div>
+      <div class="tab-pane active" id="tab-wiki">
+        <div class="section">
+          <div class="lbl">Wikipedia Search</div>
+          <div class="wiki-input-wrap" style="position:relative">
+            <input class="wiki-input" id="wikiSearch" placeholder="Any topic..." autocomplete="off" oninput="onWikiInput(this.value)" onkeypress="if(event.key==='Enter')doWikiSearch()">
+            <button class="wiki-search-btn" onclick="doWikiSearch()">→</button>
+            <div class="wiki-suggestions" id="wikiSuggestions"></div>
+          </div>
+          <div class="wiki-status" id="wikiStatus"></div>
+        </div>
+        <div class="section">
+          <div class="lbl">Quick Fetch <span id="quickFetchRefresh" title="Refresh topics" style="cursor:pointer;opacity:.5;transition:opacity .2s;font-size:10px" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.5" onclick="refreshQuickTopics()">↻</span></div>
+          <div class="quick-btns" id="quickBtns"></div>
+        </div>
+        <div class="section" id="topicSection" style="display:none">
+          <div class="lbl">Learned Topics</div>
+          <div class="topic-cloud" id="topicCloud"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-paste">
+        <div class="section">
+          <div class="lbl">Training Text <span id="charCount" style="color:var(--text-dim)"></span></div>
+          <textarea id="trainText" rows="10" placeholder="Paste any text to train Lexica..."></textarea>
+          <div class="file-drop" onclick="document.getElementById('fileUp').click()">
+            <input type="file" id="fileUp" accept=".txt,.md">
+            <div class="fi">📄</div><p>Drop .txt or .md file</p>
+          </div>
+          <div style="margin-top:8px"><input type="text" id="pasteTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
+          <button class="btn-primary" onclick="trainFromPaste()">⚡ Train on This</button>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-sources">
+        <div class="section">
+          <div class="lbl">Active Sources <span id="srcCount" style="color:var(--gold)">0</span></div>
+          <div id="srcList"><div class="no-sources">No sources yet.</div></div>
+        </div>
+        <div class="section" id="statsSection" style="display:none">
+          <div class="lbl">Knowledge Stats</div>
+          <div class="stats-grid">
+            <div class="stat-card"><div class="val" id="stSent">0</div><div class="slbl">Sentences</div></div>
+            <div class="stat-card"><div class="val" id="stTrip">0</div><div class="slbl">KG Triples</div></div>
+            <div class="stat-card"><div class="val" id="stVoc">0</div><div class="slbl">Vocabulary</div></div>
+            <div class="stat-card"><div class="val" id="stWord">0</div><div class="slbl">Word Profiles</div></div>
+            <div class="stat-card"><div class="val" id="stSynth">0</div><div class="slbl">Synthesized</div></div>
+            <div class="stat-card"><div class="val" id="stHyper">0</div><div class="slbl">HyperEdges</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-data">
+        <div class="section">
+          <div class="lbl">Export</div>
+          <button class="btn-sm" style="width:100%;padding:11px" onclick="exportData()">⬇ Export lexica-v14.json</button>
+        </div>
+        <div class="section">
+          <div class="lbl">Import</div>
+          <div class="file-drop" onclick="document.getElementById('importFile').click()">
+            <input type="file" id="importFile" accept=".json">
+            <div class="fi">📥</div><p>Load .json export</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="lbl">Reset</div>
+          <button class="btn-danger" onclick="resetAll()">✕ Clear All Training Data</button>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-words">
+        <div class="section">
+          <div class="lbl">Word Inspector</div>
+          <input class="word-lookup-input" id="wordInput" placeholder="Type any word from your data..." oninput="onWordInput(this.value)" onkeypress="if(event.key==='Enter')lookupWord(this.value)">
+          <div id="wordArea"></div>
+        </div>
+        <div class="section" id="wordBrowseSection" style="display:none">
+          <div class="lbl">Top Content Words</div>
+          <div id="wordBrowseTags"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-cognition">
+        <div class="cog-section">
+          <div class="lbl">Neural Status</div>
+          <div class="slm-status-bar" id="slmStatusBar">
+            <div class="slm-dot loading" id="slmDot"></div>
+            <div class="slm-label" id="slmLabel">Initializing...</div>
+            <div class="slm-model-name" id="slmModelName">—</div>
+          </div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Synthetic Qualia</div>
+          <div id="qualiaStateDisplay" style="padding:10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">Awaiting first thought...</div>
+          <div class="cog-state-row" id="qualiaMetrics"></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Graph Centrality <span style="font-size:7.5px;color:var(--text-muted)">(eigenvector)</span></div>
+          <div id="centralityPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Train to see centrality.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Ontological Taxonomy</div>
+          <div id="ontologyPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No nodes classified yet.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">N3 Bridge Log</div>
+          <div id="n3Log"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">N3 bridge queries appear here.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Ingestion Queue</div>
+          <div id="ingestionPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Gödelian Self-Modifications</div>
+          <div id="godelLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No self-modifications yet.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Society of Mind · Debate</div>
+          <div id="debateLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No debates yet.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">NanoCortex · Coref Merges</div>
+          <div id="corefLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Coref merges appear after training.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Inner Monologue Log</div>
+          <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle thoughts appear here.</div></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-graph">
+        <div class="hg-wrap" style="margin:-16px -16px 0;border-radius:0;border-left:none;border-right:none;border-top:none">
+          <canvas class="hg-canvas" id="hgCanvas" height="360"></canvas>
+          <div id="hgEmpty" class="hg-empty">Train on a source to visualize the knowledge graph.</div>
+        </div>
+        <div class="hg-controls" style="margin:0 -16px;padding:8px 14px">
+          <button class="hg-ctrl-btn active" id="hgBtnForce" onclick="hgSetLayout('force')">Force</button>
+          <button class="hg-ctrl-btn" id="hgBtnCircle" onclick="hgSetLayout('circle')">Circle</button>
+          <button class="hg-ctrl-btn" onclick="hgReset()">Reset</button>
+          <button class="hg-ctrl-btn" onclick="hgRefresh()">↻</button>
+          <span class="hg-node-count" id="hgStats"></span>
+        </div>
+        <div id="hgNodeCount" style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);padding:8px 0 0"></div>
       </div>
     </div>
-    <div class="section">
-      <div class="lbl">Reset</div>
-      <button class="btn-danger" onclick="resetAll()">✕ Clear All Training Data</button>
-    </div>
+
   </div>
-  <div class="tab-pane" id="tab-words">
-    <div class="section">
-      <div class="lbl">Word Inspector</div>
-      <input class="word-lookup-input" id="wordInput" placeholder="Type any word from your data..." oninput="onWordInput(this.value)" onkeypress="if(event.key==='Enter')lookupWord(this.value)">
-      <div id="wordArea"></div>
-    </div>
-    <div class="section" id="wordBrowseSection" style="display:none">
-      <div class="lbl">Top Content Words</div>
-      <div id="wordBrowseTags"></div>
-    </div>
-  </div>
-  <!-- ── V10: COGNITION / MIND TAB ── -->
-  <div class="tab-pane" id="tab-cognition">
-    <div class="cog-section">
-      <div class="lbl">Neural Cortex · V12 Status</div>
-      <div class="slm-status-bar" id="slmStatusBar">
-        <div class="slm-dot loading" id="slmDot"></div>
-        <div class="slm-label" id="slmLabel">Initializing...</div>
-        <div class="slm-model-name" id="slmModelName">—</div>
-      </div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">NanoCortex · Coreference Merge Log</div>
-      <div id="corefLog" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">Coref merges will appear here after training.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">N3 Entropy Resolution · Bridge Log</div>
-      <div id="n3Log" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">N3 neural bridge queries will appear here.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Synthetic Qualia · Current State</div>
-      <div id="qualiaStateDisplay" style="margin-top:8px;padding:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">
-        Awaiting first thought...
-      </div>
-      <div class="cog-state-row" id="qualiaMetrics"></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Graph Centrality · Top Nodes <span style="font-size:8px;color:var(--text-muted)">(eigenvector + user 10×)</span></div>
-      <div id="centralityPanel" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:10px;text-align:center">Train on a source to see centrality rankings.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Ontological Taxonomy · Recent Classifications</div>
-      <div id="ontologyPanel" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:10px;text-align:center">No nodes classified yet.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Autonomous Ingestion Queue</div>
-      <div id="ingestionPanel" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:10px;text-align:center">Ingestion idle. Will start after first training.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Gödelian Self-Modifications</div>
-      <div id="godelLog" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Society of Mind · Last Debate</div>
-      <div id="debateLog" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div></div>
-    </div>
-    <div class="cog-section">
-      <div class="lbl">Inner Monologue Log</div>
-      <div id="monologueLog" style="margin-top:6px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">Idle thoughts will appear here.</div></div>
-    </div>
-  </div>
-</aside>
+</div>
 
 <main class="chat-area">
   <header class="chat-header">
     <div class="model-info">
       <div class="model-avatar">Lx</div>
       <div>
-        <div class="model-name">LEXICA v12 — Neuro-Symbolic Ascension
+        <div class="model-name">LEXICA 2.3
           <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
         </div>
         <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
@@ -972,7 +541,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         </div>
       </button>
     </div>
-    <div class="input-hint">V12 NEURO-SYMBOLIC · NANO-CORTEX · WEBLLM · GRAPH-RAG · CFG · MORPHOLOGY · CENTRALITY · N3 ENTROPY</div>
+    <div class="input-hint">LEXICA 2.3 · NANO-CORTEX · WEBLLM · GRAPH-RAG · CFG · MORPHOLOGY · CENTRALITY · N3 ENTROPY</div>
   </div>
 </main>
 
@@ -2406,10 +1975,34 @@ class SynthesisEngine {
 
     if (!organized) return null;
     this._lastSubject = subject;
-    if (prefix) {
-      return prefix + organized.charAt(0).toLowerCase() + organized.slice(1);
+    const final = prefix
+      ? prefix + organized.charAt(0).toLowerCase() + organized.slice(1)
+      : organized;
+
+    // ── QUALITY GATE: reject output with stem artifacts ──
+    // Stem artifacts: words with no vowels, merged words (GermanyIs), BM25 index tokens
+    const words = final.split(/\s+/);
+    const badWords = words.filter(w => {
+      const clean = w.replace(/[^a-zA-Z]/g, '');
+      if (clean.length < 4) return false;
+      // No vowels = stem artifact
+      if (!/[aeiouAEIOU]/.test(clean)) return true;
+      // CamelCase in middle of a word (e.g. GermanyIs, Duinkerkenis)
+      if (/[a-z][A-Z]/.test(clean)) return true;
+      // Ends in "is is" pattern
+      return false;
+    });
+    const badRatio = badWords.length / Math.max(words.length, 1);
+    if (badRatio > 0.15) {
+      // Too many stem artifacts — fall back to evidence sentences
+      const goodEvidence = evidenceSentences
+        .filter(s => s && s.length > 20 && isValid(s))
+        .slice(0, 2);
+      if (goodEvidence.length) return goodEvidence.join(' ');
+      return null; // Let caller use fallback
     }
-    return organized;
+
+    return final;
   }
 
   _planContent(intent, subject, query, kgFacts, kgDerived, evidence, kg, recentWindow=[]) {
@@ -2831,24 +2424,29 @@ class CuriosityEngine {
   constructor(kg, qualia, onThought) {
     this.kg = kg;
     this.qualia = qualia;
-    this.onThought = onThought;   // callback(text, nodeA, nodeB)
+    this.onThought = onThought;
     this.lastInput = Date.now();
     this._interval = null;
     this.thoughtCount = 0;
-    this.lastBridgeAttempt = null;
+    this._queriedPairs = new Set();   // ALL pairs ever queried — never repeats
+    this._bridgeInFlight = false;     // only one bridge query at a time
+    this._lastBridgeTime = 0;         // min 3 min between any bridge queries
+    this._monologueCount = 0;         // cap inner monologue spam
   }
 
   resetTimer() { this.lastInput = Date.now(); }
 
   start() {
-    this._interval = setInterval(() => this._tick(), 5000);
+    this._interval = setInterval(() => this._tick(), 12000); // tick every 12s, not 5s
   }
 
   stop() { if (this._interval) { clearInterval(this._interval); this._interval = null; } }
 
   _tick() {
     const idleSecs = (Date.now() - this.lastInput) / 1000;
-    if (idleSecs < 60 || this.kg.count() < 6) return;
+    if (idleSecs < 90 || this.kg.count() < 6) return;
+    if (this._bridgeInFlight) return;
+    if (Date.now() - this._lastBridgeTime < 180000) return; // 3 min cooldown
     this._think();
   }
 
@@ -2878,12 +2476,12 @@ class CuriosityEngine {
         const a = topNodes[i], b = topNodes[j];
         // Avoid repeating the same bridge attempt
         const key = [a,b].sort().join('|');
-        if (key === this.lastBridgeAttempt) continue;
+        if (this._queriedPairs.has(key)) continue;    // skip any pair already tried
         const path = this.kg.findPath(a, b, 2);
         if (!path) {
           nodeA = a; nodeB = b;
           entropyScore = (freq.get(a)||0) + (freq.get(b)||0);
-          this.lastBridgeAttempt = key;
+          this._queriedPairs.add(key);               // mark as queried forever
           break outer;
         }
       }
@@ -2891,38 +2489,60 @@ class CuriosityEngine {
 
     if (!nodeA) return;
 
-    this.thoughtCount++;
+    this._lastBridgeTime = Date.now();
+    this.thoughtCount = (this.thoughtCount || 0) + 1;
     this.qualia.onEntropyGap(Math.min(1, entropyScore / 10));
-
-    const thoughts = [
-      `I know considerably about "${nodeA}" and also about "${nodeB}," yet no logical bridge connects them in my Hypergraph. Entropy score: ${entropyScore.toFixed(1)}. This gap is... structurally uncomfortable.`,
-      `Scanning topology... "${nodeA}" has ${Math.round(freq.get(nodeA)||0)} activation units. "${nodeB}" has ${Math.round(freq.get(nodeB)||0)}. They share no edge at depth ≤ 2. My graph is incomplete.`,
-      `[N3 QUERY SPAWNED] What is the relationship between "${nodeA}" and "${nodeB}"? The unresolved tension between these nodes is generating system-wide entropy. I need to know.`,
-      `Graph anomaly detected. "${nodeA}" and "${nodeB}" are among my most active concepts, yet they exist as isolated topological islands. I theorize a bridge exists. Seeking confirmation.`,
-    ];
-    const text = thoughts[this.thoughtCount % thoughts.length];
-    this.onThought(text, nodeA, nodeB);
-
-    // V12: Phase 3 — N3 Neural Query via NeuralMouth
-    // If SLM is ready, attempt to extract the missing bridge predicate
+    // Try SLM-generated genuine inner monologue first
     const nm = window._neuralMouth;
+    const _this = this;
+    if (nm && nm.ready) {
+      const kgCtx = this.kg.triples
+        .filter(t => t.alive !== false && (t.s === nodeA || t.o === nodeA || t.s === nodeB || t.o === nodeB))
+        .slice(0, 6)
+        .map(t => t.s + ' -> ' + t.p + ' -> ' + t.o)
+        .join('; ');
+      nm._generate(
+        'You are Lexica, reasoning privately. One sentence only. No "I am an AI." No quotes around node names. Be genuinely curious and analytical.',
+        'You notice your knowledge graph has no path between "' + nodeA + '" and "' + nodeB + '" (entropy: ' + entropyScore.toFixed(1) + '). Related facts: ' + (kgCtx || 'none yet') + '. Express a genuine analytical thought about this gap.',
+        60
+      ).then(txt => {
+        if (txt && txt.length > 10) {
+          _this.onThought(txt, nodeA, nodeB);
+        } else {
+          // Fallback: simple factual observation (no templates)
+          const aAct = Math.round(freq.get(nodeA)||0);
+          const bAct = Math.round(freq.get(nodeB)||0);
+          _this.onThought('"' + nodeA + '" (' + aAct + ' activations) and "' + nodeB + '" (' + bAct + ') have no graph path at depth 2. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
+        }
+      }).catch(() => {
+        _this.onThought('"' + nodeA + '" and "' + nodeB + '" are disconnected. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
+      });
+    } else {
+      // No SLM: emit factual observation, no templates
+      const aAct = Math.round(freq.get(nodeA)||0);
+      const bAct = Math.round(freq.get(nodeB)||0);
+      this.onThought('"' + nodeA + '" (' + aAct + ' activations) and "' + nodeB + '" (' + bAct + ') share no edge at depth 2. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
+    }
+
+    // N3 Neural Query — gated by in-flight lock so only ONE runs at a time
+    // nm already declared above — reuse it here
     if (nm && nm.ready && this.kg.triples.length > 0) {
+      this._bridgeInFlight = true;
       const corpus = this.kg.triples
         .filter(t => t.alive !== false && t.raw && t.raw.length > 15)
         .map(t => t.raw)
-        .slice(0, 60);
+        .slice(0, 40);
 
       nm.n3Bridge(nodeA, nodeB, corpus).then(result => {
+        this._bridgeInFlight = false;
         if (!result) return;
-        // Deterministically inject the discovered edge into the KG
         const subject = result.direction === 'B_to_A' ? nodeB : nodeA;
         const object  = result.direction === 'B_to_A' ? nodeA : nodeB;
         const pred    = result.predicate.replace(/\s+/g, '_').toLowerCase().slice(0, 30);
         this.kg.addHyperEdge(subject, pred, object, result.sentence, 'n3-bridge');
-        // Log to N3 panel
         addN3Entry(nodeA, nodeB, pred, result.sentence, entropyScore);
         addMsg('system', `🔭 <strong>N3 Bridge</strong>: "${nodeA}" <em>${pred.replace(/_/g,' ')}</em> "${nodeB}" — injected into Hypergraph.`);
-      }).catch(() => {});
+      }).catch(() => { this._bridgeInFlight = false; });
     }
   }
 }
@@ -3286,7 +2906,7 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
       const srcLabel=srcs===1?engine.sm.s[0].title:`${srcs} sources`;
       return{...base,conf:socialConf,text:`I am a knowledge synthesis intelligence. I am trained on ${n} sentence${n!==1?'s':''} from ${srcLabel}. What would you like to know?`,synthesized:false};
     }
-    return{...base,conf:socialConf,text:'I am Lexica v12 — Neuro-Symbolic Ascension. Fetch a Wikipedia article to get started.'};
+    return{...base,conf:socialConf,text:'I am Lexica 2.3. Fetch a Wikipedia article to get started.'};
   }
 
   if(intent==='farewell'){
@@ -3784,7 +3404,9 @@ class NeuralMouth {
   async socialResponse(intent, userInput, kgContext='') {
     if (!this.ready) return null;
     const kgCtx = kgContext ? `\nKnowledge context: ${kgContext.slice(0, 200)}` : '';
-    const system = `You are Lexica — a knowledge synthesis engine. You answer in plain, direct prose. ONE to TWO sentences maximum. No bullet points. No lists. No "I am an AI" disclaimers. No "Welcome to" phrases. Never repeat yourself.${kgCtx}`;
+    const system = 'You are Lexica. ' +
+      'You answer in plain, direct prose. ONE to TWO sentences maximum. No bullet points. No lists. No \"I am an AI\" disclaimers. Never repeat yourself. ' +
+      'You understand code, can read JavaScript, identify bugs, and propose improvements to your own architecture.' + kgCtx;
     const intentPrompts = {
       greeting:    `User: "${userInput}". Reply with a single short greeting. Introduce yourself as Lexica. Do NOT say "welcome" or "knowledge base".`,
       farewell:    `User: "${userInput}". Reply with a single brief farewell.`,
@@ -3802,15 +3424,20 @@ class NeuralMouth {
   }
 
   // Graph-RAG: translate verified KG triples into natural language
-  async graphRAG(kgFacts, query, intent) {
-    if (!this.ready || !kgFacts.length) return null;
-    const triplesText = kgFacts.slice(0,8).map(f => `${f.s} | ${f.p.replace(/_/g,' ')} | ${f.o}`).join('\n');
-    const system = `You are Lexica. Translate these verified facts into 1-3 plain sentences. Use ONLY the facts provided — no additions, no guesses. Present tense. No bullet points. No lists. No filler phrases.`;
-    const prompt = `Query: "${query}"\n\nVerified triples:\n${triplesText}\n\nTranslate into natural language:`;
+  async graphRAG(kgFacts, query, intent, evidenceSentences=[]) {
+    if (!this.ready) return null;
+    // Build context: prefer KG triples, supplement with evidence sentences
+    const triplesText = kgFacts.slice(0,8).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
+    const evidenceText = evidenceSentences.filter(s => s && s.length > 20).slice(0,4).join(' ');
+    if (!triplesText && !evidenceText) return null;
+    const context = [triplesText && ('KNOWLEDGE GRAPH:\n' + triplesText), evidenceText && ('EVIDENCE:\n' + evidenceText)].filter(Boolean).join('\n\n');
+    const system = 'You are Lexica. ' +
+      'Answer in 1-3 plain sentences using ONLY the provided context. No bullet points. No lists. No "I am an AI" phrases. ' +
+      'Be direct. Use present tense for facts. If the context does not answer the query, say so in one sentence.';
+    const prompt = 'Query: "' + query + '"\n\n' + context + '\n\nAnswer:';
     try {
-      const result = await this._generate(system, prompt, 200);
+      const result = await this._generate(system, prompt, 250);
       if (!result) return null;
-      // Strip any bullet-point formatting the model may produce
       const cleaned = result.replace(/^[\*\-•]\s*/gm,'').replace(/\n/g,' ').trim();
       return cleaned || null;
     } catch(e) { return null; }
@@ -3837,6 +3464,8 @@ class NeuralMouth {
     } catch(e) { return null; }
   }
 }
+
+
 
 
 // ─────────────────────────────────────────────────────
@@ -3899,7 +3528,7 @@ class Engine {
     const tag = this.sm.mkTag(title);
     onProgress('parse',0,0,0); await _yield();
     const ss = splitSentences(text);
-    if (ss.length < 3) throw new Error('Text too short (need 6+ sentences).');
+    if (ss.length < 1) throw new Error('No text to train on.');
     onProgress('parse',0.04,ss.length,0); await _yield();
 
     const CHUNK = 20;
@@ -4156,8 +3785,8 @@ class Engine {
     const evidenceSentences = rel.map(r=>r.s).filter(isValid);
 
     let tomPrefix = '';
-    const knownCount = subject ? this.tomTracker.alreadyKnows(subject) : 0;
-    if (knownCount >= 2) tomPrefix = `As I mentioned before, `;
+    // NOTE: Removed "As I mentioned before" prefix — it was firing incorrectly
+    // and felt like a prebaked template. If needed, SLM will handle continuity naturally.
 
     this.stateTracker.set('synthesizing');
     this.lastKgFacts = kgFacts.slice();
@@ -4176,14 +3805,15 @@ class Engine {
     let usedGraphRAG = false;
     let usedSLM = false;
 
-    // ── V12: GRAPH-RAG ── If NeuralMouth ready AND we have KG facts, use SLM
-    // The KG triples are the absolute source of truth — SLM only translates them
-    if (this.neuralMouth.ready && kgFacts.length >= 2) {
+    // ── SLM PRIMARY SYNTHESIS ── When SLM ready, it is THE primary output layer
+    // Pass both KG triples and top evidence sentences. SLM translates both.
+    if (this.neuralMouth.ready) {
       try {
-        const ragText = await this.neuralMouth.graphRAG(kgFacts, r, intent);
+        const ragText = await this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4));
         if (ragText && ragText.length > 20) {
           ansText = ragText;
           usedGraphRAG = true;
+          usedSLM = true;
         }
       } catch(e) { console.warn('[Graph-RAG] Error:', e); }
     }
@@ -4223,11 +3853,9 @@ class Engine {
     const synthesized = !!ansText && ansText.length > 10;
     if (!ansText||ansText.length<15) ansText = finalize(rel[0].s);
 
+    // TOM context: user emotional state (kept but prefix removed)
     const activeState = this.userCtx.activeState();
-    if (activeState&&this.userCtx.valence(activeState.adj)==='negative'&&!tomPrefix) {
-      if (activeState.daysSince>2.5&&activeState.daysSince<4) tomPrefix=`I recall you mentioned feeling ${activeState.adj} recently. `;
-    }
-    if (tomPrefix&&ansText) ansText = tomPrefix+ansText.charAt(0).toLowerCase()+ansText.slice(1);
+    // Don't prepend anything — let the SLM handle empathetic framing naturally
 
     this.tomTracker.record(kgFacts);
 
@@ -4281,18 +3909,18 @@ class Engine {
   }
 
   export() {
-    const data = {version:'lexica-v12',exportedAt:new Date().toISOString(),sources:this.sm.s,sentences:this.bm25.ss.map((s,i)=>({t:s,tag:this.bm25.tags[i]})),kg:this.kg.toJSON()};
+    const data = {version:'lexica-2.1',exportedAt:new Date().toISOString(),sources:this.sm.s,sentences:this.bm25.ss.map((s,i)=>({t:s,tag:this.bm25.tags[i]})),kg:this.kg.toJSON()};
     const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'lexica-v12.json';
+    a.download = 'lexica-v14.json';
     a.click();
     URL.revokeObjectURL(a.href);
   }
 
   async import(file) {
     const data = await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{res(JSON.parse(e.target.result));}catch(er){rej(er);}};r.onerror=rej;r.readAsText(file);});
-    if (!data.version?.includes('lexica')) throw new Error('Not a LEXICA export file.');
+    if (!data.version?.includes('lexica') && !data.version?.includes('lexica')) throw new Error('Not a LEXICA export file.');
     this.bm25=new BM25(); this.kg=new KnowledgeGraph(this.ets); this.sm=new SM();
     const byTag=new Map();
     (data.sentences||[]).forEach(({t,tag})=>{if(!byTag.has(tag))byTag.set(tag,[]);byTag.get(tag).push(t);});
@@ -4327,7 +3955,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. V12 synthesis ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 2.3 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -4387,6 +4015,83 @@ function updateQualiaUI() {
   }
 }
 
+// ── GLOBAL ENGINE INSTANCE ──
+const engine = new Engine();
+
+// ── BOOT UI HELPERS ──
+function updateBootBar(pct, msg) {
+  const bar = document.getElementById('bootBar');
+  const status = document.getElementById('bootStatus');
+  if (bar) bar.style.width = Math.round(pct * 100) + '%';
+  if (status && msg) status.textContent = msg;
+}
+function setBootPhase(idx, done) {
+  const el = document.getElementById('bphase' + idx);
+  if (!el) return;
+  el.classList.toggle('active', true);
+  el.classList.toggle('done', done);
+  if (done) el.style.opacity = '1';
+}
+function hideBootOverlay() {
+  const el = document.getElementById('bootOverlay');
+  if (!el) return;
+  el.style.opacity = '0';
+  el.style.transition = 'opacity .5s';
+  setTimeout(() => { el.style.display = 'none'; }, 550);
+}
+function skipBoot() {
+  hideBootOverlay();
+}
+
+// ── SLM STATUS BAR ──
+function updateSLMStatusUI(state, label, model) {
+  const dot   = document.getElementById('slmDot');
+  const lbl   = document.getElementById('slmLabel');
+  const mname = document.getElementById('slmModelName');
+  if (dot) {
+    dot.className = 'slm-dot';
+    if (state === 'ready')   dot.classList.add('ready');
+    else if (state === 'error') dot.classList.add('error');
+    else                     dot.classList.add('loading');
+  }
+  if (lbl   && label) lbl.textContent   = label;
+  if (mname && model) mname.textContent = model;
+}
+
+// ── COREF LOG UI ──
+function updateCorefUI() {
+  const el = document.getElementById('corefLog');
+  if (!el || !engine?.nanoCortex) return;
+  const merges = engine.nanoCortex.mergeLog || [];
+  if (!merges.length) return;
+  el.innerHTML = merges.slice(-20).reverse().map(m =>
+    '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-dim);padding:5px 8px;border-bottom:1px solid var(--border)">' +
+    '<span style="color:var(--cyan)">' + (m.a||'') + '</span> → <span style="color:var(--green)">' + (m.b||'') + '</span>' +
+    (m.sim ? ' <span style="color:var(--text-muted);font-size:8px">sim:' + m.sim.toFixed(2) + '</span>' : '') +
+    '</div>'
+  ).join('');
+}
+
+// ── WORD BROWSE UI ──
+function updateWordBrowse() {
+  const section = document.getElementById('wordBrowseSection');
+  const tags    = document.getElementById('wordBrowseTags');
+  if (!section || !tags || !engine?.wordProfiler?.size) return;
+  const top = [];
+  if (engine.wordProfiler.profiles) {
+    engine.wordProfiler.profiles.forEach((prof, word) => {
+      if (prof && word.length > 2) top.push({ word, score: prof.freq || 0 });
+    });
+  }
+  top.sort((a,b) => b.score - a.score);
+  const shown = top.slice(0, 40);
+  if (!shown.length) return;
+  section.style.display = 'block';
+  tags.innerHTML = shown.map(({word}) =>
+    '<span class="word-browse-tag" onclick="lookupWord(\'' + word.replace(/'/g,"\\'") + '\')">' + word + '</span>'
+  ).join('');
+}
+
 // ── GÖDEL LOG UI ──
 function updateGodelUI() {
   const el = document.getElementById('godelLog');
@@ -4421,33 +4126,47 @@ function updateDebateUI() {
 // ── INNER MONOLOGUE UI ──
 let _monologueLog = [];
 function showInnerMonologue(text, nodeA, nodeB) {
-  const panel = document.getElementById('innerMonologue');
-  const textEl = document.getElementById('imText');
-  const nodesEl = document.getElementById('imNodes');
-  textEl.textContent = text;
-  nodesEl.innerHTML = [nodeA, nodeB].filter(Boolean).map(n => `<span class="im-node">${n}</span>`).join('');
-  panel.classList.add('visible');
-  _monologueLog.unshift({text, nodeA, nodeB, ts: Date.now()});
-  if (_monologueLog.length > 10) _monologueLog.pop();
+  // Use requestIdleCallback to defer ALL DOM work to idle time — prevents lag spikes
+  const doWork = () => {
+    const panel = document.getElementById('innerMonologue');
+    const textEl = document.getElementById('imText');
+    const nodesEl = document.getElementById('imNodes');
+    if (textEl) textEl.textContent = text;
+    if (nodesEl) nodesEl.innerHTML = [nodeA, nodeB].filter(Boolean).map(n => '<span class="im-node">'+n+'</span>').join('');
+    if (panel) {
+      panel.classList.add('visible');
+      clearTimeout(panel._hideTimer);
+      panel._hideTimer = setTimeout(() => panel.classList.remove('visible'), 12000);
+    }
+    _monologueLog.unshift({text, nodeA, nodeB, ts: Date.now()});
+    if (_monologueLog.length > 10) _monologueLog.pop();
 
-  // Add to log tab
-  const logEl = document.getElementById('monologueLog');
-  if (logEl) {
-    logEl.innerHTML = _monologueLog.map(m =>
-      `<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:8px 11px;margin-bottom:6px;font-family:'JetBrains Mono',monospace">
-        <div style="font-size:7.5px;color:var(--gold);margin-bottom:4px">${new Date(m.ts).toLocaleTimeString()} · nodes: ${m.nodeA} ↔ ${m.nodeB}</div>
-        <div style="font-size:9.5px;color:var(--text-dim);line-height:1.65;font-style:italic">${m.text}</div>
-      </div>`).join('');
+    // Update log tab (batched — only if tab is visible)
+    const logEl = document.getElementById('monologueLog');
+    if (logEl && document.getElementById('tab-cognition')?.classList.contains('active')) {
+      logEl.innerHTML = _monologueLog.map(m =>
+        '<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:8px 11px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">' +
+        '<div style="font-size:7.5px;color:var(--gold);margin-bottom:4px">' + new Date(m.ts).toLocaleTimeString() + ' · nodes: ' + m.nodeA + ' ↔ ' + m.nodeB + '</div>' +
+        '<div style="font-size:9.5px;color:var(--text-dim);line-height:1.65;font-style:italic">' + m.text + '</div>' +
+        '</div>').join('');
+    }
+
+    // Chat system message: throttled (max 1 every 30s) to prevent spam
+    const now = Date.now();
+    if (!window._lastMonologueChatMsg || now - window._lastMonologueChatMsg > 30000) {
+      window._lastMonologueChatMsg = now;
+      addMsg('system', '🔍 <em>Inner Monologue:</em> ' + text.slice(0, 120) + (text.length > 120 ? '...' : ''));
+    }
+  };
+
+  if (window.requestIdleCallback) {
+    requestIdleCallback(doWork, { timeout: 3000 });
+  } else {
+    setTimeout(doWork, 0); // fallback: still async, just yield to event loop
   }
-
-  // Also add to chat as a system message
-  addMsg('system', `🔍 <em>Inner Monologue:</em> ${text.slice(0, 120)}${text.length > 120 ? '...' : ''}`);
-
-  // Auto-hide after 12 seconds
-  setTimeout(() => panel.classList.remove('visible'), 12000);
 }
-function closeMonologue() { document.getElementById('innerMonologue').classList.remove('visible'); }
-function resetIdleTimer() { if(engine) engine.curiosity.resetTimer(); }
+function closeMonologue() { const p=document.getElementById('innerMonologue'); if(p)p.classList.remove('visible'); }
+function resetIdleTimer() { if(typeof engine!=='undefined'&&engine&&engine.curiosity)engine.curiosity.resetTimer(); }
 
 // V11: UPDATE CENTRALITY PANEL
 function updateCentralityUI() {
@@ -4579,7 +4298,7 @@ async function trainFromPaste(){
   }catch(e){hideTrainOverlay();addMsg('system',`Error: ${e.message}`);setStatus(false,'error');}
 }
 
-function exportData(){if(!engine.trained){addMsg('system','Nothing to export.');return;}engine.export();addMsg('system','Exported lexica-v10.json');}
+function exportData(){if(!engine.trained){addMsg('system','Nothing to export.');return;}engine.export();addMsg('system','Exported lexica-v14.json');}
 function resetAll(){
   if(!confirm('Clear ALL training data and reset cognitive state?'))return;
   engine.curiosity.stop();
@@ -4599,7 +4318,15 @@ function resetAll(){
   addMsg('system','All training data cleared. Cognitive state reset.');
 }
 
-function switchTab(n){const names=['wiki','paste','sources','data','words','cognition'];document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===n));document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');}
+function switchTab(n){
+  const names=['wiki','paste','sources','data','words','cognition','graph'];
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===n));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  const pane=document.getElementById('tab-'+n);
+  if(pane)pane.classList.add('active');
+  // refresh hypergraph when graph tab opened
+  if(n==='graph'&&typeof hgRefresh==='function'){setTimeout(()=>{if(typeof resizeHgCanvas==='function')resizeHgCanvas();hgRefresh();},60);}
+}
 
 function updateUI(){
   const n=engine.bm25.ss.length;
@@ -4623,6 +4350,7 @@ function updateUI(){
   updateCentralityUI();
   updateOntologyUI();
   updateIngestionUI();
+  window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
 }
 function toggleTrust(tag){const s=engine.sm.get(tag);if(!s)return;const nt=!s.trusted;engine.setTrust(tag,nt);updateUI();addMsg('system',`"${s.title}" ${nt?'trusted (1.6× weight)':'untrusted (0.6× weight)'}`);}
 function rmSrc(tag){const s=engine.sm.get(tag);if(!s)return;if(!confirm(`Remove "${s.title}"?`))return;engine.rmSource(tag);updateUI();if(!engine.trained)setStatus(false,'awaiting training');addMsg('system',`Removed "${s.title}"`);}
@@ -4656,7 +4384,7 @@ function streamMsg(text, meta) {
   msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;
   const bubble=row.querySelector('.msg-bubble.ai');
   const speed=Math.max(5,Math.min(20,1600/text.length));let i=0;
-  function ty(){if(i<text.length){i++;bubble.innerHTML=text.slice(0,i)+'<span class="cursor">▋</span>';msgs.scrollTop=msgs.scrollHeight;setTimeout(ty,speed);}else{bubble.innerHTML=text;if(window._orbStreamDone)window._orbStreamDone();}}
+  function ty(){if(i<text.length){i++;bubble.innerHTML=text.slice(0,i)+'<span class="cursor">▋</span>';msgs.scrollTop=msgs.scrollHeight;setTimeout(ty,speed);}else{bubble.innerHTML=text;if(window._orbStreamDone)window._orbStreamDone();if(window.ConvoManager)window.ConvoManager.captureMessage('assistant',text,'<div>'+row.outerHTML+'</div>');}}
   bubble.addEventListener('click',()=>{bubble.innerHTML=text;i=text.length+1;},{once:true});
   setTimeout(ty,speed);
 }
@@ -4668,137 +4396,770 @@ function rmThink(){const e=document.getElementById('think');if(e)e.remove();}
 
 async function sendQ(){
   const inp=document.getElementById('qInput');const q=inp.value.trim();if(!q)return;
-  addMsg('user',q);inp.value='';showThinking();
+  window._addMsgReal('user',q);inp.value='';
   engine.curiosity.resetTimer();
+
+  // ── Self-modify intercept ──────────────────────────
+  if (window.SelfModify && window.SelfModify.isCodeIntent(q)) {
+    await window.SelfModify.modify(q);
+    return;
+  }
+
+  showThinking();
   let r;
   try {
     r=await engine.query(q);
   } catch(err) {
     rmThink();
-    addMsg('system',`⚠ Engine error: ${err.message||err}`);
+    window._addMsgReal('system',`⚠ Engine error: ${err.message||err}`);
     console.error('Lexica query error:',err);
     return;
   }
-  if(r._autoFetched){addMsg('system',`Auto-learned: <strong>${r._autoFetched}</strong>`);updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);}
+  if(r._autoFetched){window._addMsgReal('system',`Auto-learned: <strong>${r._autoFetched}</strong>`);updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);}
   rmThink();streamMsg(r.text,r);updateUI();
   updateQualiaUI();
+  window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
 }
-function clearChat(){if(confirm('Clear chat? Training stays.')){document.getElementById('messages').innerHTML='';addMsg('system','Chat cleared.');}}
+function clearChat(){if(confirm('Clear chat? Training stays.')){document.getElementById('messages').innerHTML='';const _ac=window.ConvoManager&&window.ConvoManager.getActive();if(_ac){_ac.messages=[];window.ConvoManager.save&&window.ConvoManager.save();window.ConvoManager.render&&window.ConvoManager.render();}window._addMsgReal('system','Chat cleared.');}}
 function clearCtx(){engine.ctx.clear();addMsg('system','Conversation context cleared.');}
 
-// WORD INSPECTOR
-const POS_COLORS={NOUN:'#5b8dee',PROPN:'#9f7aea',VERB:'#3ddc84',AUX:'#1ab86a',ADJ:'#f0c040',ADV:'#22d3ee',DET:'#64748b',PREP:'#475569',CONJ:'#374151',PRON:'#be185d',NUM:'#fb923c',PUNCT:'#2a2c3e'};
-let _wdTimer=null;
-function onWordInput(v){clearTimeout(_wdTimer);if(!v.trim()||v.length<2){document.getElementById('wordArea').innerHTML='';return;}_wdTimer=setTimeout(()=>lookupWord(v),280);}
-function lookupWord(word){
-  const area=document.getElementById('wordArea');
-  if(!engine.trained||!engine.wordProfiler.size){area.innerHTML='<div class="wp-not-found">Train on a source first, then explore any word.</div>';return;}
-  if(!word||!word.trim()){area.innerHTML='';return;}
-  const profile=engine.wordProfiler.fullProfile(word.toLowerCase().trim(),engine.semVec);
-  if(!profile){const sugg=[];engine.wordProfiler.profiles.forEach((_,k)=>{if(k.startsWith(word.toLowerCase().slice(0,3)))sugg.push(k);});const suggHtml=sugg.slice(0,8).map(s=>'<span class="word-browse-tag" onclick="lookupWord(\''+s+'\')">'+s+'</span>').join('')||'none';area.innerHTML='<div class="wp-not-found">Word "<strong>'+word+'</strong>" not in training data.<br>Similar: '+suggHtml+'</div>';return;}
-  renderWordProfile(profile,area);
-}
-function renderWordProfile(p,area){
-  const posBadges=p.posBreakdown.map(([pos,cnt])=>`<span class="pos-badge pos-${pos}" title="${cnt}">${pos}</span>`).join('');
-  const nerBadge=p.nerType?`<div class="wp-ner">🏷 ${p.nerType}</div>`:'';
-  const freqStat=`<div class="wp-stat">Frequency: <strong>${p.totalFreq}</strong> · Stem: <em>${p.stem}</em></div>`;
-  const neighborsHtml=p.related.length>0?p.related.slice(0,10).map(({word:w,sim})=>{const pct=Math.round(sim*100);return`<div class="sem-neighbor"><span class="sem-neighbor-word" onclick="lookupWord('${w}')">${w}</span><div class="sem-bar-wrap"><div class="sem-bar" style="width:${pct}%"></div></div><span class="sem-pct">${pct}%</span></div>`;}).join(''):'<div style="font-size:10.5px;color:var(--text-muted);font-family:monospace">More training data needed.</div>';
-  const posLabels={NOUN:'Common Noun',PROPN:'Proper Noun',VERB:'Verb',AUX:'Auxiliary',ADJ:'Adjective',ADV:'Adverb',DET:'Determiner',PREP:'Preposition',CONJ:'Conjunction',PRON:'Pronoun',NUM:'Number'};
-  const posDistHtml=p.posBreakdown.map(([pos,cnt])=>{const pct=Math.round(cnt/(p.totalFreq||1)*100);return`<div class="sem-neighbor"><span class="sem-neighbor-word" style="cursor:default">${posLabels[pos]||pos}</span><div class="sem-bar-wrap"><div class="sem-bar" style="width:${pct}%;background:${POS_COLORS[pos]||'var(--gold)'}"></div></div><span class="sem-pct">${pct}%</span></div>`;}).join('');
-  const samplesHtml=p.sampleSentences.slice(0,2).map(s=>{const hl=s.replace(new RegExp('\\b('+p.clean+'|'+p.word+'|'+p.stem+'[a-z]*)\\b','gi'),m=>`<span class="hl">${m}</span>`);return`<div class="wp-sample">${hl}</div>`;}).join('');
-  area.innerHTML=`<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:14px;margin-top:10px;animation:fadeUp .2s ease-out">
-    <div class="wp-word">${p.word}</div><div class="wp-pos-row">${posBadges}</div>
-    ${nerBadge}${freqStat}
-    <div class="wp-section"><div class="wp-section-title">POS Distribution</div>${posDistHtml}</div>
-    <div class="wp-section"><div class="wp-section-title">Semantic Neighbors (PMI)</div>${neighborsHtml}</div>
-    <div class="wp-section"><div class="wp-section-title">In Context</div>${samplesHtml||'<div style="font-size:10.5px;color:var(--text-muted)">No samples.</div>'}</div>
-  </div>`;
-}
-function updateWordBrowse(){
-  const sec=document.getElementById('wordBrowseSection'),tagsEl=document.getElementById('wordBrowseTags');
-  if(!engine.wordProfiler.size){sec.style.display='none';return;}
-  sec.style.display='block';
-  const topWords=[];engine.wordProfiler.profiles.forEach((p,k)=>{if(p.totalFreq>2&&k.length>3&&!['page','also','such','this','that','have','been','from','which','were','when','with','they','there','into','about','than','more','some','would','their','these','those','after','first','other'].includes(k))topWords.push({word:k,freq:p.totalFreq});});
-  topWords.sort((a,b)=>b.freq-a.freq);
-  tagsEl.innerHTML=topWords.slice(0,32).map(({word:w})=>`<span class="word-browse-tag" onclick="lookupWord('${w}')">${w}</span>`).join('');
-}
 
-// ─────────────────────────────────────────────────────
-// V12 UI HELPERS
-// ─────────────────────────────────────────────────────
-function updateCorefUI() {
-  const el = document.getElementById('corefLog');
-  if (!el || !engine.nanoCortex) return;
-  const log = engine.nanoCortex.mergeLog;
-  if (!log.length) return;
-  el.innerHTML = log.slice().reverse().slice(0,20).map(e =>
-    '<div class="coref-entry">' +
-    '<div class="coref-nodes">' +
-    '<span class="coref-node">' + e.a + '</span>' +
-    '<span class="coref-arrow">→</span>' +
-    '<span class="coref-node">' + e.canonical + '</span>' +
-    '</div>' +
-    '<div class="coref-sim">cosine sim: ' + e.sim + ' · merged as: ' + e.canonical + '</div>' +
-    '</div>'
-  ).join('');
-}
+window.ConvoManager = (function() {
+  let _convos = [];
+  let _activeId = null;
+  // Capture full HTML of each message row for restore
+  const _origAddMsg       = window.addMsg        || null;
+  const _origStreamMsg    = window.streamMsg     || null;
 
-function updateSLMStatusUI(state, label, model) {
-  const dot = document.getElementById('slmDot');
-  const lbl = document.getElementById('slmLabel');
-  const mdl = document.getElementById('slmModelName');
-  if (!dot || !lbl) return;
-  dot.className = 'slm-dot ' + (state || 'loading');
-  lbl.textContent = label || 'Initializing...';
-  if (mdl && model) mdl.textContent = model;
-}
-
-function addN3Entry(nodeA, nodeB, predicate, sentence, entropy) {
-  const el = document.getElementById('n3Log');
-  if (!el) return;
-  const placeholder = el.querySelector('div[style]');
-  if (placeholder) placeholder.remove();
-  const entry = document.createElement('div');
-  entry.className = 'n3-entry';
-  entry.innerHTML = '<div class="n3-bridge">🔭 "' + nodeA + '" <em>' + predicate.replace(/_/g,' ') + '</em> "' + nodeB + '"</div>' +
-    '<div class="n3-result">' + sentence + '</div>' +
-    '<div class="coref-sim">entropy: ' + (entropy||0).toFixed(1) + '</div>';
-  el.insertBefore(entry, el.firstChild);
-}
-
-function updateBootBar(pct, statusText) {
-  const bar = document.getElementById('bootBar');
-  const status = document.getElementById('bootStatus');
-  if (bar) bar.style.width = Math.round(Math.min(1, pct) * 100) + '%';
-  if (status && statusText) status.textContent = statusText;
-}
-
-function setBootPhase(idx, done) {
-  for (let i = 0; i < 4; i++) {
-    const el = document.getElementById('bphase' + i);
-    if (!el) continue;
-    el.className = 'boot-phase' + (i < idx ? ' done' : i === idx && !done ? ' active' : i === idx && done ? ' done' : '');
+  function save() {
+    try {
+      // Store up to 60 messages per convo, cap value at ~2MB total
+      const toSave = _convos.map(c => ({
+        id: c.id, name: c.name, createdAt: c.createdAt,
+        messages: c.messages.slice(-60)
+      }));
+      localStorage.setItem('lexica_convos_v2', JSON.stringify(toSave));
+    } catch(e) {}
   }
-}
 
-function skipBoot() {
-  document.getElementById('bootOverlay').classList.add('hidden');
-  addMsg('system', '⚠ Neural init skipped — running in Symbolic-only mode.');
-}
+  function getActive() {
+    return _convos.find(c => c.id === _activeId) || null;
+  }
 
-function hideBootOverlay() {
-  setTimeout(() => {
-    const bo = document.getElementById('bootOverlay');
-    if (bo) bo.classList.add('hidden');
-  }, 600);
-}
+  function render() {
+    const list = document.getElementById('convoList');
+    if (!list) return;
+    list.innerHTML = _convos.map(c => {
+      const active  = c.id === _activeId;
+      const preview = (c.messages.filter(m => m.role==='user').slice(-1)[0]?.content||'').slice(0,45);
+      const date    = new Date(c.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      return `<div class="convo-item${active?' active':''}" onclick="window.ConvoManager.switchTo('${c.id}')">` +
+        `<div class="convo-name">${escHtml(c.name)}</div>` +
+        (preview?`<div class="convo-preview">${escHtml(preview)}</div>`:'') +
+        `<div class="convo-date">${date}</div>` +
+        `<button class="convo-del" onclick="event.stopPropagation();window.ConvoManager.del('${c.id}')" title="Delete">✕</button>` +
+        `</div>`;
+    }).join('');
+    // Update knowledge badge
+    const kbEl = document.getElementById('kbCount');
+    if (kbEl) kbEl.textContent = engine.bm25.ss.length + ' sentences';
+  }
 
-// ─────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────
-const engine = new Engine();
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function createNew(silent) {
+    const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    const c = { id, name: 'New conversation', messages: [], createdAt: Date.now() };
+    _convos.unshift(c);
+    _activeId = id;
+    save();
+    render();
+    document.getElementById('messages').innerHTML = '';
+    if (!silent) _showIntro();
+  }
+
+  function _showIntro() {
+    const n    = typeof engine !== 'undefined' && engine && engine.bm25 ? engine.bm25.ss.length : 0;
+    const srcs = typeof engine !== 'undefined' && engine && engine.sm   ? engine.sm.s.length   : 0;
+    const msgs = document.getElementById('messages');
+    if (!msgs) return;
+    const row = document.createElement('div');
+    row.className = 'msg-row ai intro-msg';
+    let introHtml;
+    if (n > 0) {
+      introHtml = 'I have <strong>' + n + ' sentences</strong> from <strong>' + srcs + ' source' + (srcs !== 1 ? 's' : '') + '</strong> ready. Ask me anything about what I know.';
+    } else {
+      introHtml = 'I am Lexica — a neuro-symbolic reasoning engine. ' +
+        'Feed me knowledge by fetching a Wikipedia article or pasting text in the <strong>📝 Paste</strong> tab. ' +
+        'I will build a live knowledge graph and reason over it. ' +
+        '<br><br><span style="opacity:.55;font-size:9px">All conversations share the same knowledge base. ' +
+        'When I notice a flaw in my own reasoning, I will propose a fix — you approve or reject it.</span>';
+    }
+    // Try SLM-generated intro if available
+    const nm = window._neuralMouth;
+    if (nm && nm.ready && n > 0) {
+      nm._generate(
+        'You are Lexica. One or two sentences only. Be direct and self-aware. No "I am an AI" boilerplate.',
+        'Greet the user and tell them you have ' + n + ' sentences from ' + srcs + ' source(s) loaded, in your own words. Be brief and genuine.'
+      , 80).then(txt => {
+        if (txt && txt.length > 10) {
+          const bubble = row.querySelector('.msg-bubble');
+          if (bubble) bubble.innerHTML = txt;
+        }
+      }).catch(() => {});
+    }
+    row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai" style="font-size:12px;line-height:1.7">' + introHtml + '</div></div>';
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  async function nameFromPrompt(text) {
+    const c = getActive();
+    if (!c || c.name !== 'New conversation') return;
+    // Quick title from first message text
+    const cleaned = text.replace(/[<>&"]/g,'').trim();
+    c.name = cleaned.slice(0,36) + (cleaned.length > 36 ? '…' : '') || 'Conversation';
+    save(); render();
+    // Try to get a better name from the SLM
+    const nm = window._neuralMouth;
+    if (nm && nm.ready) {
+      try {
+        const name = await nm._generate(
+          'Generate a very short chat title (2-5 words max). Output ONLY the title, no punctuation at end, no quotes, no extra text.',
+          'First message: "' + text.slice(0, 80) + '"',
+          14
+        );
+        const cleaned2 = (name||'').replace(/^["']+|["']+$/g,'').trim().split('\n')[0];
+        if (cleaned2 && cleaned2.length >= 3 && cleaned2.length <= 50) {
+          c.name = cleaned2; save(); render();
+        }
+      } catch(e) {}
+    }
+  }
+
+  function captureMessage(role, content, rowHtml) {
+    const c = getActive();
+    if (!c) return;
+    c.messages.push({ role, content: String(content).slice(0,1500), html: rowHtml, ts: Date.now() });
+    save();
+    if (role === 'user') nameFromPrompt(content);
+  }
+
+  function switchTo(id) {
+    if (id === _activeId) return;
+    const c = _convos.find(c => c.id === id);
+    if (!c) return;
+    _activeId = id;
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = '';
+    c.messages.forEach(m => {
+      if (!m.html) return;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = m.html;
+      const row = tmp.firstElementChild;
+      if (row) msgs.appendChild(row);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+    save(); render();
+  }
+
+  function del(id) {
+    if (_convos.length === 1) { createNew(true); }
+    _convos = _convos.filter(c => c.id !== id);
+    if (_activeId === id) {
+      _activeId = _convos[0]?.id || null;
+      const msgs = document.getElementById('messages');
+      if (msgs) msgs.innerHTML = '';
+      if (_activeId) switchTo(_activeId);
+    }
+    save(); render();
+  }
+
+  function init() {
+    try {
+      const saved = localStorage.getItem('lexica_convos_v2');
+      if (saved) {
+        _convos = JSON.parse(saved);
+        _activeId = _convos[0]?.id || null;
+      }
+    } catch(e) { _convos = []; }
+    if (!_convos.length || !_activeId) createNew(true);
+    // Restore most recent conversation messages
+    const c = getActive();
+    if (c && c.messages.length > 0) {
+      const msgs = document.getElementById('messages');
+      if (msgs) {
+        msgs.innerHTML = '';
+        c.messages.forEach(m => {
+          if (!m.html) return;
+          const tmp = document.createElement('div');
+          tmp.innerHTML = m.html;
+          const row = tmp.firstElementChild;
+          if (row) msgs.appendChild(row);
+        });
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+    render();
+  }
+
+  // Expose knowledge badge update to updateUI
+  function updateKnowledgeBadge() {
+    const kbEl = document.getElementById('kbCount');
+    if (kbEl) kbEl.textContent = engine.bm25.ss.length + ' sentences';
+  }
+
+  return { createNew, switchTo, del, captureMessage, nameFromPrompt, init, render, updateKnowledgeBadge, getActive };
+})();
+
+// ─── Intercept addMsg to capture into active conversation ───
+window._addMsgReal = function(role, content) {
+  const msgs = document.getElementById('messages');
+  const row  = document.createElement('div');
+  if (role==='system') {
+    row.className='msg-row';
+    row.innerHTML=`<div class="msg-bubble system">— ${content} —</div>`;
+  } else if (role==='user') {
+    row.className='msg-row user';
+    row.innerHTML=`<div class="msg-avatar user">U</div><div class="msg-bubble-wrap"><div class="msg-bubble user">${content}</div></div>`;
+  } else {
+    row.className='msg-row ai';
+    row.innerHTML=`<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">${content}</div></div>`;
+  }
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (role !== 'system') window.ConvoManager.captureMessage(role, content, `<div>${row.outerHTML}</div>`);
+};
+// Override global addMsg
+window.addMsg = window._addMsgReal;
+
+
+// ═══════════════════════════════════════════════════════════════
+//  SELF-MODIFY ENGINE
+//  Lexica can read and modify its own source code using Claude API.
+//  Intent detection → source fetch → Claude patch generation → apply + download
+// ═══════════════════════════════════════════════════════════════
+window.SelfModify = (function() {
+
+  // Coding rules embedded into every self-modify prompt
+  const CODING_RULES = `
+LEXICA CODEBASE RULES:
+1. SINGLE FILE: One HTML file. All JS, CSS, HTML inline. No imports except CDN.
+2. NO NESTED TEMPLATE LITERALS: Use string concatenation for HTML inside JS.
+3. STRUCTURE: <style> for CSS, last <script> for all JS.
+4. LAYOUT (3 columns): #convosSidebar (left, conversations) | .chat-area (center) | #sidebar (right, tools). CSS: .convos-sidebar, .sidebar, .chat-area.
+5. ARCHITECTURE LAYERS: L1=Lexical, L2=BM25, L3=KG, L4=NER, L5=Synthesis, L6=Society, L7=Qualia, L8=Godel, L9=CFG, L10=NanoCortex, L11=NeuralMouth.
+6. GLOBALS: engine (Engine instance), window.ConvoManager (conversation manager), window.SelfModify (self-mod engine), window._neuralMouth (SLM), window._nanoCortex (embeddings).
+7. MESSAGES: window._addMsgReal(role, content) — adds+captures. streamMsg(text, meta) — animated AI reply with badges.
+8. CSS VARIABLES: --bg, --bg2, --bg3, --text, --text-dim, --text-muted, --border, --gold, --blue, --purple, --green, --red, --cyan, --orange, --glass-bg, --glass-border.
+9. PERFORMANCE: Heavy ops (BM25._rebuild, KG extraction) should use Web Workers with postMessage. Don't block the main thread.
+10. N3 BRIDGE: CuriosityEngine has _queriedPairs (Set) and _bridgeInFlight (bool). Never call N3 bridge in a tight loop. Min 3min cooldown between bridge queries.
+11. CONVERSATIONS: window.ConvoManager.captureMessage(role, content, rowHtml) captures messages. Don't use localStorage directly for messages.
+12. CSS CLASSES: Only add CSS near similar elements. Use existing color variables. Never hardcode colors.
+`;
+
+  // Detect if a user query is asking Lexica to modify its own code
+  function isCodeIntent(query) {
+    const q = query.toLowerCase();
+    const codeVerbs = ['add','create','build','implement','make','fix','change','update','modify','remove','delete','refactor','optimize','improve','rewrite','install','enable','disable'];
+    const codeNouns = ['worker','thread','sidebar','button','feature','function','animation','performance','lag','speed','color','style','font','layout','panel','tab','widget','dark mode','light mode','search','filter','export','import','modal','tooltip','shortcut','keyboard','cache','storage','api','endpoint','hook','event','listener'];
+    const hasSelfRef = /\b(yourself|your code|this app|this page|the app|lexica itself|self|you to|you can)\b/.test(q) || /\b(code|source|html|javascript|css|js)\b/.test(q);
+    const hasCodeVerb = codeVerbs.some(v => q.includes(v));
+    const hasCodeNoun = codeNouns.some(n => q.includes(n));
+    return (hasSelfRef && hasCodeVerb) || (hasCodeVerb && hasCodeNoun && q.length < 200);
+  }
+
+  // Fetch the current page source
+  async function getSource() {
+    try {
+      const resp = await fetch(location.href + '?_nocache=' + Date.now());
+      if (resp.ok) return await resp.text();
+    } catch(e) {}
+    // Fallback: use current DOM
+    return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  }
+
+  // Apply a list of patches to the source
+  function applyPatches(source, patches) {
+    let result = source;
+    let applied = 0;
+    for (const p of patches) {
+      if (!p.find || !p.replace && p.replace !== '') continue;
+      if (result.includes(p.find)) {
+        result = result.replace(p.find, p.replace);
+        applied++;
+      } else {
+        console.warn('[SelfModify] Patch not found:', p.find.slice(0,80));
+      }
+    }
+    return { result, applied, total: patches.length };
+  }
+
+  // Trigger download of the modified file
+  function downloadModified(html, desc) {
+    const blob   = new Blob([html], { type: 'text/html' });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement('a');
+    a.href       = url;
+    a.download   = 'lexica-v14-patched.html';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
+
+  // ── analyzeAndPlan: Lexica reads its own code and reasons about it ──
+  // No prebaked answers. Finds relevant source sections itself via keyword
+  // extraction, then uses its SLM to reason about what needs to change.
+  async function analyzeAndPlan(instruction, relevantSource) {
+    const nm = window._neuralMouth;
+    const sections = findRelevantCode(instruction, relevantSource);
+
+    if (nm && nm.ready) {
+      try {
+        const codeCtx = sections.map(function(s){ return '// === ' + s.kw + ' ===\n' + s.snippet; }).join('\n\n---\n\n');
+        const sysPrompt = 'You are Lexica reading your own source code to modify yourself.\n' + CODING_RULES;
+        const userPrompt = 'TASK: ' + instruction + '\n\nRELEVANT SOURCE SECTIONS:\n' + codeCtx.slice(0, 1400) + '\n\nRespond ONLY with valid JSON, no markdown fences:\n{"description":"what changes","patches":[{"find":"exact string","replace":"replacement","note":"why"}]}';
+        let raw = await nm._generate(sysPrompt, userPrompt, 300);
+        raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+        const jStart = raw.indexOf('{'), jEnd = raw.lastIndexOf('}');
+        if (jStart !== -1 && jEnd !== -1) {
+          const parsed = JSON.parse(raw.slice(jStart, jEnd + 1));
+          if (parsed && Array.isArray(parsed.patches)) return parsed;
+        }
+      } catch(e) {
+        console.warn('[SelfModify] SLM reasoning failed:', e.message);
+      }
+    }
+    const found = sections.map(function(s){ return s.kw; }).join(', ');
+    return {
+      description: 'Found relevant code at: ' + (found || 'no matches') + '. NeuralMouth (WebGPU) needed for autonomous patching.',
+      patches: [],
+      sections: sections
+    };
+  }
+
+  // Scan source for sections relevant to the instruction by extracting identifiers
+  // from the instruction itself and finding them in the actual source code.
+  function findRelevantCode(instruction, source) {
+    const found = [], seen = new Set();
+    const identifiers = (instruction.match(/\b([a-zA-Z_][a-zA-Z0-9_]{3,})\b/g) || []);
+    const unique = [...new Set(identifiers)].filter(function(id){ return source.indexOf(id) !== -1; }).slice(0, 8);
+    unique.forEach(function(kw) {
+      if (seen.has(kw)) return;
+      seen.add(kw);
+      const idx = source.indexOf(kw);
+      if (idx < 0) return;
+      let start = idx;
+      while (start > 0 && source[start] !== '\n') start--;
+      start = Math.max(0, start - 1);
+      found.push({ kw: kw, snippet: source.slice(start, Math.min(source.length, idx + 500)) });
+    });
+    return found;
+  }
+
+
+  // Main entry: perform the modification
+  async function modify(instruction) {
+    // Show a special thinking bubble
+    const msgs = document.getElementById('messages');
+    const thinking = document.createElement('div');
+    thinking.id = 'selfmod-thinking';
+    thinking.className = 'msg-row ai';
+    thinking.innerHTML = '<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking">reading source code<div class="dots"><span></span><span></span><span></span></div></div></div></div>';
+    msgs.appendChild(thinking);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    let source;
+    try {
+      source = await getSource();
+    } catch(e) {
+      thinking.remove();
+      window._addMsgReal('system', '⚠ Could not read source: ' + e.message);
+      return;
+    }
+
+    // Extract just the relevant sections to stay within context limits
+    // We send: full CSS block + full JS block (skip the raw HTML body)
+    const styleMatch  = source.match(/<style>([\s\S]*?)<\/style>/);
+    const scriptMatch = source.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
+    const relevantSource = [
+      '/* === CSS === */',
+      styleMatch ? styleMatch[0].slice(0, 40000) : '/* CSS not extracted */',
+      '/* === JAVASCRIPT === */',
+      scriptMatch ? scriptMatch[0].slice(0, 80000) : '/* JS not extracted */'
+    ].join('\n\n');
+
+    thinking.querySelector('.thinking div').textContent = 'generating code patch';
+
+    // ── LOCAL ANALYSIS (no API call) ──
+    // Lexica reasons about its own code using its SLM + rule-based pattern matching
+    let patchJson;
+    try {
+      patchJson = await analyzeAndPlan(instruction, relevantSource);
+    } catch(e) {
+      thinking.remove();
+      window._addMsgReal('system', '⚠ Self-modify analysis failed: ' + e.message);
+      return;
+    }
+
+    thinking.remove();
+
+    const { patches, description } = patchJson;
+    if (!patches || !patches.length) {
+      // Show explanation bubble
+      const row = document.createElement('div');
+      row.className = 'msg-row ai';
+      row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">' +
+        '<div class="patch-preview"><div class="patch-title">⚙ Code Analysis</div><div class="patch-desc">' + escHtml(description) + '</div></div>' +
+        '</div></div>';
+      msgs.appendChild(row);
+      msgs.scrollTop = msgs.scrollHeight;
+      return;
+    }
+
+    // Apply patches to full source
+    const { result, applied, total } = applyPatches(source, patches);
+
+    // Render a patch preview with download button
+    const patchSummary = patches.slice(0,5).map(p =>
+      '• ' + escHtml(p.note || p.find.slice(0,60).trim())
+    ).join('\n');
+
+    const bubId = 'sm-' + Date.now();
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+
+    const approveBtn = applied > 0
+      ? '<button onclick="window.SelfModify._approve(\''+bubId+'\')" style="flex:1;padding:9px;background:rgba(54,239,178,.12);border:1px solid rgba(54,239,178,.3);border-radius:9px;color:var(--green);font-family:JetBrains Mono,monospace;font-size:10px;cursor:pointer">✓ Approve &amp; Download</button>'
+      : '<div style="color:var(--red);font-size:10px">⚠ No patches applicable.</div>';
+    const rejectBtn = '<button onclick="window.SelfModify._reject(\''+bubId+'\')" style="flex:1;padding:9px;background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.2);border-radius:9px;color:var(--red);font-family:JetBrains Mono,monospace;font-size:10px;cursor:pointer">✕ Reject</button>';
+
+    row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">' +
+      '<div class="patch-preview">' +
+        '<div class="patch-title">🔧 Self-Modification Proposal</div>' +
+        '<div class="patch-desc">' + escHtml(description) + '</div>' +
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);white-space:pre-line;margin-bottom:8px">' + patchSummary + '</div>' +
+        '<div style="font-size:9px;color:var(--text-dim);margin-bottom:10px">' + applied + '/' + total + ' patches applicable · I will learn from your decision.</div>' +
+        '<div style="display:flex;gap:8px">' + approveBtn + (applied > 0 ? rejectBtn : '') + '</div>' +
+      '</div>' +
+    '</div></div>';
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    if (applied > 0) {
+      window._pendingPatches = window._pendingPatches || {};
+      window._pendingPatches[bubId] = { html: result, description, patches };
+    }
+    window._pendingDecisions = window._pendingDecisions || {};
+    window._pendingDecisions[bubId] = { description, patches };
+
+    window.ConvoManager.captureMessage('assistant',
+      'Self-mod proposal: ' + description + ' (' + applied + '/' + total + ' patches)',
+      '<div>' + row.outerHTML + '</div>'
+    );
+  }
+
+  function _approve(bubId) {
+    const p = (window._pendingPatches || {})[bubId];
+    if (!p) return;
+    downloadModified(p.html, p.description);
+    // Record approval
+    if (!window._selfModLog) window._selfModLog = [];
+    window._selfModLog.push({ verdict: 'approved', description: p.description, ts: Date.now() });
+    if (engine && engine.godel && typeof engine.godel.recordDecision === 'function') {
+      engine.godel.recordDecision('approved', p.description);
+    }
+    addMsg('system', '✓ Approved. Patched file downloading. Reload to apply.');
+    _markDecision(bubId, 'approved');
+  }
+
+  function _reject(bubId) {
+    const d = (window._pendingDecisions || {})[bubId];
+    if (!window._selfModLog) window._selfModLog = [];
+    window._selfModLog.push({ verdict: 'rejected', description: d?.description, ts: Date.now() });
+    if (engine && engine.godel && typeof engine.godel.recordDecision === 'function') {
+      engine.godel.recordDecision('rejected', d?.description);
+    }
+    addMsg('system', '✕ Rejected. I will note this and avoid similar proposals.');
+    _markDecision(bubId, 'rejected');
+  }
+
+  function _markDecision(bubId, verdict) {
+    // Find the card by scanning all msg-row elements for the button
+    const btns = document.querySelectorAll('[onclick*="' + bubId + '"]');
+    const card = btns.length ? btns[0].closest('.msg-bubble') : null;
+    if (card) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.remove());
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:8px;font-family:"JetBrains Mono",monospace;font-size:9px;color:' + (verdict === 'approved' ? 'var(--green)' : 'var(--text-muted)');
+      note.textContent = verdict === 'approved' ? '✓ Approved — learning from this.' : '✕ Rejected — learning from this.';
+      card.appendChild(note);
+    }
+  }
+
+  function _download(bubId) {
+    _approve(bubId); // Legacy alias
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  return { isCodeIntent, modify, _download };
+})();
+
+
+// ═══════════════════════════════════════════════════════════════
+//  HYPERGRAPH VISUALIZER — Force-directed canvas graph
+//  Renders the live KnowledgeGraph as an infinite scrollable canvas
+// ═══════════════════════════════════════════════════════════════
+(function initHypergraphViz() {
+  let canvas, ctx;
+  let nodes = [], edges = [];
+  let nodeMap = new Map();
+  let layoutMode = 'force';
+  let animFrame = null;
+  let pan = { x: 0, y: 0 };
+  let zoom = 1.0;
+  let dragging = false, dragStart = { x: 0, y: 0 }, panStart = { x: 0, y: 0 };
+  let selectedNode = null;
+  let tickCount = 0;
+  let simRunning = false;
+  let lastBuildTripleCount = -1;
+
+  window.hgSetLayout = function(mode) {
+    layoutMode = mode;
+    const fb = document.getElementById('hgBtnForce'), cb = document.getElementById('hgBtnCircle');
+    if (fb) fb.classList.toggle('active', mode==='force');
+    if (cb) cb.classList.toggle('active', mode==='circle');
+    if (mode==='circle') applyCircleLayout();
+    restartSim();
+  };
+  window.hgReset = function() { pan={x:0,y:0}; zoom=1.0; selectedNode=null; draw(); };
+  window.hgRefresh = function() { buildGraph(); restartSim(); };
+
+  function init() {
+    canvas = document.getElementById('hgCanvas');
+    if (!canvas) return;
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    bindEvents();
+    setInterval(tryRebuild, 4000);
+    tryRebuild();
+  }
+
+  function resizeCanvas() {
+    if (!canvas) return;
+  }
+  window.resizeHgCanvas = resizeCanvas;
+  function resizeCanvas_body() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement ? canvas.parentElement.clientWidth : 400;
+    canvas.width  = w * dpr;
+    canvas.height = 380 * dpr;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = '380px';
+    ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    draw();
+  }
+
+  function tryRebuild() {
+    if (typeof engine === 'undefined' || !engine || !engine.kg) return;
+    const tc = engine.kg.count();
+    if (tc === lastBuildTripleCount) return;
+    lastBuildTripleCount = tc;
+    buildGraph();
+    if (layoutMode === 'circle') applyCircleLayout();
+    restartSim();
+  }
+
+  function buildGraph() {
+    if (typeof engine === 'undefined' || !engine || !engine.kg) return;
+    const triples = engine.kg.triples.filter(t => t.alive !== false);
+    const emptyEl = document.getElementById('hgEmpty');
+    if (!triples.length) {
+      if (emptyEl) emptyEl.style.display = 'block';
+      nodes=[]; edges=[]; nodeMap.clear(); draw(); return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const newNodeMap = new Map();
+    triples.forEach(t => {
+      [t.s, t.o].forEach(label => {
+        if (typeof label !== 'string' || !label) return;
+        if (!newNodeMap.has(label)) {
+          const existing = nodeMap.get(label);
+          newNodeMap.set(label, {
+            id: label,
+            label: label.length > 18 ? label.slice(0,16)+'…' : label,
+            fullLabel: label,
+            x: existing ? existing.x : (Math.random()*500-250),
+            y: existing ? existing.y : (Math.random()*360-180),
+            vx: 0, vy: 0, degree: 0, r: 8, tag: t.tag
+          });
+        }
+      });
+    });
+    nodeMap = newNodeMap;
+    nodes = [...nodeMap.values()];
+
+    const edgeSeen = new Set();
+    edges = [];
+    triples.forEach(t => {
+      if (typeof t.s !== 'string' || typeof t.o !== 'string') return;
+      const key = t.s+'|'+t.p+'|'+t.o;
+      if (edgeSeen.has(key)) return;
+      edgeSeen.add(key);
+      edges.push({ source:t.s, target:t.o, label:String(t.p).replace(/_/g,' ').slice(0,16), isHyper:t.tag==='n3-bridge', tag:t.tag });
+    });
+
+    const deg = new Map();
+    edges.forEach(e => { deg.set(e.source,(deg.get(e.source)||0)+1); deg.set(e.target,(deg.get(e.target)||0)+1); });
+    nodes.forEach(n => { n.degree=deg.get(n.id)||0; n.r=Math.min(26,8+n.degree*2.2); });
+
+    const statsEl = document.getElementById('hgStats');
+    if (statsEl) statsEl.textContent = nodes.length+' nodes · '+edges.length+' edges';
+    const ncEl = document.getElementById('hgNodeCount');
+    if (ncEl) ncEl.textContent = '('+nodes.length+')';
+  }
+
+  function applyCircleLayout() {
+    const R = Math.min(180, 40+nodes.length*7);
+    nodes.forEach((n,i)=>{ const a=(i/nodes.length)*Math.PI*2-Math.PI/2; n.x=Math.cos(a)*R; n.y=Math.sin(a)*R; n.vx=0; n.vy=0; });
+  }
+
+  function restartSim() { tickCount=0; simRunning=true; if(!animFrame) animFrame=requestAnimationFrame(tick); }
+
+  function tick() {
+    animFrame=null;
+    if (simRunning && layoutMode==='force') {
+      runForce(); tickCount++;
+      if (tickCount<280) animFrame=requestAnimationFrame(tick); else simRunning=false;
+    }
+    draw();
+  }
+
+  function runForce() {
+    const alpha = Math.max(0.01, 0.5*Math.pow(0.97,tickCount));
+    const ideal = 80;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i],b=nodes[j]; const dx=b.x-a.x,dy=b.y-a.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||0.1; const f=(ideal*ideal)/dist*alpha*0.8;
+      const fx=(dx/dist)*f,fy=(dy/dist)*f; a.vx-=fx;a.vy-=fy;b.vx+=fx;b.vy+=fy;
+    }
+    edges.forEach(e=>{ const a=nodeMap.get(e.source),b=nodeMap.get(e.target); if(!a||!b)return;
+      const dx=b.x-a.x,dy=b.y-a.y; const dist=Math.sqrt(dx*dx+dy*dy)||0.1;
+      const f=(dist-ideal)/dist*alpha*0.4; a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f; });
+    nodes.forEach(n=>{ n.vx-=n.x*alpha*0.03;n.vy-=n.y*alpha*0.03; n.vx*=0.82;n.vy*=0.82; n.x+=n.vx;n.y+=n.vy; });
+  }
+
+  const TAG_COL = {
+    'user'      :{ fill:'rgba(232,184,75,.2)',  stroke:'rgba(232,184,75,.8)',  text:'#ffd166' },
+    'n3-bridge' :{ fill:'rgba(176,148,255,.2)', stroke:'rgba(176,148,255,.7)', text:'#b094ff' },
+    'wiki'      :{ fill:'rgba(54,239,178,.15)', stroke:'rgba(54,239,178,.6)',  text:'#36efb2' },
+    'self'      :{ fill:'rgba(110,168,255,.15)',stroke:'rgba(110,168,255,.6)', text:'#6ea8ff' },
+    'default'   :{ fill:'rgba(255,255,255,.05)',stroke:'rgba(255,255,255,.2)', text:'#8890a8' }
+  };
+  function nCol(n){ return n===selectedNode ? {fill:'rgba(255,144,82,.25)',stroke:'rgba(255,144,82,.9)',text:'#ff9052'} : (TAG_COL[n.tag]||TAG_COL.default); }
+
+  function draw() {
+    if (!canvas||!ctx) return;
+    const dpr = window.devicePixelRatio||1;
+    const W = canvas.width/dpr, H = canvas.height/dpr;
+    ctx.clearRect(0,0,W,H);
+    if (!nodes.length) return;
+    ctx.save();
+    ctx.translate(W/2+pan.x, H/2+pan.y);
+    ctx.scale(zoom,zoom);
+
+    // edges
+    edges.forEach(e=>{
+      const a=nodeMap.get(e.source),b=nodeMap.get(e.target); if(!a||!b)return;
+      const hi=selectedNode&&(e.source===selectedNode.id||e.target===selectedNode.id);
+      ctx.strokeStyle=e.isHyper?'rgba(176,148,255,'+(hi?'0.8':'0.3')+')':'rgba(110,168,255,'+(hi?'0.6':'0.12')+')';
+      ctx.lineWidth=hi?1.4:0.7; ctx.setLineDash(e.isHyper?[3,3]:[]);
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+      if ((zoom>0.8||hi)&&e.label) {
+        const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+        ctx.font='7px "JetBrains Mono",monospace'; ctx.fillStyle='rgba(80,90,130,'+(hi?'1':'0.7')+')'; ctx.textAlign='center';
+        ctx.fillText(e.label,mx,my-2);
+      }
+    });
+
+    // nodes
+    nodes.forEach(n=>{
+      const col=nCol(n); const r=n.r;
+      if (n===selectedNode) {
+        const grd=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*2.5);
+        grd.addColorStop(0,'rgba(255,144,82,0.2)'); grd.addColorStop(1,'rgba(255,144,82,0)');
+        ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(n.x,n.y,r*2.5,0,Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle=col.fill; ctx.strokeStyle=col.stroke; ctx.lineWidth=n===selectedNode?1.8:1;
+      ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      const fsz=Math.min(10,Math.max(7,7+n.degree*0.3));
+      ctx.font=(n.degree>2?'600 ':'')+fsz+'px "Syne",sans-serif';
+      ctx.fillStyle=col.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.label,n.x,n.y);
+    });
+    ctx.restore();
+
+    // selected info overlay
+    if (selectedNode) {
+      const iW=Math.min(W-20,240),iH=50;
+      ctx.fillStyle='rgba(3,3,10,0.85)'; ctx.strokeStyle='rgba(110,168,255,0.3)'; ctx.lineWidth=1;
+      ctx.beginPath(); if(ctx.roundRect)ctx.roundRect(10,10,iW,iH,8); else ctx.rect(10,10,iW,iH);
+      ctx.fill(); ctx.stroke();
+      ctx.font='600 10px "Syne",sans-serif'; ctx.fillStyle='#6ea8ff'; ctx.textAlign='left';
+      ctx.fillText(selectedNode.fullLabel.slice(0,34),20,28);
+      ctx.font='9px "JetBrains Mono",monospace'; ctx.fillStyle='#5a5d7a';
+      ctx.fillText('degree: '+selectedNode.degree+' · tag: '+(selectedNode.tag||'—'),20,46);
+    }
+  }
+
+  function bindEvents() {
+    if (!canvas) return;
+    canvas.addEventListener('mousedown',e=>{ dragging=true; dragStart={x:e.clientX,y:e.clientY}; panStart={x:pan.x,y:pan.y}; });
+    window.addEventListener('mouseup',()=>{ dragging=false; });
+    window.addEventListener('mousemove',e=>{ if(!dragging)return; pan.x=panStart.x+(e.clientX-dragStart.x); pan.y=panStart.y+(e.clientY-dragStart.y); if(!animFrame)animFrame=requestAnimationFrame(()=>{animFrame=null;draw();}); });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const wx = (mx - pan.x) / zoom;
+      const wy = (my - pan.y) / zoom;
+      zoom = Math.max(0.2, Math.min(4, zoom * (e.deltaY > 0 ? 0.88 : 1.14)));
+      pan.x = mx - wx * zoom;
+      pan.y = my - wy * zoom;
+      if (!animFrame) animFrame = requestAnimationFrame(() => { animFrame = null; draw(); });
+    }, { passive: false });
+    canvas.addEventListener('click',e=>{
+      const rect=canvas.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+      const W=canvas.width/dpr,H=canvas.height/dpr;
+      const mx=((e.clientX-rect.left)-W/2-pan.x)/zoom, my=((e.clientY-rect.top)-H/2-pan.y)/zoom;
+      let hit=null,minD=Infinity;
+      nodes.forEach(n=>{ const d=Math.sqrt((n.x-mx)**2+(n.y-my)**2); if(d<n.r+4&&d<minD){minD=d;hit=n;} });
+      selectedNode=(hit&&hit!==selectedNode)?hit:null; draw();
+    });
+    window.addEventListener('resize',resizeCanvas);
+  }
+
+  // Override switchTab to refresh HG when Mind tab opens
+  const origSwitchTab2 = window.switchTab;
+  window.switchTab = function(n) {
+    if (origSwitchTab2) origSwitchTab2(n);
+    if (n==='cognition') setTimeout(()=>{ if(!canvas)init(); else{resizeCanvas();tryRebuild();} },60);
+  };
+
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(init, 600));
+})();
+
 
 window.addEventListener('DOMContentLoaded', () => {
+  if (window.ConvoManager) window.ConvoManager.init();
   const ta=document.getElementById('trainText'),cc=document.getElementById('charCount');
   ta.addEventListener('input',()=>{const n=ta.value.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';});
   document.getElementById('fileUp').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{ta.value=ev.target.result;const n=ev.target.result.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';addMsg('system','Loaded: '+f.name);};r.readAsText(f);});
@@ -5088,34 +5449,54 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   })();
 
-  // ── SIDEBAR TOGGLE ──────────────────────────────────────────────────
-  (function initSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const toggle  = document.getElementById('sidebarToggle');
-    let collapsed = false;
+  // ── DUAL SIDEBAR TOGGLES ──────────────────────────────────────────
+  // ── ICON RAIL / DRAWER CONTROLLER ──
+  // Defined as global immediately so onclick attributes can call it before DOMContentLoaded
+  (function initRail() {
+    let _open = null; // 'chats' | 'tools' | null
 
-    function updateToggle() {
-      const w = collapsed ? 0 : sidebar.offsetWidth;
-      toggle.style.left   = w + 'px';
-      toggle.textContent  = collapsed ? '›' : '‹';
-    }
+    function railOpen(panel) {
+      const drawer   = document.getElementById('drawer');
+      const btnChats = document.getElementById('railBtnChats');
+      const btnTools = document.getElementById('railBtnTools');
+      const pChats   = document.getElementById('panelChats');
+      const pTools   = document.getElementById('panelTools');
+      if (!drawer) return;
 
-    window.toggleSidebar = function() {
-      collapsed = !collapsed;
-      if (collapsed) {
-        sidebar.classList.add('collapsed');
-        toggle.style.left  = '0px';
-        toggle.textContent = '›';
+      if (_open === panel) {
+        // clicking same icon = close
+        _open = null;
+        drawer.classList.remove('open');
+        btnChats.classList.remove('active');
+        btnTools.classList.remove('active');
       } else {
-        sidebar.classList.remove('collapsed');
-        // wait for transition to complete then reposition
-        setTimeout(updateToggle, 340);
-        toggle.textContent = '‹';
+        _open = panel;
+        drawer.classList.add('open');
+        if (panel === 'chats') {
+          btnChats.classList.add('active');
+          btnTools.classList.remove('active');
+          if(pChats) pChats.style.display='flex';
+          if(pTools) pTools.style.display='none';
+        } else {
+          btnTools.classList.add('active','tools');
+          btnChats.classList.remove('active');
+          if(pTools) pTools.style.display='flex';
+          if(pChats) pChats.style.display='none';
+        }
       }
+      // refresh HG if tools/graph visible
+      if(_open==='tools' && typeof hgRefresh==='function') setTimeout(hgRefresh,80);
     };
 
-    // Set initial position after layout
-    setTimeout(updateToggle, 50);
+    // Expose globally so HTML onclick can reach it
+    window.railOpen = railOpen;
+    // Legacy aliases so old code doesn't crash
+    window.toggleToolsSidebar  = function() { railOpen('tools'); };
+    window.toggleConvosSidebar = function() { railOpen('chats'); };
+    window.toggleSidebar       = function() { railOpen('tools'); };
+
+    // Open chats by default on load
+    setTimeout(()=>railOpen('chats'), 120);
   })();
 
   // ── REPLY BUBBLE BORDER ANIMATION ──────────────────────────────────
@@ -5416,7 +5797,7 @@ window.addEventListener('DOMContentLoaded', () => {
         setBootPhase(3, false);
         updateBootBar(0.95, 'NeuralMouth ready ✓');
         updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
-        addMsg('system', '🧠 <strong>V12 NeuralMouth online</strong> — Graph-RAG synthesis & N3 bridge active.');
+        addMsg('system', '🧠 <strong>Lexica 2.3 NeuralMouth online</strong> — Graph-RAG synthesis & N3 bridge active.');
       } else {
         setBootPhase(2, false);
         updateBootBar(0.95, 'WebLLM unavailable — symbolic fallback active');
@@ -5425,28 +5806,28 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
           updateSLMStatusUI('error', 'Neural layers unavailable — full symbolic mode', '—');
         }
-        addMsg('system', '⚠ WebGPU/WebLLM unavailable. Running in full symbolic mode (V11 fallback). All features work.');
+        addMsg('system', '⚠ WebGPU/WebLLM unavailable. Running in full symbolic mode. All features work.');
       }
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
       updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
-      console.error('[V12 boot]', e);
+      console.error('[Lexica 2.3 boot]', e);
     }
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'V12 Neuro-Symbolic ready ✓');
+    updateBootBar(1.0, 'Lexica 2.3 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
 
     // Post-boot: show welcome message
-    addMsg('system', 'LEXICA v12 — Neuro-Symbolic Ascension engine loaded.');
-    addMsg('system', 'V12 Stack: <strong>CFG · Morphology · Ontology · Centrality · NanoCortex · NeuralMouth · Graph-RAG · N3 Bridge · Society of Mind · Qualia · Gödel</strong>');
+    addMsg('system', 'LEXICA 2.3 engine loaded.');
+    addMsg('system', 'Lexica 2.3 Stack: <strong>CFG · Morphology · Ontology · Centrality · NanoCortex · NeuralMouth · Graph-RAG · N3 Bridge · Society of Mind · Qualia · Gödel</strong>');
     const introTriples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
     const introText=engine.synthesis.synthesize('what is lexica','what','lexica',introTriples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
     const hintTriple={s:'knowledge',p:'is_a',o:'obtained by fetching a Wikipedia article',conf:1.0,raw:'Knowledge is obtained by fetching a Wikipedia article.',tag:'self',alive:true,justified_by:new Set(['self']),subjectStr:()=>'knowledge',objectStr:()=>'obtained by fetching a Wikipedia article',isNested:()=>false};
     const hintText=engine.synthesis.synthesize('how to start','what','knowledge',[hintTriple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    const full=[(introText||'I am Lexica v12 — Neuro-Symbolic Ascension. I am idle.'),(hintText||'')].filter(Boolean).join(' ');
+    const full=[(introText||'I am Lexica 2.3. I am idle.'),(hintText||'')].filter(Boolean).join(' ');
     streamMsg(full,{strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:false,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
     updateUI();
   })();
