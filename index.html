@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEXICA 2.3</title>
+<title>LEXICA 2.4</title>
 <script type="module">
   // Pre-declare module-loaded globals for non-module access
   window._transformersReady = false;
@@ -78,15 +78,7 @@ self.addEventListener('fetch', e => {
   --glass-bg:rgba(255,255,255,.04);--glass-border:rgba(255,255,255,.10);--glass-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
-body{
-  font-family:'Syne',sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  height:100vh;
-  overflow:hidden;
-  display:flex;
-  position:relative;
-}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
 
 /* ── STARFIELD BACKGROUND ── */
 body::before{
@@ -100,7 +92,7 @@ body::before{
 body>*{position:relative;z-index:1;}
 
 /* ═══════════════════════════════════════════════
-   LEXICA 2.3 — ICON RAIL + DRAWER LAYOUT
+   LEXICA 2.4 — ICON RAIL + DRAWER LAYOUT
    body = flex row: [icon-rail 48px] [drawer 0–340px] [chat flex-1]
    Two icon buttons open drawers: Chats | Tools
    ═══════════════════════════════════════════════ */
@@ -233,35 +225,609 @@ body>*{position:relative;z-index:1;}
 .drawer-panel{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;}
 .drawer-panel .tab-pane{flex:1;overflow-y:auto;}
 
-/* ── OVERLAY FIX (required for rail + drawer) ── */
-.boot-overlay,
-.train-overlay,
-.kg-modal,
-.inner-monologue {
-  position:fixed !important;
-  inset:0 !important;
-  z-index:99999 !important;
-  display:none !important;
+
+/* Liquid glass inputs */
+.wiki-input-wrap{position:relative}
+.wiki-input,.word-lookup-input{
+  width:100%;
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  padding:11px 46px 11px 14px;
+  color:var(--text);
+  font-family:'Syne',sans-serif;font-size:13px;
+  outline:none;
+  transition:all .25s;
+  backdrop-filter:blur(10px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 16px rgba(0,0,0,.3);
+}
+.wiki-input:focus,.word-lookup-input:focus{
+  border-color:rgba(232,184,75,.4);
+  background:rgba(255,255,255,.06);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 20px rgba(232,184,75,.08);
+}
+.wiki-input::placeholder,.word-lookup-input::placeholder{color:var(--text-muted)}
+.wiki-search-btn{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:linear-gradient(135deg, rgba(232,184,75,.9), rgba(232,184,75,.7));
+  color:#000;border:none;border-radius:8px;width:28px;height:28px;
+  cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;font-weight:700;
+  box-shadow:0 2px 8px rgba(232,184,75,.3);
+}
+.wiki-search-btn:hover{background:var(--gold2);box-shadow:0 4px 16px rgba(232,184,75,.5)}
+.wiki-suggestions{
+  background:rgba(13,13,26,.95);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-radius:12px;margin-top:5px;overflow:hidden;
+  display:none;position:absolute;z-index:100;width:100%;
+  box-shadow:0 16px 48px rgba(0,0,0,.6);
+}
+.wiki-sug{padding:10px 14px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,.04)}.wiki-sug:last-child{border-bottom:none}.wiki-sug:hover{background:rgba(255,255,255,.05)}
+.s-title{font-size:12px;font-weight:600;color:var(--text)}.s-desc{font-size:10px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wiki-status{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);margin-top:7px;min-height:15px}
+
+/* Quick fetch chips — liquid glass pills */
+.quick-btns{display:flex;flex-wrap:wrap;gap:5px}
+.btn-sm{
+  background:var(--glass-bg);
+  color:var(--text-dim);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  padding:5px 11px;font-size:9.5px;
+  font-family:'JetBrains Mono',monospace;
+  cursor:pointer;transition:all .25s;
+  backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+.btn-sm:hover{border-color:rgba(232,184,75,.4);color:var(--gold);background:rgba(232,184,75,.07);box-shadow:0 0 12px rgba(232,184,75,.1)}
+
+textarea{
+  width:100%;
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-radius:12px;padding:12px 14px;
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;
+  resize:vertical;outline:none;transition:all .2s;line-height:1.6;
+  backdrop-filter:blur(10px);
+}
+textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var(--text-muted)}
+.file-drop{margin-top:8px;border:1px dashed rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--glass-bg)}
+.file-drop:hover{border-color:rgba(232,184,75,.3);background:var(--gold-dim)}.file-drop input{display:none}
+.file-drop p{font-size:10.5px;color:var(--text-dim)}.fi{font-size:16px;margin-bottom:3px}
+
+.btn-primary{
+  width:100%;
+  background:linear-gradient(135deg, var(--gold) 0%, rgba(255,209,102,.8) 100%);
+  color:#06060a;border:none;border-radius:12px;padding:12px;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;margin-top:8px;letter-spacing:.04em;
+  box-shadow:0 4px 20px rgba(232,184,75,.25);
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 32px rgba(232,184,75,.4)}
+.btn-danger{width:100%;background:var(--red-dim);color:var(--red);border:1px solid rgba(255,85,120,.2);border-radius:10px;padding:10px;font-size:10.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;margin-top:6px}
+.btn-danger:hover{background:rgba(255,85,120,.15)}
+
+.source-item{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:9px;animation:fadeUp .2s ease-out;backdrop-filter:blur(8px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.source-icon{font-size:15px;flex-shrink:0}.source-info{flex:1;min-width:0}
+.source-title{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.source-meta{font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.source-actions{display:flex;gap:5px;flex-shrink:0}
+.trust-btn{background:none;border:1px solid var(--glass-border);color:var(--text-dim);border-radius:6px;padding:3px 7px;font-size:8.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s}
+.trust-btn.trusted{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.trust-btn:hover{border-color:var(--green);color:var(--green)}
+.kg-view-btn{background:none;border:1px solid var(--glass-border);color:var(--text-dim);border-radius:6px;padding:3px 7px;font-size:8.5px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s}
+.kg-view-btn:hover{border-color:var(--purple);color:var(--purple)}
+.source-remove{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:2px 5px;border-radius:5px;transition:all .2s}
+.source-remove:hover{color:var(--red);background:var(--red-dim)}
+.no-sources{font-size:11px;color:var(--text-muted);text-align:center;padding:24px;font-family:'JetBrains Mono',monospace}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.stat-card{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:11px 13px;backdrop-filter:blur(8px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.stat-card .val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:400;color:var(--gold)}
+.stat-card .slbl{font-size:9.5px;color:var(--text-dim);margin-top:2px;font-family:'JetBrains Mono',monospace}
+.topic-cloud{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.topic-tag{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;padding:3px 10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:9.5px;display:inline-block;transition:all .2s;cursor:default;backdrop-filter:blur(6px)}
+.topic-tag:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
+
+/* Word Profile */
+.wp-word{font-size:24px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text);margin-bottom:8px}
+.wp-pos-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.pos-badge{padding:2px 8px;border-radius:8px;font-size:9.5px;font-family:'JetBrains Mono',monospace;font-weight:500;color:#000}
+.pos-NOUN{background:#5b8dee}.pos-PROPN{background:#9f7aea}.pos-VERB{background:#3ddc84}
+.pos-AUX{background:#1ab86a}.pos-ADJ{background:#f0c040}.pos-ADV{background:#22d3ee}
+.pos-DET{background:#64748b;color:#dde0f0}.pos-PREP{background:#475569;color:#dde0f0}
+.pos-CONJ{background:#374151;color:#dde0f0}.pos-PRON{background:#be185d}.pos-NUM{background:#fb923c}
+.wp-section{margin-bottom:13px}
+.wp-section-title{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim);margin-bottom:7px}
+.sem-neighbor{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px}
+.sem-neighbor-word{font-family:'JetBrains Mono',monospace;color:var(--text);min-width:90px;cursor:pointer}
+.sem-neighbor-word:hover{color:var(--gold)}
+.sem-bar-wrap{flex:1;background:rgba(255,255,255,.03);border-radius:3px;height:4px;overflow:hidden}
+.sem-bar{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:3px;transition:width .4s}
+.sem-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);min-width:28px;text-align:right}
+.wp-sample{background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:8px;padding:9px 11px;margin-bottom:5px;font-size:11px;line-height:1.65;color:var(--text-dim)}
+.wp-sample .hl{background:rgba(212,160,23,.15);color:var(--gold);border-radius:3px;padding:0 2px;font-weight:600}
+.wp-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:4px}
+.wp-ner{display:inline-block;padding:2px 8px;border-radius:7px;font-size:9.5px;font-family:'JetBrains Mono',monospace;background:var(--purple-dim);border:1px solid rgba(159,122,234,.25);color:var(--purple);margin-bottom:8px}
+.wp-not-found{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);text-align:center;padding:20px}
+.word-browse-tag{background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:20px;padding:2px 9px;font-size:9.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;display:inline-block;margin:2px}
+.word-browse-tag:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Chat area */
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-header{
+  background:rgba(7,7,16,.6);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;position:relative;
+}
+.chat-header::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(110,168,255,.2),rgba(176,148,255,.2),transparent)}
+.model-info{display:flex;align-items:center;gap:13px}
+.model-avatar{
+  width:38px;height:38px;
+  background:linear-gradient(135deg,rgba(232,184,75,.15) 0%,rgba(110,168,255,.1) 100%);
+  border:1px solid rgba(232,184,75,.3);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:var(--gold);
+  position:relative;
+  box-shadow:0 0 20px rgba(232,184,75,.1);
+}
+.model-avatar::after{
+  content:'12';position:absolute;bottom:-4px;right:-4px;
+  width:14px;height:14px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(232,184,75,.3);
+  border-radius:50%;font-size:7px;font-family:'JetBrains Mono',monospace;
+  color:var(--gold);display:flex;align-items:center;justify-content:center;
+  line-height:14px;text-align:center;
+}
+.model-name{font-weight:700;font-size:14px;letter-spacing:.02em}
+.model-status{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;margin-top:3px}
+.model-status.active{color:var(--green)}
+.pulse{width:5px;height:5px;background:currentColor;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.15}}
+.header-btns{display:flex;gap:7px}
+.btn-clear{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  color:var(--text-dim);border-radius:8px;padding:5px 12px;
+  font-size:10px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;transition:all .2s;
+  backdrop-filter:blur(8px);
+}
+.btn-clear:hover{border-color:rgba(255,85,120,.4);color:var(--red)}
+
+.messages{
+  flex:1;overflow-y:auto;padding:24px;
+  display:flex;flex-direction:column;gap:18px;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(110,168,255,.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(176,148,255,.03) 0%, transparent 50%),
+    var(--bg);
+}
+.msg-row{display:flex;align-items:flex-start;gap:10px;animation:fadeUp .2s ease-out}
+.msg-row.user{flex-direction:row-reverse}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg-avatar{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-top:2px}
+.msg-avatar.ai{background:linear-gradient(135deg,rgba(232,184,75,.2),rgba(110,168,255,.15));border:1px solid rgba(232,184,75,.2);color:var(--gold)}
+.msg-avatar.user{background:rgba(110,168,255,.08);border:1px solid rgba(110,168,255,.15);color:var(--blue)}
+
+/* Bubble wrapper constrains max width; bubble itself is inline so it hugs content */
+.msg-bubble-wrap{max-width:78%;display:flex;flex-direction:column;min-width:0;}
+.msg-row.user .msg-bubble-wrap{align-items:flex-end;}
+
+.msg-bubble{
+  display:inline-block; /* hugs short content naturally */
+  padding:12px 16px;
+  border-radius:16px;
+  font-size:14px;line-height:1.75;
+  word-break:break-word;
+  width:fit-content;
+  max-width:100%;
+}
+.msg-bubble.ai{
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.11);
+  border-top-left-radius:4px;cursor:pointer;
+  backdrop-filter:blur(28px);
+  -webkit-backdrop-filter:blur(28px);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.13),
+    inset 0 -1px 0 rgba(0,0,0,.18),
+    inset 1px 0 0 rgba(255,255,255,.04),
+    0 8px 32px rgba(0,0,0,.28),
+    0 2px 8px rgba(0,0,0,.2);
+}
+.msg-bubble.ai::before{
+  content:'';
+  position:absolute;
+  inset:0;border-radius:inherit;
+  background:linear-gradient(135deg, rgba(255,255,255,.06) 0%, transparent 60%);
+  pointer-events:none;
+}
+.msg-bubble.ai{position:relative;overflow:hidden;}
+.msg-bubble.user{
+  background:rgba(110,168,255,.08);
+  border:1px solid rgba(110,168,255,.14);
+  border-top-right-radius:4px;color:#a8c8ff;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 20px rgba(0,0,0,.2);
+  position:relative;overflow:hidden;
+}
+.msg-bubble.user::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg, rgba(110,168,255,.1) 0%, transparent 55%);
+  pointer-events:none;
+}
+.msg-bubble.system{
+  background:none;border:none;color:var(--text-dim);
+  font-size:10px;font-family:'JetBrains Mono',monospace;
+  text-align:center;display:block;width:100%;padding:2px;
 }
 
-.boot-overlay.show,
-.train-overlay.show,
-.kg-modal.show,
-.inner-monologue.show,
-.boot-overlay.active,
-.train-overlay.active,
-.kg-modal.active,
-.inner-monologue.active {
-  display:flex !important;
+.cursor{display:inline-block;color:var(--gold);animation:blink-c .75s infinite;font-weight:200}
+@keyframes blink-c{0%,100%{opacity:1}50%{opacity:0}}
+.msg-meta{font-size:9px;color:var(--text-muted);margin-top:5px;font-family:'JetBrains Mono',monospace;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.badge{padding:2px 7px;border-radius:8px;font-size:8px;font-family:'JetBrains Mono',monospace}
+.badge.synth{background:rgba(232,184,75,.1);border:1px solid rgba(232,184,75,.2);color:var(--gold)}
+.badge.kg{background:var(--purple-dim);border:1px solid rgba(176,148,255,.2);color:var(--purple)}
+.badge.fallback{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim)}
+.badge.refuted{background:var(--red-dim);border:1px solid rgba(255,85,120,.2);color:var(--red)}
+.badge.boolean{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
+.badge.conf-high{background:rgba(54,239,178,.08);border:1px solid rgba(54,239,178,.2);color:var(--green)}
+.badge.conf-med{background:rgba(255,144,82,.08);border:1px solid rgba(255,144,82,.2);color:var(--orange)}
+.badge.conf-low{background:var(--red-dim);border:1px solid rgba(255,85,120,.2);color:var(--red)}
+.badge.social{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
+.badge.auto{background:rgba(54,239,178,.08);border:1px solid rgba(54,239,178,.2);color:var(--green)}
+.badge.ctx{background:var(--blue-dim);border:1px solid rgba(110,168,255,.2);color:var(--blue)}
+.badge.cached{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim)}
+.badge.conflict{background:var(--orange-dim);border:1px solid rgba(255,144,82,.2);color:var(--orange)}
+.src-btn{background:none;border:1px solid var(--glass-border);color:var(--text-muted);border-radius:6px;padding:1px 7px;font-size:8px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .2s}
+.src-btn:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
+.source-reveal{
+  margin-top:6px;
+  background:rgba(13,13,26,.8);
+  border:1px solid var(--glass-border);
+  border-left:2px solid var(--gold);
+  border-radius:10px;padding:9px 13px;
+  font-size:10.5px;color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace;line-height:1.6;max-width:78%;
+  animation:fadeUp .15s ease-out;backdrop-filter:blur(10px);
+}
+.source-title-line{font-size:8.5px;color:var(--gold);margin-bottom:4px;letter-spacing:.06em}
+.evidence-line{font-size:9px;color:var(--cyan);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.05)}
+.deduction-line{font-size:9px;color:var(--purple);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.05)}
+.feedback-row{display:flex;gap:5px;margin-top:5px}
+.fb-btn{background:none;border:1px solid var(--glass-border);color:var(--text-muted);border-radius:7px;padding:2px 9px;font-size:11px;cursor:pointer;transition:all .2s}
+.fb-btn.good:hover{border-color:var(--green);color:var(--green)}.fb-btn.bad:hover{border-color:var(--red);color:var(--red)}
+.fb-btn.voted-good{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.fb-btn.voted-bad{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+
+.thinking{display:flex;align-items:center;gap:9px;color:var(--text-dim);font-size:11.5px;font-family:'JetBrains Mono',monospace}
+.dots span{display:inline-block;width:4px;height:4px;background:var(--gold);border-radius:50%;margin:0 2px;animation:blink 1.4s infinite}
+.dots span:nth-child(2){animation-delay:.22s}.dots span:nth-child(3){animation-delay:.44s}
+@keyframes blink{0%,80%,100%{opacity:.1}40%{opacity:1}}
+
+/* ── INPUT AREA with cosmic orb ── */
+.input-area{
+  background:rgba(7,7,16,.7);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  padding:14px 24px;flex-shrink:0;
+  position:relative;
+}
+.input-row{display:flex;gap:12px;align-items:center;position:relative;}
+
+/* Input wrapper for layering glow canvas behind the glass field */
+.input-wrap{flex:1;position:relative;}
+
+/* Glow canvas behind the input — filled by the stream animation */
+#inputGlowCanvas{
+  position:absolute;
+  inset:-5px;
+  border-radius:21px;
+  pointer-events:none;
+  z-index:0;
+  opacity:0;
+  transition:opacity .5s;
+}
+#inputGlowCanvas.active{opacity:1;}
+
+/* Liquid glass input field */
+.input-field{
+  position:relative;z-index:1;
+  width:100%;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:16px;
+  padding:14px 20px;
+  font-family:'Syne',sans-serif;font-size:14px;
+  color:var(--text);outline:none;
+  transition:background .25s, border-color .25s, box-shadow .25s;
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.25),
+    0 4px 24px rgba(0,0,0,.35);
+}
+.input-field:focus{
+  border-color:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.07);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(0,0,0,.25),
+    0 8px 36px rgba(0,0,0,.4);
+}
+.input-field::placeholder{color:rgba(255,255,255,.18)}
+
+/* Gloss sheen on top of input — the glass highlight */
+.input-wrap::after{
+  content:'';
+  position:absolute;
+  top:2px;left:16px;right:16px;
+  height:35%;
+  border-radius:14px 14px 0 0;
+  background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,transparent 100%);
+  pointer-events:none;z-index:2;
 }
 
-.inner-monologue {
-  top:90px !important;
-  left:70px !important;
-  width:380px !important;
-  height:auto !important;
-  border-radius:14px !important;
+/* ── COSMIC ORB SEND BUTTON ── */
+.btn-send{
+  width:52px;height:52px;
+  border:none;cursor:pointer;
+  flex-shrink:0;
+  border-radius:50%;
+  position:relative;
+  background:transparent;
+  outline:none;
+  padding:0;
+  transition:transform .18s;
 }
+.btn-send:active{transform:scale(.9)}
+.btn-send:hover{transform:scale(1.06)}
+
+/* outer ambient glow — pure CSS, perfectly circular */
+.btn-send::before{
+  content:'';
+  position:absolute;
+  inset:-6px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(176,148,255,.35) 0%, rgba(110,168,255,.2) 40%, transparent 70%);
+  animation:orbPulse 3s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes orbPulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+
+/* The canvas is the orb — perfectly round via CSS clip */
+#orbCanvas{
+  display:block;
+  border-radius:50%;
+  width:52px;height:52px;
+  position:relative;z-index:1;
+  /* glass sphere gloss overlay via pseudo on wrapper */
+}
+
+.orb-wrap{
+  position:relative;
+  width:52px;height:52px;
+  border-radius:50%;
+  overflow:hidden; /* CRITICAL: clips everything to circle */
+  pointer-events:none;
+}
+
+/* glass specular highlight on top */
+.orb-wrap::after{
+  content:'';
+  position:absolute;
+  top:4px;left:7px;
+  width:18px;height:10px;
+  border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(255,255,255,.65) 0%, transparent 100%);
+  transform:rotate(-30deg);
+  pointer-events:none;
+  z-index:3;
+}
+
+/* typing state glow changes handled via JS speed */
+
+.input-hint{text-align:center;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-top:7px;letter-spacing:.06em}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
+
+/* ── TRAIN OVERLAY ── */
+.train-overlay{position:fixed;inset:0;background:rgba(3,3,10,.92);backdrop-filter:blur(24px);z-index:2000;display:none;align-items:center;justify-content:center}
+.train-overlay.visible{display:flex}
+.train-panel{
+  width:480px;
+  background:rgba(13,13,26,.7);
+  backdrop-filter:blur(30px);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:36px 42px;position:relative;overflow:hidden;
+  box-shadow:0 0 80px rgba(110,168,255,.06), 0 0 40px rgba(176,148,255,.04), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.train-panel::before{content:'LEXICA V12 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
+.tp-corner{position:absolute;width:16px;height:16px;border-color:rgba(110,168,255,.3)}
+.tp-corner.tl{top:8px;left:8px;border-top:1.5px solid;border-left:1.5px solid}
+.tp-corner.tr{top:8px;right:8px;border-top:1.5px solid;border-right:1.5px solid}
+.tp-corner.bl{bottom:8px;left:8px;border-bottom:1.5px solid;border-left:1.5px solid}
+.tp-corner.br{bottom:8px;right:8px;border-bottom:1.5px solid;border-right:1.5px solid}
+.scan-line{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(110,168,255,.5),rgba(176,148,255,.4),transparent);animation:scanMove 2.4s linear infinite;pointer-events:none}
+@keyframes scanMove{0%{top:-1%;opacity:0}5%{opacity:1}95%{opacity:.5}100%{top:101%;opacity:0}}
+.train-title{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:400;color:var(--text);margin:22px 0 4px;letter-spacing:.03em}
+.train-subtitle{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);margin-bottom:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phases{display:flex;gap:0;margin-bottom:16px;border:1px solid rgba(255,255,255,.06);border-radius:8px;overflow:hidden}
+.phase-item{flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--text-muted);padding:7px 2px 5px;border-right:1px solid rgba(255,255,255,.05);letter-spacing:.06em;text-transform:uppercase;transition:all .35s;position:relative}
+.phase-item:last-child{border-right:none}.phase-dot{width:4px;height:4px;border-radius:50%;background:currentColor;margin:0 auto 4px}
+.phase-item.active{color:var(--cyan);background:rgba(34,211,238,.05)}.phase-item.done{color:var(--green);background:rgba(54,239,178,.04)}
+.phase-item.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5px;background:var(--cyan);animation:phaseG 1s ease-in-out infinite alternate}
+@keyframes phaseG{from{opacity:.4}to{opacity:1}}
+.progress-track{height:2px;background:rgba(255,255,255,.04);border-radius:1px;margin-bottom:18px;position:relative;overflow:visible}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple),var(--cyan));border-radius:1px;transition:width .25s ease;position:relative;box-shadow:0 0 12px rgba(110,168,255,.4)}
+.progress-fill::after{content:'';position:absolute;top:-2.5px;right:-4px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px rgba(34,211,238,.6)}
+.train-counters{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.train-counter{text-align:center;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:9px 4px;backdrop-filter:blur(8px)}
+.counter-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:400;color:var(--gold);display:block}
+.counter-lbl{font-family:'JetBrains Mono',monospace;font-size:7px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;display:block}
+.train-log{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);min-height:14px;letter-spacing:.04em;text-align:center}
+
+/* KG Modal */
+.kg-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(16px);z-index:1500;display:none;align-items:center;justify-content:center}
+.kg-modal.visible{display:flex}
+.kg-modal-panel{
+  width:540px;max-height:65vh;
+  background:rgba(13,13,26,.85);
+  backdrop-filter:blur(24px);
+  border:1px solid var(--glass-border);
+  border-radius:16px;overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 24px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.kg-modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.kg-modal-title{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--gold)}
+.kg-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px;transition:color .2s}.kg-close:hover{color:var(--red)}
+.kg-modal-body{overflow-y:auto;padding:14px 18px;flex:1}
+.triple-row{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-family:'JetBrains Mono',monospace;font-size:9.5px}
+.triple-s{color:var(--gold);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.triple-p{color:var(--purple);padding:1px 6px;background:var(--purple-dim);border-radius:4px;white-space:nowrap;flex-shrink:0}
+.triple-o{color:var(--text-dim);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.triple-conf{font-size:7.5px;color:var(--green);padding:1px 4px;background:var(--green-dim);border-radius:3px;flex-shrink:0}
+
+/* ── V10: INNER MONOLOGUE PANEL ── */
+.inner-monologue{position:fixed;bottom:90px;right:22px;width:340px;background:linear-gradient(135deg,rgba(6,6,10,.97),rgba(12,12,20,.97));border:1px solid rgba(212,160,23,.25);border-radius:14px;padding:14px 16px;z-index:500;animation:fadeUp .3s ease-out;box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 30px rgba(212,160,23,.04);display:none}
+.inner-monologue.visible{display:block}
+.im-label{font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.22em;color:rgba(212,160,23,.5);text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.im-label::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 1.5s infinite}
+.im-text{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);line-height:1.7;font-style:italic}
+.im-nodes{margin-top:8px;display:flex;gap:5px;flex-wrap:wrap}
+.im-node{font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--gold-dim);border:1px solid rgba(212,160,23,.2);color:var(--gold);border-radius:6px;padding:2px 8px}
+.im-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;transition:color .2s}
+.im-close:hover{color:var(--text)}
+
+/* ── V10: QUALIA STATE ── */
+.qualia-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan);transition:all .4s;margin-left:8px}
+.qualia-joy{background:rgba(212,160,23,.10);border-color:rgba(212,160,23,.3);color:var(--gold)}
+.qualia-pain{background:var(--red-dim);border-color:rgba(255,77,106,.3);color:var(--red)}
+.qualia-curiosity{background:var(--cyan-dim);border-color:rgba(34,211,238,.3);color:var(--cyan)}
+.qualia-confusion{background:var(--purple-dim);border-color:rgba(159,122,234,.3);color:var(--purple)}
+.qualia-neutral{background:var(--glass-bg);border-color:var(--glass-border);color:var(--text-dim)}
+
+/* ── V10: SOCIETY OF MIND DEBATE ── */
+.badge.skeptic{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);color:var(--red)}
+.badge.literal{background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.25);color:var(--green)}
+.badge.dreamer{background:rgba(212,160,23,.10);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
+.badge.society{background:var(--purple-dim);border:1px solid rgba(159,122,234,.25);color:var(--purple)}
+.badge.tms{background:var(--orange-dim);border:1px solid rgba(251,146,60,.25);color:var(--orange)}
+.badge.qualia{background:var(--cyan-dim);border:1px solid rgba(34,211,238,.25);color:var(--cyan)}
+.badge.godel{background:rgba(159,122,234,.10);border:1px solid rgba(159,122,234,.3);color:var(--purple)}
+
+/* ── V10: COGNITION TAB ── */
+.cog-section{margin-bottom:18px}
+.cog-state-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cog-state-card{flex:1;min-width:80px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:9px 10px;text-align:center}
+.cog-state-val{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--gold);display:block}
+.cog-state-lbl{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:.1em}
+.godel-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--purple);border-radius:8px;padding:9px 12px;margin-bottom:7px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text-dim);animation:fadeUp .2s ease-out}
+.godel-version{font-size:8px;color:var(--purple);margin-bottom:4px;letter-spacing:.08em}
+.godel-theorem{color:var(--text);font-size:10px;line-height:1.6}
+.debate-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:8px 11px;margin-bottom:6px;font-size:10.5px}
+.debate-winner{border-color:rgba(212,160,23,.3);background:var(--gold-dim)}
+.debate-agent{font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+.debate-score{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-dim)}
+.hyper-badge{font-family:'JetBrains Mono',monospace;font-size:7.5px;padding:1px 6px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:4px;color:var(--cyan);vertical-align:middle;margin-left:4px}
+
+/* ── V10: TMS INDICATOR ── */
+.tms-cascade{background:var(--red-dim);border:1px solid rgba(255,77,106,.25);border-radius:9px;padding:8px 12px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--red);animation:fadeUp .2s ease-out}
+
+/* ── V12: NEURAL BOOT OVERLAY ── */
+.boot-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s ease,visibility .5s ease}
+.boot-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.boot-logo{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:transparent;background:linear-gradient(135deg,var(--gold),var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.2em;filter:drop-shadow(0 0 30px rgba(110,168,255,.4))}
+.boot-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:.22em;text-transform:uppercase}
+.boot-bar-wrap{width:340px;height:2px;background:rgba(255,255,255,.05);border-radius:4px;overflow:visible;position:relative}
+.boot-bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple),var(--cyan));border-radius:4px;transition:width .3s ease;width:0%;box-shadow:0 0 16px rgba(34,211,238,.5);position:relative}
+.boot-bar::after{content:'';position:absolute;right:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px rgba(34,211,238,.8)}
+.boot-status{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);max-width:340px;text-align:center;min-height:14px;letter-spacing:.04em}
+.boot-phase-list{display:flex;flex-direction:column;gap:5px;width:340px}
+.boot-phase{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)}
+.boot-phase.active{color:var(--gold)}.boot-phase.done{color:var(--green)}
+.boot-phase::before{content:'○';width:10px;flex-shrink:0}.boot-phase.done::before{content:'✓'}.boot-phase.active::before{content:'▶'}
+.boot-skip{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim);border-radius:8px;padding:6px 18px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer;margin-top:6px;transition:all .2s;backdrop-filter:blur(8px)}
+.boot-skip:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
+
+/* ── V12: NEURAL BADGES ── */
+.badge.n3{background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);color:var(--cyan)}
+.badge.slm{background:rgba(159,122,234,.12);border:1px solid rgba(159,122,234,.3);color:var(--purple)}
+.badge.graphrag{background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
+.badge.coref{background:rgba(61,220,132,.10);border:1px solid rgba(61,220,132,.25);color:var(--green)}
+
+/* ── V12: COREF LOG ── */
+.coref-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--green);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;animation:fadeUp .2s ease-out}
+.coref-nodes{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px}
+.coref-node{background:var(--green-dim);border:1px solid rgba(61,220,132,.2);border-radius:5px;padding:2px 7px;font-size:9px;color:var(--green)}
+.coref-arrow{color:var(--text-dim);font-size:10px}
+.coref-sim{font-size:8px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+
+/* ── V12: SLM STATUS ── */
+.slm-status-bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;margin-bottom:10px;font-family:'JetBrains Mono',monospace;font-size:9px}
+.slm-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;transition:background .3s}
+.slm-dot.loading{background:var(--gold);animation:pulse 1.2s infinite}
+.slm-dot.ready{background:var(--green)}
+.slm-dot.error{background:var(--red)}
+.slm-label{color:var(--text-dim);flex:1}
+.slm-model-name{color:var(--text-muted);font-size:8px;margin-left:auto}
+
+/* ── V12: N3 ENTROPY QUERY ── */
+.n3-entry{background:var(--glass-bg);border:1px solid var(--glass-border);border-left:2px solid var(--cyan);border-radius:8px;padding:8px 11px;margin-bottom:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;animation:fadeUp .2s ease-out}
+.n3-bridge{font-size:10px;color:var(--cyan);margin-bottom:3px}
+.n3-result{color:var(--text-dim);line-height:1.5}
+
+.centrality-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-family:'JetBrains Mono',monospace;font-size:9px}
+.centrality-label{color:var(--text);min-width:100px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.centrality-bar-bg{flex:1;height:5px;background:var(--glass-bg);border-radius:3px;overflow:hidden}
+.centrality-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--gold));border-radius:3px;transition:width .4s}
+.centrality-score{color:var(--text-muted);font-size:8px;min-width:36px;text-align:right}
+.centrality-user{color:var(--gold) !important}
+.centrality-user .centrality-bar-fill{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+
+/* ── V11: ONTOLOGY DISPLAY ── */
+.ont-entry{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:7px 9px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:9px}
+.ont-node{color:var(--text);font-size:10px;min-width:80px}
+.ont-path{color:var(--text-muted);font-size:8px;line-height:1.5}
+.ont-category{display:inline-block;padding:1px 5px;background:var(--purple-dim);border:1px solid rgba(159,122,234,.2);border-radius:4px;color:var(--purple);font-size:7.5px;margin-top:2px}
+
+/* ── V11: INGESTION QUEUE ── */
+.ingestion-item{display:flex;align-items:center;gap:8px;padding:6px 9px;margin-bottom:4px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:9px}
+.ingestion-pending{color:var(--text-muted)}
+.ingestion-done{color:var(--green)}
+.ingestion-rejected{color:var(--red)}
+.ingestion-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.ingestion-dot.pending{background:var(--text-muted)}
+.ingestion-dot.done{background:var(--green)}
+.ingestion-dot.rejected{background:var(--red)}
+
+/* ── V11: CFG PARSE BADGE ── */
+.badge.cfg{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
+.badge.morph{background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.2);color:var(--green)}
+.badge.user-assert{background:var(--gold-dim);border:1px solid rgba(212,160,23,.3);color:var(--gold)}
+.badge.levenshtein{background:var(--orange-dim);border:1px solid rgba(251,146,60,.2);color:var(--orange)}
+
+/* ── HYPERGRAPH CANVAS TAB ── */
+.hg-wrap{position:relative;background:var(--bg);border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;margin-bottom:12px}
+.hg-canvas{width:100%;display:block;cursor:grab}
+.hg-canvas:active{cursor:grabbing}
+.hg-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);text-align:center;padding:20px;pointer-events:none}
+.hg-controls{display:flex;align-items:center;gap:6px;padding:6px 0;flex-wrap:wrap}
+.hg-ctrl-btn{background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim);border-radius:7px;padding:4px 10px;font-size:9px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .18s}
+.hg-ctrl-btn:hover{border-color:rgba(232,184,75,.4);color:var(--gold)}
+.hg-ctrl-btn.active{border-color:rgba(110,168,255,.35);color:var(--blue);background:var(--blue-dim)}
+.hg-node-count{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-left:auto}
+
 </style>
 </head>
 <body>
@@ -269,7 +835,7 @@ body>*{position:relative;z-index:1;}
 <!-- V12 NEURAL BOOT OVERLAY -->
 <div class="boot-overlay" id="bootOverlay">
   <div class="boot-logo">LEXICA</div>
-  <div class="boot-sub">2.3 · Neuro-Symbolic Ascension</div>
+  <div class="boot-sub">2.4 · Neuro-Symbolic Ascension</div>
   <div class="boot-bar-wrap"><div class="boot-bar" id="bootBar"></div></div>
   <div class="boot-status" id="bootStatus">Initializing symbolic core...</div>
   <div class="boot-phase-list">
@@ -334,7 +900,7 @@ body>*{position:relative;z-index:1;}
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 5v4l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
   </button>
   <div class="rail-spacer"></div>
-  <div class="rail-version">2.3</div>
+  <div class="rail-version">2.4</div>
 </div>
 
 <div class="drawer" id="drawer">
@@ -359,7 +925,7 @@ body>*{position:relative;z-index:1;}
     <!-- TOOLS PANEL -->
     <div class="drawer-panel" id="panelTools" style="display:none">
       <div class="tools-head">
-        <div class="tools-brand">LEXICA <span>2.3</span></div>
+        <div class="tools-brand">LEXICA <span>2.4</span></div>
         <div class="tab-bar">
           <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
           <button class="tab-btn" onclick="switchTab('paste')">📝</button>
@@ -517,7 +1083,7 @@ body>*{position:relative;z-index:1;}
     <div class="model-info">
       <div class="model-avatar">Lx</div>
       <div>
-        <div class="model-name">LEXICA 2.3
+        <div class="model-name">LEXICA 2.4
           <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
         </div>
         <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
@@ -541,27 +1107,27 @@ body>*{position:relative;z-index:1;}
         </div>
       </button>
     </div>
-    <div class="input-hint">LEXICA 2.3 · NANO-CORTEX · WEBLLM · GRAPH-RAG · CFG · MORPHOLOGY · CENTRALITY · N3 ENTROPY</div>
+    <div class="input-hint">LEXICA 2.4 · SLM-L2-L5 · NANO-CORTEX · WEBLLM · GRAPH-RAG · AUTO-LEARN · SOCIETY · GÖDEL · N3 ENTROPY</div>
   </div>
 </main>
 
 <script>
 'use strict';
 // ═══════════════════════════════════════════════════════════
-//  LEXICA v12 — NEURO-SYMBOLIC ASCENSION
-//  Architecture:
+//  LEXICA 2.4 — NEURO-SYMBOLIC ASCENSION
+//  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
 //  L1  — Lexical Analysis (POS, NER, Roles)
-//  L2  — Semantic Indexing (PMI, BM25, Word Profiles)
-//  L3  — Knowledge Hypergraph (n-ary triples, TMS, cascades)
-//  L4  — Logical Reasoning (intent, syllogism, refutation)
-//  L5  — NLG Synthesis Engine (anaphora, compound, intent-prefix)
+//  L2  — Semantic Indexing (PMI, BM25, Word Profiles) + SLM query expansion
+//  L3  — Knowledge Hypergraph (n-ary triples, TMS, cascades) + SLM triple extraction
+//  L4  — Logical Reasoning (intent, syllogism, refutation) + SLM contradiction eval
+//  L5  — NLG Synthesis Engine (graphRAG + synthesizeWithReasoning via SLM)
 //  L6  — Society of Mind (Skeptic × Literal × Dreamer debate)
 //  L7  — Synthetic Qualia (Joy · Pain · Curiosity · Confusion)
 //  L8  — Gödelian Self-Modification (theorem→rewrite loop)
-//  L9  — Curiosity Engine (idle entropy scan, inner monologue)
+//  L9  — Curiosity Engine (entropy scan + autonomous Wikipedia learning + SLM monologue)
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
-//  L11 — NeuralMouth (WebLLM Graph-RAG synthesis & social SLM)
-//  L12 — N3 Entropy Resolution (bridge query via SLM on gap nodes)
+//  L11 — NeuralMouth (WebLLM — SLM across all layers L2–L5, social, N3 bridge)
+//  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
 // ═══════════════════════════════════════════════════════════
 
 
@@ -2421,10 +2987,12 @@ class GodelEngine {
 // nodes. Generates inner monologue and attempts to bridge.
 // ─────────────────────────────────────────────────────
 class CuriosityEngine {
-  constructor(kg, qualia, onThought) {
+  constructor(kg, qualia, onThought, engineRef) {
     this.kg = kg;
     this.qualia = qualia;
     this.onThought = onThought;
+    this._engineRef = engineRef; // reference to main Engine for auto-learn
+    this._autoLearnInFlight = false;
     this.lastInput = Date.now();
     this._interval = null;
     this.thoughtCount = 0;
@@ -2522,6 +3090,35 @@ class CuriosityEngine {
       const aAct = Math.round(freq.get(nodeA)||0);
       const bAct = Math.round(freq.get(nodeB)||0);
       this.onThought('"' + nodeA + '" (' + aAct + ' activations) and "' + nodeB + '" (' + bAct + ') share no edge at depth 2. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
+    }
+
+    // ── AUTONOMOUS WIKIPEDIA LEARNING ──
+    // If these nodes have few connections, auto-learn about them from Wikipedia
+    if (!this._autoLearnInFlight) {
+      const allNodes = [nodeA, nodeB];
+      for (const node of allNodes) {
+        const nodeTriples = this.kg.triples.filter(t => t.s===node||t.o===node).length;
+        if (nodeTriples < 3 && node.length > 3 && !/^\d/.test(node)) {
+          this._autoLearnInFlight = true;
+          // Fire-and-forget: learn in background, don't block monologue
+          (async () => {
+            try {
+              const results = await searchWiki(node);
+              if (results && results.length) {
+                const art = await fetchWikiArt(results[0].title);
+                if (art && art.text && art.text.length > 200) {
+                  const _eng = this._engineRef || (typeof engine !== 'undefined' ? engine : null);
+                  if (_eng) await _eng.addSourceAsync(art.text, art.title, art.url, ()=>{});
+                  addMsg('system', '🔭 <strong>Auto-learned</strong>: "' + art.title + '" — curiosity-driven fetch.');
+                  updateUI();
+                }
+              }
+            } catch(e) {}
+            this._autoLearnInFlight = false;
+          })();
+          break; // only one auto-learn at a time
+        }
+      }
     }
 
     // N3 Neural Query — gated by in-flight lock so only ONE runs at a time
@@ -2697,7 +3294,7 @@ function extractUserState(q){
 function handleAbstractNeed(engine){
   const base={strategy:'abstract',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'abstract_need'};
   const conf={l:'medium',lbl:'suggestion',cls:'conf-med'};
-  if(!engine.trained)return{...base,conf,text:'I have no knowledge yet. Fetch a Wikipedia article and I can suggest something from what I learn.'};
+  if(!engine.trained)return{...base,conf,text:'I have not yet learned about anything. Discover a topic first and then ask me to suggest something related.'};
   const candidates=engine.kg.triples.filter(t=>t.p==='is_a').slice(0,30);
   if(!candidates.length)return{...base,conf,text:'I do not have enough structured knowledge to make a suggestion yet.'};
   // Pick a random is_a subject, avoid things just told
@@ -2726,7 +3323,7 @@ function handleDeclarativeStatement(input,engine){
       if(text){engine.ctx.add(input,text,topic,'medium');return{...base,conf,text,kgUsed:true,synthesized:true};}
     }
   }
-  return{...base,conf,text:'Understood.'};
+  return{...base,conf,text:'I hear you.'};
 }
 
 // Synthesizes responses for greetings, statements, etc.
@@ -2840,7 +3437,7 @@ function handleMetaCognition(q, engine){
   if(/\b(topic|topics|subject|subjects|source|sources|list|what.*know)\b/.test(ql)&&
      (/\b(those|your|the|all|my|our|known|available)\b/.test(ql)||/^(list|what|show)/.test(ql))){
     const titles=engine.sm.s.map(s=>s.title);
-    if(!titles.length)return{...base,conf,text:'I have not learned from any sources yet. Fetch a Wikipedia article to get started.'};
+    if(!titles.length)return{...base,conf,text:'I have no knowledge loaded yet. Ask me any topic and I will try to learn about it autonomously.'};
     const joined=titles.length===1?titles[0]:titles.slice(0,-1).join(', ')+' and '+titles[titles.length-1];
     return{...base,conf,text:`The topic${titles.length!==1?'s':''} I know ${titles.length!==1?'are':'is'}: ${joined}.`};
   }
@@ -2900,17 +3497,19 @@ function handleSocialIntent(intent,input,engine){
 }
 
 function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
+  // All social fallbacks use real KG data where available — no canned strings
   if(intent==='greeting'){
     if(n>0){
-      // Direct construction — bypass synthesis to prevent PMI picking "represents"
-      const srcLabel=srcs===1?engine.sm.s[0].title:`${srcs} sources`;
-      return{...base,conf:socialConf,text:`I am a knowledge synthesis intelligence. I am trained on ${n} sentence${n!==1?'s':''} from ${srcLabel}. What would you like to know?`,synthesized:false};
+      const srcLabel=srcs===1?engine.sm.s[0].title:srcs+' sources';
+      const topNode=engine.kg.triples.find(t=>t.p==='is_a');
+      const kgNote=topNode?(' I know about '+topNode.s+' among other things.'):'';
+      return{...base,conf:socialConf,text:'I have '+n+' sentence'+(n!==1?'s':'')+' from '+srcLabel+'.'+kgNote,synthesized:false};
     }
-    return{...base,conf:socialConf,text:'I am Lexica 2.3. Fetch a Wikipedia article to get started.'};
+    return{...base,conf:socialConf,text:'I am Lexica. I reason over knowledge.',synthesized:false};
   }
 
   if(intent==='farewell'){
-    return{...base,conf:socialConf,text:'Farewell.'};
+    return{...base,conf:socialConf,text:'Farewell.',synthesized:false};
   }
 
   if(intent==='gratitude'){
@@ -2918,11 +3517,11 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
     if(lastSubj&&engine.trained){
       const facts=engine.kg.query(lastSubj.toLowerCase());
       if(facts.length>1){
-        const text=engine.synthesis.synthesize(`more about ${lastSubj}`,'factoid',lastSubj,facts.slice(1,4),[],[],engine.semVec,engine.wordProfiler,engine.kg);
+        const text=engine.synthesis.synthesize('more about '+lastSubj,'factoid',lastSubj,facts.slice(1,4),[],[],engine.semVec,engine.wordProfiler,engine.kg);
         if(text)return{...base,conf:socialConf,text,kgUsed:true,synthesized:true,ctxUsed:true};
       }
     }
-    return{...base,conf:socialConf,text:'Understood.'};
+    return{...base,conf:socialConf,text:'There is more I can say if you have questions.',synthesized:false};
   }
 
   if(intent==='user_emotion'){
@@ -2930,42 +3529,45 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
     if(adj){
       engine.userCtx.push(adj);
       const v=engine.userCtx.valence(adj);
-      const triple={s:'user',p:'user_state',o:adj,conf:1.0,raw:`The user is ${adj}.`,tag:'user_state'};
-      const synthText=engine.synthesis.synthesize('user state','what','user',[triple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
-      let prefix='';
-      if(v==='negative')prefix=`I am sorry to hear you are ${adj}. `;
-      else if(v==='positive')prefix=`I am glad you are ${adj}. `;
-      const reply=synthText&&synthText.length>4?prefix:prefix+'I have noted your state.';
       if(NEGATIVE_STATES.has(adj)&&engine.trained){
         const suggest=handleAbstractNeed(engine);
-        if(suggest.text)return{...base,conf:socialConf,text:prefix+suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
+        if(suggest.text){
+          const prefix=v==='negative'?'That sounds difficult. ':'';
+          return{...base,conf:socialConf,text:prefix+suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
+        }
       }
-      return{...base,conf:socialConf,text:reply||prefix+'Understood.'};
+      const valText=v==='negative'?'That sounds difficult.':v==='positive'?'That is good to hear.':'I follow.';
+      return{...base,conf:socialConf,text:valText,synthesized:false};
     }
-    return{...base,conf:socialConf,text:'Understood.'};
+    return{...base,conf:socialConf,text:'I hear you.',synthesized:false};
   }
 
   if(intent==='abstract_need'){
     const adj=engine.userCtx.activeState()?.adj;
-    const prefix=adj&&engine.userCtx.valence(adj)==='negative'?`I am sorry to hear you are ${adj}. `:'';
     const suggest=handleAbstractNeed(engine);
-    return{...base,conf:{l:'medium',lbl:'suggestion',cls:'conf-med'},text:prefix+suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
+    return{...base,conf:{l:'medium',lbl:'suggestion',cls:'conf-med'},text:suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
   }
 
   if(intent==='self_status'){
     const triples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
     const text=engine.synthesis.synthesize('what is lexica','what','lexica',triples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    return{...base,conf:socialConf,text:text||'I am operational.',synthesized:!!text};
+    return{...base,conf:socialConf,text:text||'I am Lexica — operational with '+engine.kg.count()+' KG triples.',synthesized:!!text};
   }
 
   if(intent==='passive_ack'||intent==='acknowledgement'||intent==='reaction'){
-    const acks=['Understood.','Got it.','I follow.','Makes sense.','Noted.'];
-    const text=acks[Math.floor(Math.random()*acks.length)];
-    return{...base,conf:socialConf,text};
+    // Draw from actual KG knowledge instead of acks — or just say nothing meaningful
+    if(engine.trained&&engine.ctx.lastSubj){
+      const facts=engine.kg.query(engine.ctx.lastSubj.toLowerCase()).slice(0,2);
+      if(facts.length){
+        const txt=engine.synthesis.synthesize(engine.ctx.lastSubj,'factoid',engine.ctx.lastSubj,facts,[],[],engine.semVec,engine.wordProfiler,engine.kg);
+        if(txt&&txt.length>10)return{...base,conf:socialConf,text:txt,synthesized:true,kgUsed:true};
+      }
+    }
+    return{...base,conf:socialConf,text:'.',synthesized:false};
   }
 
   if(intent==='declarative_statement'){
-    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:'Understood.'};
+    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:'Noted in context.'};
   }
 
   if(intent==='statement'){
@@ -2983,7 +3585,7 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         }
       }
     }
-    return{...base,conf:socialConf,text:'Noted.'};
+    return{...base,conf:socialConf,text:'I follow that.'};
   }
 
   return null; // unhandled social intent — fall through to factual pipeline
@@ -3446,21 +4048,86 @@ class NeuralMouth {
   // N3 Bridge: find missing predicate between two disconnected nodes
   async n3Bridge(nodeA, nodeB, corpusSentences) {
     if (!this.ready) return null;
-    // Pick up to 8 relevant sentences mentioning either node
     const relevant = corpusSentences.filter(s => {
       const sl = s.toLowerCase();
       return sl.includes(nodeA.toLowerCase()) || sl.includes(nodeB.toLowerCase());
     }).slice(0, 8);
     if (relevant.length < 2) return null;
 
-    const system = `You are a knowledge graph assistant. Your job is to find the relationship between two concepts based on provided text. Output ONLY a JSON object: {"predicate": "relationship_name", "direction": "A_to_B or B_to_A", "sentence": "one sentence explaining the connection"}. No other text.`;
-    const prompt = `Find the relationship between "${nodeA}" and "${nodeB}" from this text:\n\n${relevant.join(' ')}\n\nOutput JSON only:`;
+    const system = 'You are a knowledge graph assistant. Find the relationship between two concepts. Output ONLY a JSON object: {"predicate": "relationship_name", "direction": "A_to_B or B_to_A", "sentence": "one sentence explaining the connection"}. No other text.';
+    const prompt = 'Find the relationship between "' + nodeA + '" and "' + nodeB + '" from this text:\n\n' + relevant.join(' ') + '\n\nOutput JSON only:';
     try {
       const raw = await this._generate(system, prompt, 120);
       const cleaned = raw.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(cleaned);
       if (parsed.predicate && parsed.sentence) return parsed;
       return null;
+    } catch(e) { return null; }
+  }
+
+  // ── L2: SEMANTIC EXPANSION ──
+  // SLM expands a query into semantically related terms beyond PMI
+  async semanticExpand(query, knownTerms=[]) {
+    if (!this.ready) return [];
+    try {
+      const known = knownTerms.slice(0,6).join(', ');
+      const raw = await this._generate(
+        'Output ONLY a JSON array of 4-6 single words semantically related to the query. No explanations, no other text.',
+        'Query: "' + query.slice(0,80) + '"' + (known ? '. Already found: ' + known : '') + '. Output JSON array:',
+        60
+      );
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      const arr = JSON.parse(cleaned);
+      if (Array.isArray(arr)) return arr.map(s=>String(s).toLowerCase().trim()).filter(s=>s.length>2&&s.length<25);
+    } catch(e) {}
+    return [];
+  }
+
+  // ── L3: KG TRIPLE EXTRACTION ──
+  // SLM extracts additional structured triples from raw text
+  async extractTriples(sentences) {
+    if (!this.ready) return [];
+    const text = sentences.slice(0,6).join(' ').slice(0,600);
+    try {
+      const raw = await this._generate(
+        'Extract 3-5 factual triples from the text. Output ONLY a JSON array: [{"s":"subject","p":"predicate","o":"object"},...]. Short words only. No quotes inside values.',
+        'Text: "' + text + '"\n\nOutput JSON array:',
+        200
+      );
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      const arr = JSON.parse(cleaned);
+      if (Array.isArray(arr)) return arr.filter(t=>t.s&&t.p&&t.o&&t.s.length<50&&t.o.length<80);
+    } catch(e) {}
+    return [];
+  }
+
+  // ── L4: REASONING — contradiction evaluation ──
+  // SLM resolves whether two contradictory facts can be reconciled
+  async evalContradiction(factA, factB, subject) {
+    if (!this.ready) return null;
+    try {
+      const txt = await this._generate(
+        'You are a logic evaluator. Explain in one sentence whether two facts about the same subject contradict each other, and if so, which is more likely correct based on standard knowledge.',
+        'Subject: "' + subject + '". Fact A: "' + factA.slice(0,120) + '". Fact B: "' + factB.slice(0,120) + '". Evaluate:',
+        80
+      );
+      return txt || null;
+    } catch(e) { return null; }
+  }
+
+  // ── L5: ENHANCED SYNTHESIS — SLM generates richer answer with reasoning trace ──
+  // Used when graphRAG gives a short answer and we have good KG coverage
+  async synthesizeWithReasoning(query, kgFacts, evidenceSentences, intent) {
+    if (!this.ready || !kgFacts.length) return null;
+    const triplesText = kgFacts.slice(0,10).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
+    const evText = evidenceSentences.slice(0,3).join(' ');
+    const system = 'You are Lexica, a neuro-symbolic reasoning engine. ' +
+      'Synthesize an answer using ONLY the provided knowledge. 2-4 sentences. Direct, factual, no bullet points. ' +
+      'If reasoning across multiple facts, do so explicitly. No "I am an AI" phrases.';
+    const prompt = 'Query: "' + query.slice(0,100) + '"\n\nKnowledge Graph triples:\n' + triplesText +
+      (evText ? '\n\nEvidence:\n' + evText.slice(0,300) : '') + '\n\nAnswer with reasoning:';
+    try {
+      return await this._generate(system, prompt, 300);
     } catch(e) { return null; }
   }
 }
@@ -3572,6 +4239,20 @@ class Engine {
     this.cache.invalidate();
     onProgress('complete',1.0,ss.length,this.kg.count());
 
+    // L3: SLM triple extraction — enrich KG with SLM-detected relationships
+    if (this.neuralMouth && this.neuralMouth.ready) {
+      const sampleSents = ss.slice(0, 12);
+      this.neuralMouth.extractTriples(sampleSents).then(slmTriples => {
+        slmTriples.forEach(t => {
+          if (t.s && t.p && t.o && t.s.length > 1 && t.o.length > 1) {
+            const raw = t.s + ' ' + t.p.replace(/_/g,' ') + ' ' + t.o + '.';
+            this.kg._add(t.s.toLowerCase(), t.p.toLowerCase().replace(/\s+/g,'_'), t.o.toLowerCase(), raw, tag, 0.7);
+          }
+        });
+        if (slmTriples.length) { this.kg.centrality.invalidate(); updateUI(); }
+      }).catch(()=>{});
+    }
+
     // V12: NanoCortex — async coreference merging (non-blocking, runs in background)
     if (this.nanoCortex.ready) {
       // Extract unique entity strings from newly learned triples
@@ -3662,7 +4343,7 @@ class Engine {
         const directive = `⚡ CFG: ${this.cfgParser.toDirective(ast)}`;
         addMsg('system', directive);
         return {
-          text: `Understood. I have recorded: "${subject} ${predicate === 'is_a' ? 'is' : predicate} ${object}" with a 10× user authority weight. This fact now outweighs any conflicting Wikipedia data.`,
+          text: 'Recorded: "' + subject + ' ' + (predicate === 'is_a' ? 'is' : predicate) + ' ' + object + '" — 10× user authority weight applied.',
           strategy: 'cfg-assert', synthesized: true, conf: {l:'high',lbl:'user assertion',cls:'conf-high'},
           src: null, srcTitle: '', ctxUsed: false, kgUsed: true, conflict: null, cached: false, evidence: 'user assertion (10x weight)', intent: 'assert'
         };
@@ -3687,7 +4368,7 @@ class Engine {
     }
 
     if (isFillerInput(question)) {
-      const acks = ['Noted.','Okay.','Got it.','Moving on.','Understood.'];
+      const acks = ['I follow.','Interesting.','Continuing.','Acknowledged.','I see that.'];
       return {strategy:'social',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,conf:{l:'high',lbl:'social',cls:'conf-high'},text:acks[Math.floor(Math.random()*acks.length)],intent:'passive_ack'};
     }
 
@@ -3704,7 +4385,7 @@ class Engine {
           }
         } catch(e) {}
       }
-      return {text:"I need to learn something first. Fetch a Wikipedia article or paste text in the tabs on the left.",strategy:'none',conf:null,src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'none'};
+      return {text:"I have no knowledge on that yet.",strategy:'none',conf:null,src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'none'};
     }
     this.bm25.flush();
 
@@ -3731,11 +4412,17 @@ class Engine {
     const ext = expandQuery(r);
     const qStems = sWords(r);
     const semExt = this.semVec.semanticExpand(qStems,4,0.22);
+    // L2: SLM-augmented semantic expansion
+    let slmTerms = [];
+    if (this.neuralMouth && this.neuralMouth.ready) {
+      try { slmTerms = await this.neuralMouth.semanticExpand(r, [...qStems, ...semExt]); } catch(e) {}
+    }
+    const allExt = [...new Set([...semExt, ...slmTerms])];
 
     const refuted = tryRefute(r, this.kg, this.ets);
     if (refuted) return {text:refuted,strategy:'refuted',conf:{l:'high',lbl:'verified refutation',cls:'conf-high'},src:null,srcTitle:'',ctxUsed:used,kgUsed:true,synthesized:true,conflict:null,cached:false,evidence:'logical deduction',intent};
 
-    const rel = this.bm25.query(r,[...ext,...semExt],16,subject);
+    const rel = this.bm25.query(r,[...ext,...allExt],16,subject);
 
     if ((!rel.length||rel[0].score<0.3)&&!_retried) {
       const fetchSubj = subject||extractSubject(question);
@@ -3805,17 +4492,26 @@ class Engine {
     let usedGraphRAG = false;
     let usedSLM = false;
 
-    // ── SLM PRIMARY SYNTHESIS ── When SLM ready, it is THE primary output layer
-    // Pass both KG triples and top evidence sentences. SLM translates both.
+    // ── SLM PRIMARY SYNTHESIS (L5) ── SLM is the primary output layer when ready
     if (this.neuralMouth.ready) {
       try {
+        // Try graphRAG first (faster, direct)
         const ragText = await this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4));
         if (ragText && ragText.length > 20) {
           ansText = ragText;
           usedGraphRAG = true;
           usedSLM = true;
         }
-      } catch(e) { console.warn('[Graph-RAG] Error:', e); }
+        // If ragText is thin or kgFacts are rich, use full reasoning synthesis
+        if ((!ansText || ansText.length < 80) && kgFacts.length >= 3) {
+          const reasonText = await this.neuralMouth.synthesizeWithReasoning(r, kgFacts, evidenceSentences, intent);
+          if (reasonText && reasonText.length > ansText?.length) {
+            ansText = reasonText;
+            usedSLM = true;
+            usedGraphRAG = false; // mark as deeper synthesis
+          }
+        }
+      } catch(e) { console.warn('[L5 SLM Synthesis] Error:', e); }
     }
 
     // ── SOCIETY OF MIND ── Complex queries (symbolic fallback or supplement)
@@ -3876,7 +4572,19 @@ class Engine {
     let conflict = null;
     if (subject) {
       const cs = this.kg.contradictions(subject);
-      if (cs.length > 0) { const c=cs[0]; conflict={predicate:c.predicate,values:c.values.map(v=>`"${v.o}"(${this.sm.get(v.tag)?.title||v.tag})`).join(' vs ')}; }
+      if (cs.length > 0) {
+        const c = cs[0];
+        conflict = {predicate:c.predicate, values:c.values.map(v=>'"'+v.o+'"('+(this.sm.get(v.tag)?.title||v.tag)+')').join(' vs ')};
+        // L4: SLM evaluates the contradiction and may update ansText
+        if (this.neuralMouth.ready && ansText) {
+          const factA = c.values[0]?.o || '';
+          const factB = c.values[1]?.o || '';
+          this.neuralMouth.evalContradiction(factA, factB, subject).then(evalTxt => {
+            // Store for future context — can't modify current response asynchronously
+            if (evalTxt) console.log('[L4 SLM Contradiction]', subject, ':', evalTxt);
+          }).catch(()=>{});
+        }
+      }
     }
 
     const topTag = rel[0].tag;
@@ -3955,7 +4663,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 2.3 ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 2.4 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -4309,7 +5017,7 @@ function resetAll(){
   engine.stateTracker=new LexicaStateTracker();engine.mood=new MoodEngine();
   engine.qualia=new QualiaEngine();engine.society=new SocietyOfMind();
   engine.godel=new GodelEngine(engine.kg);
-  engine.curiosity=new CuriosityEngine(engine.kg,engine.qualia,(text,a,b)=>showInnerMonologue(text,a,b));
+  engine.curiosity=new CuriosityEngine(engine.kg,engine.qualia,(text,a,b)=>showInnerMonologue(text,a,b),engine);
   engine.curiosity.start();
   engine.lastResult=null;engine.lastKgFacts=null;engine.lastQuery=null;engine.lastSubject=null;engine.recentTripleWindow=[];
   updateUI();setStatus(false,'awaiting training');updateQualiaUI();
@@ -5268,7 +5976,7 @@ window.addEventListener('DOMContentLoaded', () => {
       { rx:0.4,  ry:0.2,  rz:0.0,  dx: 0.000,  dy: 0.006,  dz: 0.010,  color:[0,   195, 195] },
       { rx:1.2,  ry:1.8,  rz:0.7,  dx: 0.009,  dy: 0.000,  dz:-0.007,  color:[225,  45,  90] },
       { rx:2.1,  ry:0.9,  rz:1.4,  dx:-0.007,  dy: 0.010,  dz: 0.000,  color:[ 90,  80, 230] },
-      { rx:3.5,  ry:2.3,  rz:2.1,  dx: 0.008,  dy:-0.009,  dz: 0.005,  color:[  0, 140, 160] },
+      { rx:3.5,  ry:2.4,  rz:2.1,  dx: 0.008,  dy:-0.009,  dz: 0.005,  color:[  0, 140, 160] },
       { rx:4.8,  ry:3.7,  rz:3.6,  dx:-0.011,  dy: 0.000,  dz:-0.008,  color:[190,  30, 140] },
     ];
 
@@ -5797,7 +6505,7 @@ window.addEventListener('DOMContentLoaded', () => {
         setBootPhase(3, false);
         updateBootBar(0.95, 'NeuralMouth ready ✓');
         updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
-        addMsg('system', '🧠 <strong>Lexica 2.3 NeuralMouth online</strong> — Graph-RAG synthesis & N3 bridge active.');
+        addMsg('system', '🧠 <strong>Lexica 2.4 NeuralMouth online</strong> — Graph-RAG synthesis & N3 bridge active.');
       } else {
         setBootPhase(2, false);
         updateBootBar(0.95, 'WebLLM unavailable — symbolic fallback active');
@@ -5811,23 +6519,23 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
       updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
-      console.error('[Lexica 2.3 boot]', e);
+      console.error('[Lexica 2.4 boot]', e);
     }
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'Lexica 2.3 ready ✓');
+    updateBootBar(1.0, 'Lexica 2.4 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
 
     // Post-boot: show welcome message
-    addMsg('system', 'LEXICA 2.3 engine loaded.');
-    addMsg('system', 'Lexica 2.3 Stack: <strong>CFG · Morphology · Ontology · Centrality · NanoCortex · NeuralMouth · Graph-RAG · N3 Bridge · Society of Mind · Qualia · Gödel</strong>');
+    addMsg('system', 'LEXICA 2.4 engine loaded.');
+    addMsg('system', 'Lexica 2.4 Stack: <strong>CFG · Morphology · Ontology · Centrality · NanoCortex · NeuralMouth · Graph-RAG · N3 Bridge · Society of Mind · Qualia · Gödel</strong>');
     const introTriples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
     const introText=engine.synthesis.synthesize('what is lexica','what','lexica',introTriples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
     const hintTriple={s:'knowledge',p:'is_a',o:'obtained by fetching a Wikipedia article',conf:1.0,raw:'Knowledge is obtained by fetching a Wikipedia article.',tag:'self',alive:true,justified_by:new Set(['self']),subjectStr:()=>'knowledge',objectStr:()=>'obtained by fetching a Wikipedia article',isNested:()=>false};
     const hintText=engine.synthesis.synthesize('how to start','what','knowledge',[hintTriple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    const full=[(introText||'I am Lexica 2.3. I am idle.'),(hintText||'')].filter(Boolean).join(' ');
+    const full=[(introText||'I am Lexica 2.4. I am idle.'),(hintText||'')].filter(Boolean).join(' ');
     streamMsg(full,{strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:false,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
     updateUI();
   })();
