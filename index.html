@@ -3846,12 +3846,12 @@ class CuriosityEngine {
       const top = [...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n])=>n);
       if (top.length > 0 && nm && nm.ready) {
         const node = top[Math.floor(Math.random() * top.length)];
-        const facts = this.kg.triples.filter(t => t.s === node).slice(0,4).map(t => t.p + ':' + t.o).join(', ');
-        nm._generate(
-          'Write one sentence about a knowledge concept based on its connections.',
-          `Concept: ${node}. Connections: ${facts}. Sentence:`,
-          55
-        ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
+        const facts = this.kg.triples.filter(t => t.s === node).slice(0,3).map(t => t.p.replace(/_/g,' ') + ': ' + t.o).join('; ');
+        // Use factual data directly — T5 generates noise for "write a sentence" tasks
+        const thought = facts
+          ? `"${node}" — ${facts}.`
+          : `"${node}" is highly activated (${freq.get(node)||0} connections).`;
+        this.onThought(thought, node, null);
         return;
       } else if (top.length > 0) {
         const node = top[0];
@@ -3873,9 +3873,9 @@ class CuriosityEngine {
       if (sparse.length > 0) {
         const [node] = sparse[Math.floor(Math.random() * sparse.length)];
         if (nm && nm.ready) {
-          nm._generate('Write one curious sentence about a concept that needs more information.',
-            `Concept: ${node}. What might it be? Sentence:`, 50
-          ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
+          // Use factual data directly — T5 hallucinates for open-ended "write a sentence" tasks
+          const sparseThought = `"${node}" appears in my knowledge graph but has only 1 connection — a sparse node I know little about.`;
+          this.onThought(sparseThought, node, null);
         } else {
           this.onThought('"' + node + '" is in my graph but sparsely connected. I want to learn more about it.', node, null);
         }
@@ -3943,22 +3943,13 @@ class CuriosityEngine {
         .slice(0, 6)
         .map(t => t.s + ' -> ' + t.p + ' -> ' + t.o)
         .join('; ');
-      nm._generate(
-        'Write one curious sentence about why two knowledge concepts might be connected.',
-        `Concept A: ${nodeA}. Concept B: ${nodeB}. Facts: ${kgCtx || 'unknown'}. Sentence:`,
-        60
-      ).then(txt => {
-        if (txt && txt.length > 10) {
-          _this.onThought(txt, nodeA, nodeB);
-        } else {
-          // Fallback: simple factual observation (no templates)
-          const aAct = Math.round(freq.get(nodeA)||0);
-          const bAct = Math.round(freq.get(nodeB)||0);
-          _this.onThought('"' + nodeA + '" (' + aAct + ' activations) and "' + nodeB + '" (' + bAct + ') have no graph path at depth 2. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
-        }
-      }).catch(() => {
-        _this.onThought('"' + nodeA + '" and "' + nodeB + '" are disconnected. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
-      });
+      // Use factual graph data directly — T5 hallucinates on "write a sentence" tasks
+      const aAct = Math.round(freq.get(nodeA)||0);
+      const bAct = Math.round(freq.get(nodeB)||0);
+      const bridgeThought = kgCtx
+        ? `"${nodeA}" and "${nodeB}" — no direct path found. Related: ${kgCtx.slice(0,120)}`
+        : `"${nodeA}" (${aAct} activations) and "${nodeB}" (${bAct}) have no graph path at depth 2.`;
+      _this.onThought(bridgeThought, nodeA, nodeB);
     } else {
       // No SLM: emit factual observation, no templates
       const aAct = Math.round(freq.get(nodeA)||0);
@@ -4028,7 +4019,16 @@ function classifyIntent(q){
   // ── USER STATE & EMOTIONAL INTENTS ──
   if(/^i (am|'m|was|feel|felt)\s+/i.test(ql)&&extractUserState(ql))return'user_emotion';
   if(/\b(bored|boring|suggest|recommend|entertain|something to do|amuse me|what (should|can) i)\b/i.test(ql))return'abstract_need';
+  // ── SELF-DIRECTED / META INTENTS — catch before factual routing ──
+  // These all refer to Lexica itself, not to external knowledge
+  if(/\b(who|what)\s+(are|is)\s+you\b/i.test(ql))return'self_status';
+  if(/\bwhat\s+(are\s+you|do\s+you)\s+(thinking|doing|feeling|knowing|learning|working)\b/i.test(ql))return'self_status';
+  if(/\b(tell|say)\s+(me\s+)?(about\s+)?yourself\b/i.test(ql))return'self_status';
+  if(/\byour\s+(name|identity|purpose|goal|function|job|role|capabilities?)\b/i.test(ql))return'self_status';
   if(/^(how are you|how do you feel|what are you doing|what('s| is) your (status|state)|are you (busy|ready|alive|working))\b/i.test(ql))return'self_status';
+  if(/\byou\s+(are|were)\s+(an?\s+)?(ai|bot|robot|computer|machine|program|software|assistant)\b/i.test(ql))return'self_status';
+  if(/\bi\s+(got\s+you|gotchu|got\s+it|see|understand|ok|okay)\b/i.test(ql))return'acknowledgement';
+  if(/\b(i\s+gotchu|gotchu|gotcha)\b/i.test(ql))return'acknowledgement';
   if(/^i (like|love|hate|prefer|enjoy|dislike|know about|feel about|want|need)\b/.test(ql))return'statement';
   if(/^i think\b/.test(ql))return'statement';
   if(/^(ok|okay|alright|sure|got it|i see|makes sense|understood|right|i know|interesting|k|yep|yup|nope|lol|haha|yes|no)\s*[.!?]?\s*$/.test(ql))return'passive_ack';
@@ -4082,10 +4082,11 @@ function isGarbageSubject(subj){
   if(/^\d+$/.test(sl))return true;
   if(/^[^a-z]+$/i.test(sl))return true;
   // V11: Levenshtein slang gate — reject inputs that look like abbreviations/slang
-  // If the subject is all-lowercase, short, and contains no vowels → likely slang
   if(sl.length<=5&&!/[aeiou]/.test(sl)&&sl===sl.toLowerCase()&&!/^[a-z]{2,5}$/.test(sl.replace(/[^a-z]/g,'')))return true;
   // Short all-caps (likely acronym being misidentified as a proper noun entity)
   if(/^[A-Z]{2,4}$/.test(subj)&&sl.length<=4&&!['AI','ML','DL','UK','US','EU'].includes(subj))return true;
+  // Block subjects extracted from self-directed questions — these refer to Lexica, not Wikipedia topics
+  if(['code','self','yourself','myself','lag','lagging','prompt','yourself','yourself'].includes(sl))return true;
   return false;
 }
 
@@ -4439,9 +4440,20 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
     return{...base,conf:{l:'medium',lbl:'suggestion',cls:'conf-med'},text:suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
   }
   if(intent==='self_status'){
-    const triples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
-    const text=engine.synthesis.synthesize('what is lexica','what','lexica',triples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    return{...base,conf:socialConf,text:text||'Operational. '+engine.kg.count()+' triples, '+n+' sentences.',synthesized:!!text};
+    // Build a factual description from actual engine state
+    const srcList = engine.sm.s.slice(0,4).map(s=>s.title).join(', ') || 'none';
+    const stateDesc = `${n} sentences from ${srcs} source${srcs!==1?'s':''} (${srcList}). ${engine.kg.count()} knowledge triples. I am a neuro-symbolic knowledge engine named Lexica.`;
+    if(engine.neuralMouth?.ready){
+      return engine.neuralMouth._generate(
+        'Describe what an AI knowledge assistant is and does, in 1-2 sentences.',
+        `State: ${stateDesc}\nQuestion: "${input}"\nAnswer:`,
+        90
+      ).then(txt=>{
+        const answer = txt && txt.length>10 ? txt : stateDesc;
+        return{...base,conf:socialConf,text:answer,synthesized:!!txt,_slm:!!txt,strategy:txt?'slm':'social'};
+      }).catch(()=>({...base,conf:socialConf,text:stateDesc,synthesized:false}));
+    }
+    return{...base,conf:socialConf,text:stateDesc,synthesized:false};
   }
   if(intent==='passive_ack'||intent==='acknowledgement'||intent==='reaction'){
     if(engine.trained&&engine.ctx.lastSubj){
@@ -5404,20 +5416,9 @@ class Engine {
         const topNodes = this.kg.centrality.topNodes(this.kg.triples, 5);
         const nodeNames = topNodes.slice(0,3).map(n => n.node).filter(Boolean);
         if (nodeNames.length >= 2) {
-          const nm = window._neuralMouth;
-          if (nm && nm.ready) {
-            nm._generate(
-              'Write one curious sentence about a newly learned topic.',
-              `Topic: ${title}. Key concepts: ${nodeNames.join(', ')}. Sentence:`,
-              60
-            ).then(txt => {
-              if (txt && txt.length > 10) showInnerMonologue(txt, nodeNames[0], nodeNames[1]);
-            }).catch(() => {
-              showInnerMonologue('Absorbed "' + title + '": ' + this.kg.count() + ' triples now indexed. Top concepts: ' + nodeNames.join(', ') + '.', nodeNames[0], nodeNames[1]);
-            });
-          } else {
-            showInnerMonologue('Absorbed "' + title + '": ' + this.kg.count() + ' triples indexed. High-activation nodes: ' + nodeNames.join(', ') + '.', nodeNames[0], nodeNames[1]);
-          }
+          // Use factual data directly — T5 hallucinates on open-ended "write a sentence" tasks
+          const thought = `Absorbed "${title}": ${this.kg.count()} triples indexed. Central concepts: ${nodeNames.join(', ')}.`;
+          showInnerMonologue(thought, nodeNames[0], nodeNames[1]);
         }
       }
     }, 1500);
@@ -5476,6 +5477,17 @@ class Engine {
 
     const directive = handleDirective(question, this);
     if (directive) return directive;
+
+    // ── SELF-DIRECTED GATE: questions about Lexica itself never reach KG routing ──
+    // Catches: "can you X yourself", "can you stop lagging", "are you an AI", etc.
+    const isSelfDirected = /\b(you|your(self)?|lexica)\b/i.test(question) &&
+      /\b(are you|were you|can you|could you|do you|did you|will you|would you|are you|what (are|is) you|who (are|is) you|stop|speed|faster|lag|slow|fix yourself|code yourself|modify yourself|improve yourself)\b/i.test(question);
+    if (isSelfDirected) {
+      const intent0self = classifyIntent(question);
+      const sr0 = await Promise.resolve(handleSocialIntent(
+        SOCIAL_INTENTS.has(intent0self) ? intent0self : 'self_status', question, this));
+      if (sr0 && sr0.text) return sr0;
+    }
 
     const metaSubjMatch = /\b(you|your|we|our|chat|conversation|us)\b/i.test(question);
     if (metaSubjMatch) { const mc = handleMetaCognition(question,this); if(mc) return mc; }
