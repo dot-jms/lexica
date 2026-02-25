@@ -1068,6 +1068,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
             <div class="slm-dot loading" id="slmDot"></div>
             <div class="slm-label" id="slmLabel">Initializing...</div>
             <div class="slm-model-name" id="slmModelName">—</div>
+            <button id="slmRetryBtn" onclick="window._retryNeuralInit && window._retryNeuralInit()" style="display:none;margin-left:auto;padding:2px 8px;background:rgba(110,168,255,.12);border:1px solid rgba(110,168,255,.3);border-radius:6px;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(110,168,255,.22)'" onmouseout="this.style.background='rgba(110,168,255,.12)'">↻ retry</button>
           </div>
         </div>
         <div class="cog-section">
@@ -4641,28 +4642,36 @@ class NanoCortex {
   }
 
   async init(onProgress) {
+    const TIMEOUT_MS = 20000; // 20s max — don't block NeuralMouth
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('NanoCortex init timeout')), TIMEOUT_MS)
+    );
     try {
-      // Dynamic import — won't throw if CDN unavailable
-      const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0');
-      const pipeline = mod.pipeline || mod.default?.pipeline;
-      const env = mod.env || mod.default?.env || null;
-      if (env) { try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_){} }
-      onProgress('NanoCortex: Loading all-MiniLM-L6-v2...');
-      this.pipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-        progress_callback: (info) => {
-          if (info.status === 'downloading') {
-            const pct = info.loaded && info.total ? Math.round(info.loaded/info.total*100) : '?';
-            onProgress(`NanoCortex: Downloading model (${pct}%)`);
-          }
-        }
-      });
-      this.ready = true;
-      onProgress('NanoCortex: Ready ✓');
+      await Promise.race([this._doInit(onProgress), timeoutPromise]);
     } catch(e) {
       this.error = e.message || String(e);
-      onProgress('NanoCortex: Unavailable (CPU fallback active)');
+      onProgress('NanoCortex: ' + (e.message === 'NanoCortex init timeout' ? 'Timed out — continuing without embeddings' : 'Unavailable (CPU fallback active)'));
       console.warn('[NanoCortex] Init failed:', e);
     }
+  }
+
+  async _doInit(onProgress) {
+    // Dynamic import — won't throw if CDN unavailable
+    const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0');
+    const pipeline = mod.pipeline || mod.default?.pipeline;
+    const env = mod.env || mod.default?.env || null;
+    if (env) { try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_){} }
+    onProgress('NanoCortex: Loading all-MiniLM-L6-v2...');
+    this.pipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+      progress_callback: (info) => {
+        if (info.status === 'downloading') {
+          const pct = info.loaded && info.total ? Math.round(info.loaded/info.total*100) : '?';
+          onProgress(`NanoCortex: Downloading model (${pct}%)`);
+        }
+      }
+    });
+    this.ready = true;
+    onProgress('NanoCortex: Ready ✓');
   }
 
   // Compute mean-pooled embedding for a string
@@ -4745,15 +4754,45 @@ class NeuralMouth {
   }
 
   async init(onProgress) {
+    // Check 1: WebGPU hardware support
     if (!navigator.gpu) {
       this.error = 'WebGPU not available in this browser';
-      onProgress('NeuralMouth: WebGPU unavailable — symbolic fallback active');
-      console.warn('[NeuralMouth] WebGPU not supported');
+      onProgress('NeuralMouth: WebGPU unavailable — use Chrome 113+ or Edge 113+');
+      console.warn('[NeuralMouth] WebGPU not supported. Use a Chromium-based browser.');
+      return false;
+    }
+    // Check 2: crossOriginIsolated — required for SharedArrayBuffer (WebLLM threading)
+    if (!crossOriginIsolated) {
+      this.error = 'Page not cross-origin isolated — SharedArrayBuffer unavailable';
+      onProgress('NeuralMouth: Waiting for cross-origin isolation (page will reload)...');
+      console.warn('[NeuralMouth] crossOriginIsolated=false. COOP/COEP headers missing. SharedArrayBuffer unavailable.');
+      // The service worker shim should handle this via reload — wait a moment then check again
+      await new Promise(r => setTimeout(r, 3000));
+      if (!crossOriginIsolated) {
+        onProgress('NeuralMouth: Cross-origin isolation failed — symbolic fallback active');
+        return false;
+      }
+    }
+    // Check 3: Try to get a GPU adapter to confirm WebGPU actually works
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        this.error = 'No WebGPU adapter available';
+        onProgress('NeuralMouth: No GPU adapter found — symbolic fallback active');
+        console.warn('[NeuralMouth] navigator.gpu.requestAdapter() returned null.');
+        return false;
+      }
+    } catch(gpuErr) {
+      this.error = String(gpuErr);
+      onProgress('NeuralMouth: GPU adapter error — symbolic fallback active');
       return false;
     }
     this.loading = true;
     try {
-      const { CreateMLCEngine } = await import('https://esm.run/@mlc-ai/web-llm');
+      // Pinned to 0.2.79 — stable, CreateMLCEngine API confirmed working
+      // Model weights are cached in IndexedDB after first download (~1GB).
+      // After the first load, inference runs 100% locally — no server contact per prompt.
+      const { CreateMLCEngine } = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm');
       onProgress('NeuralMouth: Initializing WebGPU engine...');
       const progressCb = (info) => {
         const pct = info.progress ? Math.round(info.progress * 100) : '?';
@@ -4766,6 +4805,7 @@ class NeuralMouth {
       } catch(modelErr) {
         const fallbackId = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
         onProgress(`NeuralMouth: Primary model failed, trying ${fallbackId}...`);
+        console.warn('[NeuralMouth] Primary model failed:', modelErr.message || modelErr);
         this.modelId = fallbackId;
         this.engine = await CreateMLCEngine(fallbackId, { initProgressCallback: progressCb });
       }
@@ -4776,7 +4816,7 @@ class NeuralMouth {
     } catch(e) {
       this.error = e.message || String(e);
       this.loading = false;
-      onProgress('NeuralMouth: Load failed — symbolic fallback active');
+      onProgress('NeuralMouth: Load failed — ' + (e.message || String(e)).slice(0, 60));
       console.warn('[NeuralMouth] Init failed:', e);
       return false;
     }
@@ -5820,6 +5860,7 @@ function updateSLMStatusUI(state, label, model) {
   const dot   = document.getElementById('slmDot');
   const lbl   = document.getElementById('slmLabel');
   const mname = document.getElementById('slmModelName');
+  const retry = document.getElementById('slmRetryBtn');
   if (dot) {
     dot.className = 'slm-dot';
     if (state === 'ready')   dot.classList.add('ready');
@@ -5828,7 +5869,32 @@ function updateSLMStatusUI(state, label, model) {
   }
   if (lbl   && label) lbl.textContent   = label;
   if (mname && model) mname.textContent = model;
+  // Show retry button only when NeuralMouth has failed (not just NanoCortex)
+  if (retry) retry.style.display = (state === 'error' && !engine.neuralMouth?.ready) ? 'block' : 'none';
 }
+
+// Retry NeuralMouth init from the cognition tab
+window._retryNeuralInit = async function() {
+  if (engine.neuralMouth?.ready) return;
+  const retry = document.getElementById('slmRetryBtn');
+  if (retry) retry.style.display = 'none';
+  updateSLMStatusUI('loading', 'Retrying NeuralMouth...', engine.neuralMouth?.modelId || '—');
+  try {
+    engine.neuralMouth = new NeuralMouth();
+    const ok = await engine.neuralMouth.init((msg) => {
+      updateSLMStatusUI('loading', msg, engine.neuralMouth.modelId);
+    });
+    window._neuralMouth = engine.neuralMouth;
+    if (ok) {
+      engine._neuralReady = true;
+      updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
+    } else {
+      updateSLMStatusUI('error', engine.neuralMouth.error || 'Load failed', engine.neuralMouth.modelId || '—');
+    }
+  } catch(e) {
+    updateSLMStatusUI('error', 'Retry failed: ' + (e.message||e).slice(0,40), '—');
+  }
+};
 
 // ── COREF LOG UI ──
 function updateCorefUI() {
