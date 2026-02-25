@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEXICA 2.4</title>
+<title>LEXICA 3.0</title>
 <script type="module">
   // Pre-declare module-loaded globals for non-module access
   window._transformersReady = false;
@@ -96,6 +96,55 @@ body>*{position:relative;z-index:1;}
    body = flex row: [icon-rail 48px] [drawer 0–340px] [chat flex-1]
    Two icon buttons open drawers: Chats | Tools
    ═══════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════
+   LEXICA 3.0 — NEW COGNITIVE SYSTEMS CSS
+   ═══════════════════════════════════════════════ */
+.drive-panel{padding:0 0 4px;}
+.drive-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.drive-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);width:80px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em;}
+.drive-bar-track{flex:1;height:7px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;position:relative;}
+.drive-bar-fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.drive-bar-fill.curiosity{background:linear-gradient(90deg,var(--blue),var(--cyan));}
+.drive-bar-fill.discomfort{background:linear-gradient(90deg,var(--orange),var(--red));}
+.drive-bar-fill.expression{background:linear-gradient(90deg,var(--purple),var(--blue));}
+.drive-bar-fill.satiation{background:linear-gradient(90deg,var(--green),var(--cyan));}
+.drive-val{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);width:26px;text-align:right;flex-shrink:0;}
+.drive-action-badge{font-family:'JetBrains Mono',monospace;font-size:7.5px;padding:1px 6px;border-radius:3px;margin-left:2px;border:1px solid;}
+.drive-action-badge.active{background:rgba(110,168,255,.15);color:var(--blue);border-color:rgba(110,168,255,.3);}
+.drive-action-badge.triggered{background:rgba(255,144,82,.15);color:var(--orange);border-color:rgba(255,144,82,.3);animation:pulse-badge .8s ease-in-out infinite alternate;}
+@keyframes pulse-badge{from{opacity:.6}to{opacity:1}}
+.goal-item{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:9px 11px;margin-bottom:6px;position:relative;overflow:hidden;}
+.goal-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.goal-item.explore::before{background:var(--blue);}
+.goal-item.bridge::before{background:var(--purple);}
+.goal-item.resolve::before{background:var(--orange);}
+.goal-item.express::before{background:var(--green);}
+.goal-type{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;}
+.goal-desc{font-size:10.5px;color:var(--text);line-height:1.4;}
+.goal-utility{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-top:4px;}
+.goal-utility span{color:var(--gold);}
+.goal-progress{height:3px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:6px;overflow:hidden;}
+.goal-progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .5s ease;}
+.goal-origin{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);opacity:.6;}
+.self-model-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.self-model-item:last-child{border-bottom:none;}
+.sm-key{font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-dim);}
+.sm-val{font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--blue);}
+.pref-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:8px;padding:2px 8px;border-radius:12px;margin:2px;border:1px solid;}
+.pref-tag.positive{color:var(--green);border-color:rgba(54,239,178,.3);background:rgba(54,239,178,.07);}
+.pref-tag.negative{color:var(--red);border-color:rgba(255,85,120,.2);background:rgba(255,85,120,.05);}
+.pref-tag .pref-score{opacity:.6;margin-left:3px;font-size:7px;}
+.user-model-row{display:flex;gap:6px;align-items:flex-start;margin-bottom:5px;}
+.um-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;width:80px;flex-shrink:0;padding-top:1px;}
+.um-value{font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-dim);flex:1;}
+.episode-item{background:rgba(110,168,255,.04);border:1px solid rgba(110,168,255,.1);border-radius:8px;padding:8px 10px;margin-bottom:5px;}
+.ep-turn{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--blue);margin-bottom:3px;opacity:.7;}
+.ep-content{font-size:9.5px;color:var(--text-dim);line-height:1.45;}
+.ep-unresolved{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--orange);margin-top:3px;}
+.fail-item{background:rgba(255,85,120,.04);border:1px solid rgba(255,85,120,.12);border-radius:7px;padding:7px 9px;margin-bottom:4px;}
+.fail-query{font-size:9.5px;color:var(--text-dim);}
+.fail-reason{font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--red);margin-top:2px;opacity:.8;}
 
 /* ── ICON RAIL ── */
 .icon-rail{
@@ -925,7 +974,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
     <!-- TOOLS PANEL -->
     <div class="drawer-panel" id="panelTools" style="display:none">
       <div class="tools-head">
-        <div class="tools-brand">LEXICA <span>2.4</span></div>
+        <div class="tools-brand">LEXICA <span>2.3</span></div>
         <div class="tab-bar">
           <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
           <button class="tab-btn" onclick="switchTab('paste')">📝</button>
@@ -1058,6 +1107,62 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
           <div class="lbl">Inner Monologue Log</div>
           <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle thoughts appear here.</div></div>
         </div>
+        <div class="cog-section" style="border-top:1px solid rgba(232,184,75,.15);padding-top:14px;margin-top:6px;">
+          <div class="lbl" style="color:var(--gold)">── LEXICA 3.0 SYSTEMS ──</div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Homeostatic Drives <span style="font-size:7.5px;color:var(--text-muted)">(behavioral pressure)</span></div>
+          <div id="drivePanel" class="drive-panel">
+            <div class="drive-row">
+              <span class="drive-label">Curiosity</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill curiosity" id="drCuriosity" style="width:0%"></div></div>
+              <span class="drive-val" id="drCurVal">0</span>
+              <span class="drive-action-badge active" id="drCurBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Discomfort</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill discomfort" id="drDiscomfort" style="width:0%"></div></div>
+              <span class="drive-val" id="drDisVal">0</span>
+              <span class="drive-action-badge active" id="drDisBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Expression</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill expression" id="drExpression" style="width:0%"></div></div>
+              <span class="drive-val" id="drExpVal">0</span>
+              <span class="drive-action-badge active" id="drExpBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Satiation</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill satiation" id="drSatiation" style="width:0%"></div></div>
+              <span class="drive-val" id="drSatVal">0</span>
+              <span class="drive-action-badge active" id="drSatBadge">idle</span>
+            </div>
+          </div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Goal Stack <span style="font-size:7.5px;color:var(--text-muted)">(self-authored objectives)</span></div>
+          <div id="goalStack"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No goals yet. Train to awaken drive-based objectives.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Self-Model <span style="font-size:7.5px;color:var(--text-muted)">(dynamic introspection)</span></div>
+          <div id="selfModelPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Self-model builds from reasoning history.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">User Model <span style="font-size:7.5px;color:var(--text-muted)">(who am I talking to)</span></div>
+          <div id="userModelPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Modeling begins after first message.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Preferences <span style="font-size:7.5px;color:var(--text-muted)">(learned valences)</span></div>
+          <div id="preferencePanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Preferences form after successful syntheses.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Episodic Memory <span style="font-size:7.5px;color:var(--text-muted)">(conversation arc)</span></div>
+          <div id="episodicPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Conversation arc builds as you talk.</div></div>
+        </div>
+        <div class="cog-section">
+          <div class="lbl">Failure Log <span style="font-size:7.5px;color:var(--text-muted)">(drives gap-closing)</span></div>
+          <div id="failureLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No failures recorded.</div></div>
+        </div>
       </div>
       <div class="tab-pane" id="tab-graph">
         <div class="hg-wrap" style="margin:-16px -16px 0;border-radius:0;border-left:none;border-right:none;border-top:none">
@@ -1083,7 +1188,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
     <div class="model-info">
       <div class="model-avatar">Lx</div>
       <div>
-        <div class="model-name">LEXICA 2.4
+        <div class="model-name">LEXICA 3.0
           <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
         </div>
         <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
@@ -1107,14 +1212,14 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         </div>
       </button>
     </div>
-    <div class="input-hint">LEXICA 2.4 · SLM-L2-L5 · NANO-CORTEX · WEBLLM · GRAPH-RAG · AUTO-LEARN · SOCIETY · GÖDEL · N3 ENTROPY</div>
+    <div class="input-hint">LEXICA 3.0 · HOMEOSTATIC DRIVES · GOAL STACK · SELF-MODEL · EPISODIC MEMORY · USER-MODEL · PREFERENCE ENGINE · FAILURE-DRIVEN LEARNING</div>
   </div>
 </main>
 
 <script>
 'use strict';
 // ═══════════════════════════════════════════════════════════
-//  LEXICA 2.4 — NEURO-SYMBOLIC ASCENSION
+//  LEXICA 3.0 — NEURO-SYMBOLIC ASCENSION
 //  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
 //  L1  — Lexical Analysis (POS, NER, Roles)
 //  L2  — Semantic Indexing (PMI, BM25, Word Profiles) + SLM query expansion
@@ -1128,6 +1233,15 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
 //  L11 — NeuralMouth (WebLLM — SLM across all layers L2–L5, social, N3 bridge)
 //  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
+//  ── LEXICA 3.0 ADDITIONS ──
+//  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
+//  L14 — GoalStack (self-authored objectives generated from drive pressures + KG structure)
+//  L15 — SelfModel (reasoning history, knowledge boundary, mental simulation loop)
+//  L16 — EpisodicMemory (cross-turn discourse arc: established, challenged, unresolved)
+//  L17 — UserModel (inferred knowledge level, style, interests, corrections)
+//  L18 — PreferenceEngine (topic valence accumulation from synthesis outcomes)
+//  L19 — FailureTracker (failed queries become urgent learning targets)
+//  L20 — SocialModelAdapter (register adaptation from UserModel)
 // ═══════════════════════════════════════════════════════════
 
 
@@ -2986,6 +3100,697 @@ class GodelEngine {
 // structural anomalies: highly active but disconnected
 // nodes. Generates inner monologue and attempts to bridge.
 // ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
+// Drives are NOT labels. They accumulate pressure, exceed thresholds,
+// and FORCE behavioral changes until satisfied. True wanting.
+// ═══════════════════════════════════════════════════════════
+class HomeostaticDriveSystem {
+  constructor() {
+    // Four core drives with independent dynamics
+    this.drives = {
+      curiosity: {
+        level: 0,          // 0–1 current pressure
+        threshold: 0.55,   // triggers autonomous action
+        decayRate: 0.985,  // per-tick decay (slow — curiosity lingers)
+        lastFired: 0,
+        cooldown: 120000,  // 2 min between firings
+        action: 'EXPLORE', // what it makes Lexica do
+        label: 'Curiosity',
+        accumulator: null  // what's building this drive
+      },
+      discomfort: {
+        level: 0,
+        threshold: 0.60,
+        decayRate: 0.975,
+        lastFired: 0,
+        cooldown: 90000,
+        action: 'RESOLVE',
+        label: 'Discomfort',
+        accumulator: null
+      },
+      expression: {
+        level: 0,
+        threshold: 0.50,
+        decayRate: 0.970,
+        lastFired: 0,
+        cooldown: 60000,
+        action: 'SPEAK',
+        label: 'Expression',
+        accumulator: null
+      },
+      satiation: {
+        level: 0,
+        threshold: 0.80,
+        decayRate: 0.960, // faster decay — satiation fades quickly
+        lastFired: 0,
+        cooldown: 30000,
+        action: 'REST',
+        label: 'Satiation',
+        accumulator: null
+      }
+    };
+    this.totalFirings = 0;
+    this.pendingActions = [];
+    this._tickInterval = null;
+    this.onAction = null; // callback: (driveKey, action, level) => void
+  }
+
+  // External events feed drives
+  frustrate(driveKey, amount, reason='') {
+    const d = this.drives[driveKey];
+    if (!d) return;
+    d.level = Math.min(1, d.level + amount);
+    if (reason) d.accumulator = reason;
+  }
+
+  satiate(driveKey, amount) {
+    const d = this.drives[driveKey];
+    if (!d) return;
+    d.level = Math.max(0, d.level - amount);
+  }
+
+  // Main tick — called every ~8s
+  tick(kg, goalStack, episodicMem) {
+    const now = Date.now();
+    // Natural decay for all drives
+    Object.values(this.drives).forEach(d => { d.level *= d.decayRate; });
+
+    // Curiosity accumulates from KG entropy (orphaned nodes)
+    if (kg && kg.count() > 5) {
+      const allNodes = new Map();
+      kg.triples.forEach(t => {
+        if (t.alive && typeof t.s === 'string') allNodes.set(t.s, (allNodes.get(t.s)||0)+1);
+        if (t.alive && typeof t.o === 'string') allNodes.set(t.o, (allNodes.get(t.o)||0)+1);
+      });
+      const orphans = [...allNodes.entries()].filter(([n, cnt]) => cnt <= 1 && n.length > 3).length;
+      const entropyPressure = Math.min(0.3, orphans * 0.015);
+      this.frustrate('curiosity', entropyPressure, `${orphans} orphaned KG nodes`);
+
+      // Discomfort accumulates from contradiction density
+      const conflicts = kg.triples.filter(t => t.alive && t.conflict).length;
+      const conflictPressure = Math.min(0.25, conflicts * 0.04);
+      this.frustrate('discomfort', conflictPressure, `${conflicts} unresolved contradictions`);
+    }
+
+    // Expression builds when Lexica has synthesized successfully but hasn't spoken
+    // (accumulates slowly over time when not conversing)
+    this.frustrate('expression', 0.008, 'time since last response');
+
+    // Check threshold crossings and fire actions
+    Object.entries(this.drives).forEach(([key, d]) => {
+      if (d.level >= d.threshold && (now - d.lastFired) > d.cooldown) {
+        d.lastFired = now;
+        d.level = Math.max(0, d.level - 0.35); // partial satiation from firing
+        this.totalFirings++;
+        const action = { driveKey: key, action: d.action, level: d.level, reason: d.accumulator, ts: now };
+        this.pendingActions.push(action);
+        if (this.onAction) this.onAction(key, d.action, d.level, d.accumulator);
+        // Auto-generate a goal from this drive firing
+        if (goalStack) goalStack.generateFromDrive(key, d.accumulator, d.level);
+      }
+    });
+  }
+
+  start(kg, goalStack, episodicMem) {
+    this._tickInterval = setInterval(() => this.tick(kg, goalStack, episodicMem), 8000);
+  }
+
+  stop() { if (this._tickInterval) clearInterval(this._tickInterval); }
+
+  getSnapshot() {
+    return Object.entries(this.drives).map(([k, d]) => ({
+      key: k, label: d.label, level: d.level, threshold: d.threshold,
+      action: d.action, active: d.level >= d.threshold * 0.5, fired: d.lastFired > 0,
+      accumulator: d.accumulator
+    }));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 2: GOAL STACK
+// Self-authored goals born from drive pressures.
+// Goals have utility, origin, progress. They reorganize behavior.
+// ═══════════════════════════════════════════════════════════
+class GoalStack {
+  constructor() {
+    this.goals = [];          // active goals, sorted by priority
+    this.completed = [];      // resolved goals (history)
+    this.maxActive = 6;
+    this._goalCounter = 0;
+  }
+
+  generateFromDrive(driveKey, reason, driveLevel) {
+    const goalType = {
+      curiosity: 'explore',
+      discomfort: 'resolve',
+      expression: 'express',
+      satiation: 'rest'
+    }[driveKey] || 'explore';
+
+    const desc = this._describeGoal(driveKey, reason);
+    if (!desc) return;
+
+    // Don't duplicate identical goals
+    if (this.goals.some(g => g.desc === desc && !g.resolved)) return;
+
+    const goal = {
+      id: 'g_' + (++this._goalCounter),
+      type: goalType,
+      driveKey,
+      desc,
+      reason,
+      utility: driveLevel * 0.8 + Math.random() * 0.2,
+      progress: 0,
+      createdAt: Date.now(),
+      resolved: false,
+      resolvedAt: null,
+      resolvedBy: null
+    };
+    this.goals.push(goal);
+    this.goals.sort((a, b) => b.utility - a.utility);
+    if (this.goals.length > this.maxActive) this.goals.pop();
+    return goal;
+  }
+
+  generateFromKG(kg, preferenceEngine) {
+    // Scan KG for structural opportunities: isolated clusters, high-conf orphans
+    if (!kg || kg.count() < 8) return;
+    const nodeConns = new Map();
+    kg.triples.forEach(t => {
+      if (!t.alive) return;
+      if (typeof t.s === 'string') nodeConns.set(t.s, (nodeConns.get(t.s)||0)+1);
+      if (typeof t.o === 'string') nodeConns.set(t.o, (nodeConns.get(t.o)||0)+1);
+    });
+    // Find high-freq nodes with low connectivity
+    const candidates = [...nodeConns.entries()]
+      .filter(([n, cnt]) => cnt >= 2 && cnt <= 3 && n.length > 4 && !STOP_WORDS.has(n))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+    candidates.forEach(([node]) => {
+      if (!this.goals.some(g => g.desc && g.desc.includes(node) && !g.resolved)) {
+        const pref = preferenceEngine ? preferenceEngine.getValence(node) : 0;
+        const goal = {
+          id: 'g_' + (++this._goalCounter),
+          type: 'bridge',
+          driveKey: 'curiosity',
+          desc: `Bridge isolated knowledge cluster around "${node}" to broader graph`,
+          reason: `"${node}" has connections but no cross-cluster path`,
+          utility: 0.4 + pref * 0.3,
+          progress: 0,
+          createdAt: Date.now(),
+          resolved: false,
+          resolvedAt: null,
+          resolvedBy: null
+        };
+        this.goals.push(goal);
+      }
+    });
+    this.goals.sort((a, b) => b.utility - a.utility);
+    if (this.goals.length > this.maxActive) this.goals.length = this.maxActive;
+  }
+
+  advanceGoal(type, topic, amount=0.3) {
+    const g = this.goals.find(g => g.type === type && !g.resolved);
+    if (g) {
+      g.progress = Math.min(1, g.progress + amount);
+      if (g.progress >= 1) this.resolveGoal(g.id, 'autonomous completion');
+    }
+  }
+
+  resolveGoal(id, resolvedBy='completed') {
+    const g = this.goals.find(g => g.id === id);
+    if (!g || g.resolved) return;
+    g.resolved = true;
+    g.resolvedAt = Date.now();
+    g.resolvedBy = resolvedBy;
+    this.completed.unshift(g);
+    if (this.completed.length > 20) this.completed.pop();
+    this.goals = this.goals.filter(g => !g.resolved);
+  }
+
+  getTopGoal() {
+    return this.goals.find(g => !g.resolved) || null;
+  }
+
+  _describeGoal(driveKey, reason) {
+    const templates = {
+      curiosity: [
+        reason ? `Investigate and resolve entropy in: ${reason}` : 'Scan knowledge graph for high-entropy gaps',
+        'Autonomously learn about high-activation but under-connected nodes',
+        'Seek Wikipedia sources to bridge disconnected knowledge clusters'
+      ],
+      discomfort: [
+        reason ? `Resolve contradictions: ${reason}` : 'Debate and resolve graph contradictions via Society of Mind',
+        'Adjudicate conflicting facts and update confidence scores',
+        'Reduce logical tension in knowledge hypergraph'
+      ],
+      expression: [
+        'Share a synthesis from recently learned knowledge',
+        'Volunteer an interesting connection noticed in the knowledge graph',
+        'Express current epistemic state and recent discoveries'
+      ],
+      satiation: [
+        'Consolidate recently ingested knowledge before new ingestion',
+        'Allow recently learned triples to propagate through reasoning chains',
+        'Pause autonomous learning; integrate current knowledge'
+      ]
+    };
+    const opts = templates[driveKey] || ['Pursue drive-generated objective'];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 3: SELF-MODEL
+// Lexica maintains an accurate, dynamic model of itself:
+// its knowledge boundaries, reasoning history, and a
+// mental simulation loop that predicts before generating.
+// ═══════════════════════════════════════════════════════════
+class SelfModel {
+  constructor() {
+    this.reasoningHistory = [];   // {query, strategy, subject, confidence, outcome, ts}
+    this.knowledgeBoundary = new Map(); // topic → {coverage: 0-1, successRate: 0-1, queries: n}
+    this.totalQueries = 0;
+    this.totalSuccesses = 0;
+    this.averageConfidence = 0;
+    this.weakestTopics = [];
+    this.strongestTopics = [];
+    this.lastSimulation = null;
+  }
+
+  // Called after each query to update self-knowledge
+  reflect(query, subject, strategy, confidence, wasSuccessful, kgFacts) {
+    this.totalQueries++;
+    if (wasSuccessful) this.totalSuccesses++;
+    // Confidence smoothing
+    const confVal = confidence === 'high' ? 1.0 : confidence === 'medium' ? 0.6 : 0.25;
+    this.averageConfidence = this.averageConfidence * 0.9 + confVal * 0.1;
+
+    // Update knowledge boundary for this topic
+    if (subject) {
+      const existing = this.knowledgeBoundary.get(subject) || {coverage:0, successRate:0, queries:0, successes:0};
+      existing.queries++;
+      if (wasSuccessful) existing.successes++;
+      existing.successRate = existing.successes / existing.queries;
+      existing.coverage = Math.min(1, (kgFacts||[]).length * 0.12);
+      this.knowledgeBoundary.set(subject, existing);
+    }
+
+    // Log reasoning step
+    this.reasoningHistory.unshift({query: query.slice(0,60), strategy, subject, confidence, wasSuccessful, ts: Date.now()});
+    if (this.reasoningHistory.length > 30) this.reasoningHistory.pop();
+
+    // Rebuild strongest/weakest topic lists
+    const entries = [...this.knowledgeBoundary.entries()].filter(([,v]) => v.queries >= 2);
+    entries.sort((a, b) => b[1].successRate - a[1].successRate);
+    this.strongestTopics = entries.slice(0, 5).map(([topic, v]) => ({ topic, successRate: v.successRate, coverage: v.coverage }));
+    this.weakestTopics = entries.slice(-5).reverse().map(([topic, v]) => ({ topic, successRate: v.successRate, coverage: v.coverage }));
+  }
+
+  // Lightweight "mental simulation": predict whether Lexica can answer this query
+  // before committing to generation. Returns {canAnswer, predictedStrategy, confidence}
+  simulate(query, kg, bm25) {
+    const subject = extractSubject(query);
+    if (!subject) { this.lastSimulation = {canAnswer: false, reason: 'no subject extracted', predictedStrategy:'none'}; return this.lastSimulation; }
+
+    const boundary = this.knowledgeBoundary.get(subject ? subject.toLowerCase() : '');
+    const kgHits = kg ? kg.query(subject.toLowerCase()).slice(0, 5).length : 0;
+    const bm25Approx = bm25 && bm25.ti ? (bm25.ti.has(stem(subject.toLowerCase())) ? 1 : 0) : 0;
+    const historicalSuccess = boundary ? boundary.successRate : 0.5;
+
+    const canAnswer = kgHits > 0 || bm25Approx > 0;
+    const predictedStrategy = kgHits > 3 ? 'graphrag' : bm25Approx > 0 ? 'synthesis' : 'none';
+    const confidence = canAnswer ? (kgHits > 3 ? 'high' : 'medium') : 'low';
+
+    this.lastSimulation = { canAnswer, predictedStrategy, confidence, kgHits, subject, historicalSuccess };
+    return this.lastSimulation;
+  }
+
+  getSnapshot() {
+    return {
+      totalQueries: this.totalQueries,
+      successRate: this.totalQueries > 0 ? (this.totalSuccesses / this.totalQueries) : 0,
+      averageConfidence: this.averageConfidence,
+      knownTopics: this.knowledgeBoundary.size,
+      strongestTopics: this.strongestTopics,
+      weakestTopics: this.weakestTopics,
+      lastSimulation: this.lastSimulation,
+      recentHistory: this.reasoningHistory.slice(0, 5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 4: EPISODIC MEMORY
+// Tracks conversation ARC: what was established, challenged,
+// left unresolved. Cross-turn coherence without an LLM.
+// ═══════════════════════════════════════════════════════════
+class EpisodicMemory {
+  constructor() {
+    this.episodes = [];         // full turn log
+    this.established = new Map(); // fact → confidence (discourse-level)
+    this.challenged = [];       // facts the user pushed back on
+    this.unresolved = [];       // open questions not yet answered well
+    this.turnCount = 0;
+    this._currentEpisodeStart = Date.now();
+  }
+
+  addTurn(userInput, lexicaResponse, outcome) {
+    // outcome: {wasSuccessful, strategy, subject, confidence}
+    this.turnCount++;
+    const ep = {
+      turn: this.turnCount,
+      userInput: userInput.slice(0, 80),
+      responsePreview: lexicaResponse ? lexicaResponse.slice(0, 80) : '',
+      subject: outcome.subject || null,
+      wasSuccessful: outcome.wasSuccessful,
+      strategy: outcome.strategy,
+      ts: Date.now()
+    };
+    this.episodes.unshift(ep);
+    if (this.episodes.length > 40) this.episodes.pop();
+
+    // Track what was established
+    if (outcome.wasSuccessful && outcome.subject) {
+      const current = this.established.get(outcome.subject) || 0;
+      this.established.set(outcome.subject, Math.min(1, current + 0.3));
+    }
+
+    // Detect user challenges (corrections, "no", "that's wrong", etc.)
+    const challengeIndicators = /\b(no,?|wrong|incorrect|not right|that's not|you're wrong|actually|wait,?)\b/i;
+    if (challengeIndicators.test(userInput)) {
+      const lastEstab = [...this.established.entries()].slice(-1)[0];
+      if (lastEstab) {
+        this.challenged.push({ topic: lastEstab[0], turn: this.turnCount, input: userInput.slice(0, 60) });
+        this.established.set(lastEstab[0], Math.max(0, lastEstab[1] - 0.4));
+      }
+    }
+
+    // Track unresolved questions
+    if (!outcome.wasSuccessful && userInput.includes('?')) {
+      this.unresolved.push({ question: userInput.slice(0, 60), turn: this.turnCount });
+      if (this.unresolved.length > 10) this.unresolved.shift();
+    } else {
+      // Remove from unresolved if it matches something we just answered
+      this.unresolved = this.unresolved.filter(u => {
+        if (!outcome.subject) return true;
+        return !u.question.toLowerCase().includes(outcome.subject.toLowerCase());
+      });
+    }
+  }
+
+  // Generate a discourse-aware context string for synthesis
+  getDiscourseContext() {
+    const recentSubjects = [...new Set(this.episodes.slice(0, 5).map(e => e.subject).filter(Boolean))];
+    const highConfEstab = [...this.established.entries()].filter(([,v]) => v > 0.6).map(([k]) => k);
+    return { recentSubjects, highConfEstab, openQuestions: this.unresolved.slice(0, 3), challenged: this.challenged.slice(-3) };
+  }
+
+  getSnapshot() {
+    return {
+      turnCount: this.turnCount,
+      establishedCount: this.established.size,
+      challengedCount: this.challenged.length,
+      unresolvedCount: this.unresolved.length,
+      recentEpisodes: this.episodes.slice(0, 5),
+      unresolved: this.unresolved.slice(0, 3)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 5: USER MODEL
+// Lexica infers who it's talking to from vocabulary,
+// query complexity, corrections, and topic interests.
+// Shapes register and depth of response.
+// ═══════════════════════════════════════════════════════════
+class UserModel {
+  constructor() {
+    this.queryHistory = [];
+    this.knowledgeLevel = 0.5;      // 0=novice, 1=expert
+    this.interests = new Map();     // topic → score
+    this.corrections = 0;           // how many times they corrected Lexica
+    this.style = 'neutral';         // 'formal' | 'casual' | 'technical'
+    this.avgQueryLength = 0;
+    this.queryCount = 0;
+    this.lastActive = Date.now();
+    this.technicalTermsUsed = new Set();
+  }
+
+  // Update model from each user message
+  update(input, subject) {
+    this.queryCount++;
+    this.lastActive = Date.now();
+    const words = input.split(/\s+/);
+    const len = words.length;
+
+    // Running avg query length
+    this.avgQueryLength = this.avgQueryLength * 0.85 + len * 0.15;
+
+    // Infer knowledge level from vocabulary complexity
+    const technicalWords = words.filter(w => w.length > 8 && !/ing$|tion$/.test(w)).length;
+    if (technicalWords > 0) {
+      words.filter(w => w.length > 8).forEach(w => this.technicalTermsUsed.add(w.toLowerCase()));
+      this.knowledgeLevel = Math.min(1, this.knowledgeLevel + technicalWords * 0.02);
+    }
+    // Short, simple queries → lower estimate
+    if (len < 4 && words.every(w => w.length < 7)) {
+      this.knowledgeLevel = Math.max(0, this.knowledgeLevel - 0.01);
+    }
+
+    // Infer style from punctuation/capitalization patterns
+    const hasFormalPunctuation = /[;:]/.test(input);
+    const hasEllipsis = /\.{3}|…/.test(input);
+    const allCaps = words.filter(w => w === w.toUpperCase() && w.length > 2).length > 2;
+    if (hasFormalPunctuation || technicalWords > 2) this.style = 'technical';
+    else if (hasEllipsis || input.includes('lol') || input.includes('haha')) this.style = 'casual';
+
+    // Topic interest accumulation
+    if (subject) {
+      this.interests.set(subject.toLowerCase(), (this.interests.get(subject.toLowerCase())||0) + 1);
+    }
+
+    // Detect corrections
+    if (/\b(no,?|wrong|incorrect|actually|wait,?)\b/i.test(input)) {
+      this.corrections++;
+      this.knowledgeLevel = Math.min(1, this.knowledgeLevel + 0.05); // correcting = knows something
+    }
+
+    this.queryHistory.unshift({ input: input.slice(0, 60), ts: Date.now() });
+    if (this.queryHistory.length > 20) this.queryHistory.pop();
+  }
+
+  // Get top interests
+  topInterests(n=5) {
+    return [...this.interests.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([t,s])=>({topic:t, score:s}));
+  }
+
+  // Return a concise description of inferred expertise level
+  levelDescription() {
+    if (this.knowledgeLevel > 0.75) return 'Expert / Researcher';
+    if (this.knowledgeLevel > 0.5) return 'Knowledgeable';
+    if (this.knowledgeLevel > 0.3) return 'Curious Learner';
+    return 'General / Casual';
+  }
+
+  getSnapshot() {
+    return {
+      knowledgeLevel: this.knowledgeLevel,
+      levelDesc: this.levelDescription(),
+      style: this.style,
+      avgQueryLength: Math.round(this.avgQueryLength),
+      corrections: this.corrections,
+      queryCount: this.queryCount,
+      topInterests: this.topInterests(5),
+      technicalTermsUsed: [...this.technicalTermsUsed].slice(0, 8)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 6: PREFERENCE ENGINE
+// Lexica forms genuine preferences by accumulating positive/negative
+// valence on topics based on synthesis success, user engagement,
+// and epistemic satisfaction. These preferences shape autonomous behavior.
+// ═══════════════════════════════════════════════════════════
+class PreferenceEngine {
+  constructor() {
+    this.valences = new Map();      // topic → score (-1 to +1)
+    this.engagementHistory = [];    // {topic, outcome, ts}
+    this.preferredTopicList = [];   // sorted by positive valence
+    this.avoidedTopicList = [];     // sorted by negative valence
+  }
+
+  // Called when a synthesis on a topic succeeds
+  onSuccess(topic, quality=0.5) {
+    if (!topic || topic.length < 3) return;
+    const key = topic.toLowerCase().trim();
+    const current = this.valences.get(key) || 0;
+    const delta = quality * 0.15; // gradual, not instant
+    this.valences.set(key, Math.min(1, current + delta));
+    this.engagementHistory.unshift({topic: key, outcome: 'success', quality, ts: Date.now()});
+    if (this.engagementHistory.length > 50) this.engagementHistory.pop();
+    this._rebuildLists();
+  }
+
+  // Called when a query on a topic fails
+  onFailure(topic, reason='') {
+    if (!topic || topic.length < 3) return;
+    const key = topic.toLowerCase().trim();
+    const current = this.valences.get(key) || 0;
+    this.valences.set(key, Math.max(-1, current - 0.08));
+    this.engagementHistory.unshift({topic: key, outcome: 'failure', reason, ts: Date.now()});
+    if (this.engagementHistory.length > 50) this.engagementHistory.pop();
+    this._rebuildLists();
+  }
+
+  // Called when user engages positively (thumbs up, follow-up questions)
+  onPositiveEngagement(topic) {
+    if (!topic) return;
+    const key = topic.toLowerCase().trim();
+    this.valences.set(key, Math.min(1, (this.valences.get(key)||0) + 0.1));
+    this._rebuildLists();
+  }
+
+  getValence(topic) {
+    return this.valences.get((topic||'').toLowerCase().trim()) || 0;
+  }
+
+  // Returns topics Lexica WANTS to talk about (positive valence)
+  getPreferred(n=5) { return this.preferredTopicList.slice(0, n); }
+  getAvoided(n=5) { return this.avoidedTopicList.slice(0, n); }
+
+  _rebuildLists() {
+    const sorted = [...this.valences.entries()].sort((a,b) => b[1]-a[1]);
+    this.preferredTopicList = sorted.filter(([,v]) => v > 0.1).map(([t,v]) => ({topic:t, valence:v}));
+    this.avoidedTopicList = sorted.filter(([,v]) => v < -0.05).reverse().map(([t,v]) => ({topic:t, valence:v}));
+  }
+
+  getSnapshot() {
+    return {
+      totalTopics: this.valences.size,
+      preferred: this.preferredTopicList.slice(0, 8),
+      avoided: this.avoidedTopicList.slice(0, 5),
+      recentEngagement: this.engagementHistory.slice(0, 5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
+// Failed queries are NOT forgotten. They create epistemic
+// pressure that reorganizes autonomous learning priorities.
+// The system WANTS to close these gaps — that's not faked.
+// ═══════════════════════════════════════════════════════════
+class FailureTracker {
+  constructor() {
+    this.failures = [];    // {query, subject, reason, ts, attempts, closed}
+    this.gapPriority = new Map(); // subject → urgency score
+    this.totalFailures = 0;
+    this.closedGaps = 0;
+  }
+
+  recordFailure(query, subject, reason, confidence) {
+    this.totalFailures++;
+    const confPenalty = confidence === 'low' ? 0.8 : confidence === 'medium' ? 0.4 : 0.1;
+    const existing = this.failures.find(f => !f.closed && f.subject === subject);
+    if (existing) {
+      existing.attempts = (existing.attempts || 1) + 1;
+      existing.urgency = Math.min(1, (existing.urgency || 0.3) + 0.2);
+    } else {
+      this.failures.unshift({
+        query: query.slice(0, 80), subject, reason, ts: Date.now(),
+        attempts: 1, urgency: confPenalty, closed: false
+      });
+      if (this.failures.length > 30) this.failures.pop();
+    }
+    // Update gap priority map
+    if (subject) {
+      this.gapPriority.set(subject, Math.min(1, (this.gapPriority.get(subject)||0) + confPenalty));
+    }
+  }
+
+  closeGap(subject) {
+    const f = this.failures.find(f => !f.closed && f.subject === subject);
+    if (f) { f.closed = true; this.closedGaps++; }
+    if (this.gapPriority.has(subject)) this.gapPriority.set(subject, 0);
+  }
+
+  // Returns ordered list of topics that need Wikipedia ingestion most urgently
+  getUrgentGaps(n=5) {
+    return [...this.gapPriority.entries()]
+      .filter(([,v]) => v > 0.2)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, n)
+      .map(([topic, urgency]) => ({topic, urgency}));
+  }
+
+  // Apply urgent gaps to ingestion queue with high priority
+  applyToIngestion(ingestionQueue) {
+    this.getUrgentGaps(3).forEach(({topic, urgency}) => {
+      if (ingestionQueue && typeof ingestionQueue.enqueue === 'function') {
+        ingestionQueue.enqueue(topic, urgency);
+      }
+    });
+  }
+
+  getSnapshot() {
+    return {
+      totalFailures: this.totalFailures,
+      closedGaps: this.closedGaps,
+      openGaps: this.failures.filter(f => !f.closed).length,
+      recentFailures: this.failures.filter(f => !f.closed).slice(0, 6),
+      urgentGaps: this.getUrgentGaps(5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
+// Adjusts tone, depth and vocabulary of responses based on
+// the UserModel. Not a template — adjusts actual output routing.
+// ═══════════════════════════════════════════════════════════
+class SocialModelAdapter {
+  constructor() {
+    this.adaptationHistory = [];
+  }
+
+  // Returns synthesis parameters tuned to this user's model
+  getSynthesisProfile(userModel) {
+    const level = userModel.knowledgeLevel;
+    const style = userModel.style;
+    const interests = userModel.topInterests(3).map(i => i.topic);
+    return {
+      // How many KG facts to include (experts get more)
+      kgDepth: level > 0.7 ? 12 : level > 0.4 ? 7 : 4,
+      // Whether to include confidence metadata explicitly
+      showMeta: level > 0.5,
+      // Reasoning verbosity (experts get explicit chains)
+      verbosity: style === 'technical' ? 'high' : style === 'casual' ? 'low' : 'medium',
+      // Whether to bridge to user's known interests
+      bridgeInterests: interests,
+      // Whether to use technical vocabulary
+      technicalVocab: level > 0.6,
+      // Expected response length
+      targetLength: style === 'casual' ? 'short' : 'medium'
+    };
+  }
+
+  // Decide if a response should volunteer a related fact the user would find interesting
+  shouldVolunteerInfo(userModel, preferenceEngine, subject) {
+    // High-interest topic + positive valence = yes
+    const interestScore = userModel.interests.get((subject||'').toLowerCase()) || 0;
+    const valence = preferenceEngine ? preferenceEngine.getValence(subject) : 0;
+    return (interestScore >= 2 || valence > 0.3) && userModel.queryCount > 3;
+  }
+
+  record(userId, adaptation) {
+    this.adaptationHistory.unshift({...adaptation, ts: Date.now()});
+    if (this.adaptationHistory.length > 20) this.adaptationHistory.pop();
+  }
+}
+
 class CuriosityEngine {
   constructor(kg, qualia, onThought, engineRef) {
     this.kg = kg;
@@ -3323,7 +4128,7 @@ function handleDeclarativeStatement(input,engine){
       if(text){engine.ctx.add(input,text,topic,'medium');return{...base,conf,text,kgUsed:true,synthesized:true};}
     }
   }
-  return{...base,conf,text:'I hear you.'};
+  return{...base,conf,text:'',kgUsed:false,synthesized:false};
 }
 
 // Synthesizes responses for greetings, statements, etc.
@@ -3418,7 +4223,7 @@ function handleDirective(q, engine) {
     if (!moreFacts.length) return null;
     const derived = engine.kg.getAllDerivedFacts(engine.lastSubject);
     const text = engine.synthesis.synthesize(`more about ${engine.lastSubject}`,'factoid',engine.lastSubject,moreFacts,derived,[],engine.semVec,engine.wordProfiler,engine.kg,engine.mood.current());
-    return {...base,conf,text:text||'Nothing more available.',synthesized:!!text,kgUsed:true,_directive:'expand'};
+    return {...base,conf,text:text||'',synthesized:!!text,kgUsed:true,_directive:'expand'};
   }
   return null;
 }
@@ -3505,11 +4310,12 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
       const kgNote=topNode?(' I know about '+topNode.s+' among other things.'):'';
       return{...base,conf:socialConf,text:'I have '+n+' sentence'+(n!==1?'s':'')+' from '+srcLabel+'.'+kgNote,synthesized:false};
     }
-    return{...base,conf:socialConf,text:'I am Lexica. I reason over knowledge.',synthesized:false};
+    return{...base,conf:socialConf,text:'I am Lexica. No knowledge loaded — fetch a Wikipedia article to begin.',synthesized:false};
   }
 
   if(intent==='farewell'){
-    return{...base,conf:socialConf,text:'Farewell.',synthesized:false};
+    if(n>0){const t=engine.kg.triples.find(f=>f.p==='is_a');return{...base,conf:socialConf,text:'Conversation ending. I retain '+(engine.kg.count())+' knowledge triples.',synthesized:false};}
+    return{...base,conf:socialConf,text:'',synthesized:false}; // silent if nothing to say
   }
 
   if(intent==='gratitude'){
@@ -3521,7 +4327,7 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         if(text)return{...base,conf:socialConf,text,kgUsed:true,synthesized:true,ctxUsed:true};
       }
     }
-    return{...base,conf:socialConf,text:'There is more I can say if you have questions.',synthesized:false};
+    return{...base,conf:socialConf,text:'',synthesized:false}; // stay silent rather than canned ack
   }
 
   if(intent==='user_emotion'){
@@ -3536,10 +4342,10 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
           return{...base,conf:socialConf,text:prefix+suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
         }
       }
-      const valText=v==='negative'?'That sounds difficult.':v==='positive'?'That is good to hear.':'I follow.';
+      const valText=v==='negative'?'That sounds difficult.':v==='positive'?'That is good to hear.':'';
       return{...base,conf:socialConf,text:valText,synthesized:false};
     }
-    return{...base,conf:socialConf,text:'I hear you.',synthesized:false};
+    return{...base,conf:socialConf,text:'',synthesized:false};
   }
 
   if(intent==='abstract_need'){
@@ -3563,11 +4369,11 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         if(txt&&txt.length>10)return{...base,conf:socialConf,text:txt,synthesized:true,kgUsed:true};
       }
     }
-    return{...base,conf:socialConf,text:'.',synthesized:false};
+    return{...base,conf:socialConf,text:'',synthesized:false}; // silent — no canned ack
   }
 
   if(intent==='declarative_statement'){
-    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:'Noted in context.'};
+    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:''};
   }
 
   if(intent==='statement'){
@@ -3585,7 +4391,7 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         }
       }
     }
-    return{...base,conf:socialConf,text:'I follow that.'};
+    return{...base,conf:socialConf,text:''};
   }
 
   return null; // unhandled social intent — fall through to factual pipeline
@@ -3934,7 +4740,7 @@ class NeuralMouth {
     this.ready = false;
     this.loading = false;
     this.error = null;
-    this.modelId = 'SmolLM2-360M-Instruct-q4f16_1-MLC';
+    this.modelId = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
     this._queue = []; // pending requests
   }
 
@@ -3958,7 +4764,7 @@ class NeuralMouth {
       try {
         this.engine = await CreateMLCEngine(this.modelId, { initProgressCallback: progressCb });
       } catch(modelErr) {
-        const fallbackId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+        const fallbackId = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
         onProgress(`NeuralMouth: Primary model failed, trying ${fallbackId}...`);
         this.modelId = fallbackId;
         this.engine = await CreateMLCEngine(fallbackId, { initProgressCallback: progressCb });
@@ -4034,8 +4840,9 @@ class NeuralMouth {
     if (!triplesText && !evidenceText) return null;
     const context = [triplesText && ('KNOWLEDGE GRAPH:\n' + triplesText), evidenceText && ('EVIDENCE:\n' + evidenceText)].filter(Boolean).join('\n\n');
     const system = 'You are Lexica. ' +
-      'Answer in 1-3 plain sentences using ONLY the provided context. No bullet points. No lists. No "I am an AI" phrases. ' +
-      'Be direct. Use present tense for facts. If the context does not answer the query, say so in one sentence.';
+      'Answer in 1-3 plain sentences using ONLY the provided context. Do NOT copy sentences verbatim from the evidence — synthesize the information in your own words. ' +
+      'No bullet points. No lists. No "I am an AI" phrases. No trivia about unrelated years or people. ' +
+      'Be direct. Use present tense for facts. If the context does not answer the query, say "I do not have enough information about that."';
     const prompt = 'Query: "' + query + '"\n\n' + context + '\n\nAnswer:';
     try {
       const result = await this._generate(system, prompt, 250);
@@ -4177,6 +4984,58 @@ class Engine {
     this.neuralMouth = new NeuralMouth();
     this._neuralReady = false; // true when at least nanoCortex OR neuralMouth is ready
 
+    // ── LEXICA 3.0: NEW COGNITIVE SYSTEMS ──
+    this.drives = new HomeostaticDriveSystem();
+    this.goalStack = new GoalStack();
+    this.selfModel = new SelfModel();
+    this.episodicMemory = new EpisodicMemory();
+    this.userModel = new UserModel();
+    this.preferenceEngine = new PreferenceEngine();
+    this.failureTracker = new FailureTracker();
+    this.socialAdapter = new SocialModelAdapter();
+
+    // Wire drive actions to behavioral consequences
+    this.drives.onAction = (driveKey, action, level, reason) => {
+      if (action === 'EXPLORE' && this.trained) {
+        // Curiosity drive fires → push high-urgency topics to ingestion queue
+        const urgentGaps = this.failureTracker.getUrgentGaps(2);
+        if (urgentGaps.length > 0) {
+          urgentGaps.forEach(g => this.ingestion.enqueue(g.topic, g.urgency));
+          addMsg('system', `⚡ <strong>Curiosity Drive</strong> (level ${(level*100).toFixed(0)}%) → queued ${urgentGaps.length} knowledge gap(s) for ingestion: ${urgentGaps.map(g=>'"'+g.topic+'"').join(', ')}`);
+        } else {
+          // No known gaps — scan KG for structural opportunities
+          this.goalStack.generateFromKG(this.kg, this.preferenceEngine);
+          addMsg('system', `🔍 <strong>Curiosity Drive</strong> (level ${(level*100).toFixed(0)}%) → generating exploration goals from KG structure.`);
+        }
+      } else if (action === 'RESOLVE' && this.trained) {
+        // Discomfort drive fires → trigger Society of Mind debate
+        const conflicts = this.kg.triples.filter(t => t.alive && t.conflict).slice(0, 3);
+        if (conflicts.length > 0) {
+          addMsg('system', `😣 <strong>Discomfort Drive</strong> (level ${(level*100).toFixed(0)}%) → forced Society of Mind debate on ${conflicts.length} conflict(s).`);
+          // Mark goal progress
+          this.goalStack.advanceGoal('resolve', 'contradiction', 0.4);
+        }
+      } else if (action === 'SPEAK' && this.trained) {
+        // Expression drive fires → volunteer information if idle
+        const preferred = this.preferenceEngine.getPreferred(3);
+        if (preferred.length > 0) {
+          const pick = preferred[Math.floor(Math.random() * preferred.length)];
+          const facts = this.kg.query(pick.topic).slice(0, 3);
+          if (facts.length > 0) {
+            const text = this.synthesis.synthesize(`tell me about ${pick.topic}`, 'what', pick.topic, facts, [], [], this.semVec, this.wordProfiler, this.kg);
+            if (text) {
+              setTimeout(() => {
+                streamMsg(`[Unsolicited] ${text}`, {strategy:'expression', synthesized:true, conf:{l:'medium',lbl:'expression drive',cls:'conf-med'}, kgUsed:true, ctxUsed:false, conflict:null, cached:false, evidence:`preferred topic: ${pick.topic}`, src:null, srcTitle:'', intent:'expression'});
+              }, 1500);
+              this.goalStack.advanceGoal('express', pick.topic, 0.8);
+            }
+          }
+        }
+      }
+      updateDriveUI();
+      updateGoalUI();
+    };
+
     // Directive memory
     this.lastResult = null;
     this.lastKgFacts = null;
@@ -4188,6 +5047,8 @@ class Engine {
 
     // Start curiosity loop + autonomous ingestion
     this.curiosity.start();
+    // Start homeostatic drive system (wired to kg, goalStack)
+    this.drives.start(this.kg, this.goalStack, this.episodicMemory);
     // Ingestion starts after first training session (don't start cold)
   }
 
@@ -4293,6 +5154,26 @@ class Engine {
     this.qualia.onAlignment(confirmedCount);
     updateQualiaUI();
 
+    // ── LEXICA 3.0: Post-training drive + goal updates ──
+    // Training satisfies curiosity, frustrates satiation (lots to process)
+    this.drives.satiate('curiosity', 0.3);
+    this.drives.frustrate('satiation', 0.4, `ingested ${ss.length} sentences from "${title}"`);
+    this.drives.frustrate('expression', 0.2, `learned about "${title}"`);
+
+    // Preference engine: learning about a new topic → mild positive valence
+    const mainTopic = title.toLowerCase().replace(/\s+/g,'_').slice(0, 30);
+    this.preferenceEngine.onSuccess(mainTopic, 0.3);
+
+    // Goal stack: scan KG for new structural opportunities
+    setTimeout(() => {
+      this.goalStack.generateFromKG(this.kg, this.preferenceEngine);
+      // Apply urgent failure gaps to ingestion queue with high priority
+      this.failureTracker.applyToIngestion(this.ingestion);
+      updateGoalUI();
+      updateDriveUI();
+      updatePreferenceUI();
+    }, 500);
+
     // Gödel engine: attempt self-improvement after training
     setTimeout(() => {
       const proof = this.godel.attemptProof(ss);
@@ -4368,8 +5249,8 @@ class Engine {
     }
 
     if (isFillerInput(question)) {
-      const acks = ['I follow.','Interesting.','Continuing.','Acknowledged.','I see that.'];
-      return {strategy:'social',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,conf:{l:'high',lbl:'social',cls:'conf-high'},text:acks[Math.floor(Math.random()*acks.length)],intent:'passive_ack'};
+      // Pure social noise — no KG-grounded response possible. Stay silent.
+      return {strategy:'silent',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,conf:{l:'high',lbl:'social',cls:'conf-high'},text:'',intent:'passive_ack'};
     }
 
     if (!this.trained) {
@@ -4613,6 +5494,54 @@ class Engine {
     };
     this.cache.set(ck, result);
     this.lastResult = result;
+
+    // ── LEXICA 3.0: Post-query cognitive updates ──
+    const wasSuccessful = !!ansText && ansText.length > 10 && conf.l !== 'low';
+    const confLevel = conf.l || 'medium';
+
+    // 1. Self-Model: reflect on what just happened
+    this.selfModel.reflect(question, subject, result.strategy, confLevel, wasSuccessful, kgFacts);
+
+    // 2. Episodic Memory: log this turn
+    this.episodicMemory.addTurn(question, ansText, { wasSuccessful, strategy: result.strategy, subject, confidence: confLevel });
+
+    // 3. Preference Engine: accumulate topic valence from outcome
+    if (subject) {
+      if (wasSuccessful) {
+        const quality = conf.l === 'high' ? 0.8 : 0.4;
+        this.preferenceEngine.onSuccess(subject, quality);
+      } else {
+        this.preferenceEngine.onFailure(subject, result.strategy);
+      }
+    }
+
+    // 4. Failure Tracker: log failures, close gaps on success
+    if (!wasSuccessful && subject) {
+      this.failureTracker.recordFailure(question, subject, result.strategy, confLevel);
+      this.failureTracker.applyToIngestion(this.ingestion); // urgency → ingestion queue
+    } else if (wasSuccessful && subject) {
+      this.failureTracker.closeGap(subject);
+    }
+
+    // 5. Drive updates from query outcome
+    if (wasSuccessful) {
+      this.drives.satiate('curiosity', 0.2);
+      this.drives.satiate('expression', 0.4);
+      this.drives.frustrate('satiation', 0.25, 'successful synthesis');
+    } else {
+      this.drives.frustrate('discomfort', 0.15, `failed query: ${question.slice(0,30)}`);
+      this.drives.frustrate('curiosity', 0.12, subject || 'unknown gap');
+    }
+
+    // 6. Update all new system UIs
+    updateDriveUI();
+    updateGoalUI();
+    updateSelfModelUI();
+    updateUserModelUI();
+    updatePreferenceUI();
+    updateEpisodicUI();
+    updateFailureLogUI();
+
     return result;
   }
 
@@ -4663,7 +5592,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 2.4 ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 3.0 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -4725,6 +5654,141 @@ function updateQualiaUI() {
 
 // ── GLOBAL ENGINE INSTANCE ──
 const engine = new Engine();
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA 3.0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
+// ═══════════════════════════════════════════════════════════
+
+function updateDriveUI() {
+  if (!engine.drives) return;
+  const snap = engine.drives.getSnapshot();
+  snap.forEach(d => {
+    const keyMap = {curiosity:'Curiosity', discomfort:'Discomfort', expression:'Expression', satiation:'Satiation'};
+    const cssKey = d.key;
+    const barEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1));
+    const valEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1).replace('y','') + 'Val')
+                || document.getElementById('dr' + cssKey.charAt(0).toUpperCase() + cssKey.slice(1,3) + 'Val');
+    const badgeEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1,3) + 'Badge');
+    // manually resolve IDs
+    const fillId = {curiosity:'drCuriosity', discomfort:'drDiscomfort', expression:'drExpression', satiation:'drSatiation'}[d.key];
+    const valId = {curiosity:'drCurVal', discomfort:'drDisVal', expression:'drExpVal', satiation:'drSatVal'}[d.key];
+    const badgeId = {curiosity:'drCurBadge', discomfort:'drDisBadge', expression:'drExpBadge', satiation:'drSatBadge'}[d.key];
+    const fill = document.getElementById(fillId);
+    const val = document.getElementById(valId);
+    const badge = document.getElementById(badgeId);
+    if (fill) fill.style.width = Math.round(d.level * 100) + '%';
+    if (val) val.textContent = Math.round(d.level * 100);
+    if (badge) {
+      const isTriggered = d.level >= d.threshold;
+      badge.textContent = isTriggered ? '⚡ ' + d.action.toLowerCase() : (d.level > d.threshold * 0.5 ? 'building' : 'idle');
+      badge.className = 'drive-action-badge ' + (isTriggered ? 'triggered' : 'active');
+    }
+  });
+}
+
+function updateGoalUI() {
+  const panel = document.getElementById('goalStack');
+  if (!panel || !engine.goalStack) return;
+  const goals = engine.goalStack.goals.filter(g => !g.resolved);
+  if (!goals.length) {
+    panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No active goals. Drives will generate them.</div>';
+    return;
+  }
+  panel.innerHTML = goals.slice(0, 5).map(g => `
+    <div class="goal-item ${g.type}">
+      <div class="goal-type">${g.type} · <span class="goal-origin">from ${g.driveKey} drive</span></div>
+      <div class="goal-desc">${g.desc}</div>
+      <div class="goal-utility">utility <span>${(g.utility*100).toFixed(0)}%</span></div>
+      <div class="goal-progress"><div class="goal-progress-fill" style="width:${(g.progress*100).toFixed(0)}%"></div></div>
+    </div>`).join('');
+}
+
+function updateSelfModelUI() {
+  const panel = document.getElementById('selfModelPanel');
+  if (!panel || !engine.selfModel) return;
+  const snap = engine.selfModel.getSnapshot();
+  if (snap.totalQueries === 0) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Ask questions to build self-model.</div>'; return; }
+  const strongHtml = snap.strongestTopics.slice(0,3).map(t=>`<span style="color:var(--green);font-size:8px">${t.topic}(${(t.successRate*100).toFixed(0)}%)</span>`).join(' ');
+  const weakHtml = snap.weakestTopics.slice(0,3).map(t=>`<span style="color:var(--orange);font-size:8px">${t.topic}(${(t.successRate*100).toFixed(0)}%)</span>`).join(' ');
+  const sim = snap.lastSimulation;
+  panel.innerHTML = `
+    <div class="self-model-item"><span class="sm-key">Queries</span><span class="sm-val">${snap.totalQueries}</span></div>
+    <div class="self-model-item"><span class="sm-key">Success Rate</span><span class="sm-val">${(snap.successRate*100).toFixed(1)}%</span></div>
+    <div class="self-model-item"><span class="sm-key">Avg Confidence</span><span class="sm-val">${(snap.averageConfidence*100).toFixed(0)}%</span></div>
+    <div class="self-model-item"><span class="sm-key">Known Topics</span><span class="sm-val">${snap.knownTopics}</span></div>
+    ${strongHtml ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">STRONGEST</div><div>${strongHtml}</div>` : ''}
+    ${weakHtml ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">WEAKEST</div><div>${weakHtml}</div>` : ''}
+    ${sim ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">LAST SIMULATION</div><div class="self-model-item"><span class="sm-key">can answer</span><span class="sm-val" style="color:${sim.canAnswer?'var(--green)':'var(--red)'}">${sim.canAnswer?'yes':'no'} (${sim.kgHits||0} KG hits)</span></div>` : ''}
+  `;
+}
+
+function updateUserModelUI() {
+  const panel = document.getElementById('userModelPanel');
+  if (!panel || !engine.userModel) return;
+  const snap = engine.userModel.getSnapshot();
+  if (snap.queryCount === 0) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Modeling begins after first message.</div>'; return; }
+  const interestHtml = snap.topInterests.slice(0,5).map(i=>`<span style="font-size:8px;color:var(--cyan)">${i.topic}(${i.score})</span>`).join(' ');
+  panel.innerHTML = `
+    <div class="user-model-row"><span class="um-label">Level</span><span class="um-value">${snap.levelDesc}</span></div>
+    <div class="user-model-row"><span class="um-label">Style</span><span class="um-value">${snap.style}</span></div>
+    <div class="user-model-row"><span class="um-label">Queries</span><span class="um-value">${snap.queryCount} · avg ${snap.avgQueryLength} words</span></div>
+    <div class="user-model-row"><span class="um-label">Corrections</span><span class="um-value" style="color:${snap.corrections>0?'var(--orange)':'var(--text-dim)'}">${snap.corrections}</span></div>
+    ${snap.topInterests.length ? `<div class="user-model-row"><span class="um-label">Interests</span><span class="um-value">${interestHtml}</span></div>` : ''}
+    ${snap.technicalTermsUsed.length ? `<div class="user-model-row"><span class="um-label">Tech vocab</span><span class="um-value" style="font-size:7.5px">${snap.technicalTermsUsed.slice(0,5).join(', ')}</span></div>` : ''}
+  `;
+}
+
+function updatePreferenceUI() {
+  const panel = document.getElementById('preferencePanel');
+  if (!panel || !engine.preferenceEngine) return;
+  const snap = engine.preferenceEngine.getSnapshot();
+  if (!snap.totalTopics) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Preferences form through use.</div>'; return; }
+  const prefHtml = snap.preferred.slice(0,8).map(p=>
+    `<span class="pref-tag positive">${p.topic}<span class="pref-score">${(p.valence*100).toFixed(0)}</span></span>`
+  ).join('');
+  const avoidHtml = snap.avoided.slice(0,4).map(p=>
+    `<span class="pref-tag negative">${p.topic}<span class="pref-score">${(Math.abs(p.valence)*100).toFixed(0)}</span></span>`
+  ).join('');
+  panel.innerHTML = (prefHtml||avoidHtml)
+    ? `<div>${prefHtml}</div>${avoidHtml?`<div style="margin-top:5px">${avoidHtml}</div>`:''}`
+    : '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Asking more questions will form preferences.</div>';
+}
+
+function updateEpisodicUI() {
+  const panel = document.getElementById('episodicPanel');
+  if (!panel || !engine.episodicMemory) return;
+  const snap = engine.episodicMemory.getSnapshot();
+  if (!snap.turnCount) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Conversation arc builds as you talk.</div>'; return; }
+  const eps = snap.recentEpisodes.slice(0,4).map(e=>
+    `<div class="episode-item">
+      <div class="ep-turn">Turn ${e.turn} · ${e.strategy||'?'} · ${e.wasSuccessful?'✓':'✗'}</div>
+      <div class="ep-content">${e.userInput.slice(0,55)}${e.userInput.length>55?'…':''}</div>
+      ${e.subject?`<div class="ep-unresolved">subject: ${e.subject}</div>`:''}
+    </div>`
+  ).join('');
+  const unresHtml = snap.unresolved.map(u=>`<div class="ep-unresolved">• ${u.question}</div>`).join('');
+  panel.innerHTML = eps + (unresHtml ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--orange)">UNRESOLVED</div>${unresHtml}` : '');
+}
+
+function updateFailureLogUI() {
+  const panel = document.getElementById('failureLog');
+  if (!panel || !engine.failureTracker) return;
+  const snap = engine.failureTracker.getSnapshot();
+  if (!snap.totalFailures) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No failures recorded yet.</div>'; return; }
+  const failHtml = snap.recentFailures.slice(0,5).map(f=>
+    `<div class="fail-item">
+      <div class="fail-query">${f.query.slice(0,60)}${f.query.length>60?'…':''}</div>
+      <div class="fail-reason">${f.reason||'low confidence'} · attempt ${f.attempts}</div>
+    </div>`
+  ).join('');
+  const urgentHtml = snap.urgentGaps.length
+    ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--orange)">URGENT GAPS (queued for learning)</div>` +
+      snap.urgentGaps.map(g=>`<div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--red);padding:2px 0">"${g.topic}" · urgency ${(g.urgency*100).toFixed(0)}%</div>`).join('')
+    : '';
+  panel.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-bottom:6px">${snap.totalFailures} total · ${snap.closedGaps} closed · ${snap.openGaps} open</div>${failHtml}${urgentHtml}`;
+}
+
+
 
 // ── BOOT UI HELPERS ──
 function updateBootBar(pct, msg) {
@@ -5010,6 +6074,7 @@ function exportData(){if(!engine.trained){addMsg('system','Nothing to export.');
 function resetAll(){
   if(!confirm('Clear ALL training data and reset cognitive state?'))return;
   engine.curiosity.stop();
+  engine.drives.stop();
   engine.bm25=new BM25();engine.kg=new KnowledgeGraph(engine.ets);engine.sm=new SM();
   engine.trained=false;engine.synthesisCount=0;engine.cache.invalidate();
   engine.salience.clear();engine.typeStack.clear();engine.semVec=new SemanticVectors();
@@ -5019,11 +6084,21 @@ function resetAll(){
   engine.godel=new GodelEngine(engine.kg);
   engine.curiosity=new CuriosityEngine(engine.kg,engine.qualia,(text,a,b)=>showInnerMonologue(text,a,b),engine);
   engine.curiosity.start();
+  // LEXICA 3.0: Reset new cognitive systems
+  engine.drives=new HomeostaticDriveSystem();
+  engine.goalStack=new GoalStack();
+  engine.selfModel=new SelfModel();
+  engine.episodicMemory=new EpisodicMemory();
+  engine.userModel=new UserModel();
+  engine.preferenceEngine=new PreferenceEngine();
+  engine.failureTracker=new FailureTracker();
+  engine.drives.start(engine.kg,engine.goalStack,engine.episodicMemory);
   engine.lastResult=null;engine.lastKgFacts=null;engine.lastQuery=null;engine.lastSubject=null;engine.recentTripleWindow=[];
   updateUI();setStatus(false,'awaiting training');updateQualiaUI();
-  document.getElementById('godelLog').innerHTML='<div style="font-family:\'DM Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>';
-  document.getElementById('debateLog').innerHTML='<div style="font-family:\'DM Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>';
-  addMsg('system','All training data cleared. Cognitive state reset.');
+  updateDriveUI();updateGoalUI();updateSelfModelUI();updateUserModelUI();updatePreferenceUI();updateEpisodicUI();updateFailureLogUI();
+  document.getElementById('godelLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>';
+  document.getElementById('debateLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>';
+  addMsg('system','All training data cleared. Cognitive state reset. Lexica 3.0 homeostatic systems reinitialized.');
 }
 
 function switchTab(n){
@@ -5097,7 +6172,9 @@ function streamMsg(text, meta) {
   setTimeout(ty,speed);
 }
 function toggleSrcReveal(btn){const el=btn.closest('.msg-row').querySelector('.source-reveal');if(!el)return;const show=el.style.display!=='none';el.style.display=show?'none':'block';btn.textContent=show?'⟨ source ⟩':'⟨ hide ⟩';}
-function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();}
+function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();
+// LEXICA 3.0: Feed vote signal into preference engine
+if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');}updatePreferenceUI();updateDriveUI();}}
 function addMsg(role,content){const msgs=document.getElementById('messages');const row=document.createElement('div');if(role==='system'){row.className='msg-row';row.innerHTML=`<div class="msg-bubble system">— ${content} —</div>`;}else if(role==='user'){row.className='msg-row user';row.innerHTML=`<div class="msg-avatar user">U</div><div class="msg-bubble-wrap"><div class="msg-bubble user">${content}</div></div>`;}else{row.className='msg-row ai';row.innerHTML=`<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">${content}</div></div>`;}msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
 function showThinking(){const msgs=document.getElementById('messages');const d=document.createElement('div');d.id='think';d.className='msg-row ai';d.innerHTML=`<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking">synthesizing answer<div class="dots"><span></span><span></span><span></span></div></div></div></div>`;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
 function rmThink(){const e=document.getElementById('think');if(e)e.remove();}
@@ -5106,6 +6183,13 @@ async function sendQ(){
   const inp=document.getElementById('qInput');const q=inp.value.trim();if(!q)return;
   window._addMsgReal('user',q);inp.value='';
   engine.curiosity.resetTimer();
+
+  // LEXICA 3.0: Update user model on every input
+  const _sendSubject = extractSubject(q);
+  engine.userModel.update(q, _sendSubject);
+  // Reset expression drive when user talks to us (we're being heard)
+  engine.drives.satiate('expression', 0.3);
+  updateUserModelUI();
 
   // ── Self-modify intercept ──────────────────────────
   if (window.SelfModify && window.SelfModify.isCodeIntent(q)) {
@@ -5124,7 +6208,9 @@ async function sendQ(){
     return;
   }
   if(r._autoFetched){window._addMsgReal('system',`Auto-learned: <strong>${r._autoFetched}</strong>`);updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);}
-  rmThink();streamMsg(r.text,r);updateUI();
+  rmThink();
+  if (!r.text || r.text.trim() === '') { updateUI(); updateQualiaUI(); return; }
+  streamMsg(r.text,r);updateUI();
   updateQualiaUI();
   window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
 }
@@ -5976,7 +7062,7 @@ window.addEventListener('DOMContentLoaded', () => {
       { rx:0.4,  ry:0.2,  rz:0.0,  dx: 0.000,  dy: 0.006,  dz: 0.010,  color:[0,   195, 195] },
       { rx:1.2,  ry:1.8,  rz:0.7,  dx: 0.009,  dy: 0.000,  dz:-0.007,  color:[225,  45,  90] },
       { rx:2.1,  ry:0.9,  rz:1.4,  dx:-0.007,  dy: 0.010,  dz: 0.000,  color:[ 90,  80, 230] },
-      { rx:3.5,  ry:2.4,  rz:2.1,  dx: 0.008,  dy:-0.009,  dz: 0.005,  color:[  0, 140, 160] },
+      { rx:3.5,  ry:2.3,  rz:2.1,  dx: 0.008,  dy:-0.009,  dz: 0.005,  color:[  0, 140, 160] },
       { rx:4.8,  ry:3.7,  rz:3.6,  dx:-0.011,  dy: 0.000,  dz:-0.008,  color:[190,  30, 140] },
     ];
 
@@ -6505,7 +7591,6 @@ window.addEventListener('DOMContentLoaded', () => {
         setBootPhase(3, false);
         updateBootBar(0.95, 'NeuralMouth ready ✓');
         updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
-        addMsg('system', '🧠 <strong>Lexica 2.4 NeuralMouth online</strong> — Graph-RAG synthesis & N3 bridge active.');
       } else {
         setBootPhase(2, false);
         updateBootBar(0.95, 'WebLLM unavailable — symbolic fallback active');
@@ -6514,7 +7599,6 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
           updateSLMStatusUI('error', 'Neural layers unavailable — full symbolic mode', '—');
         }
-        addMsg('system', '⚠ WebGPU/WebLLM unavailable. Running in full symbolic mode. All features work.');
       }
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
@@ -6524,19 +7608,21 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'Lexica 2.4 ready ✓');
+    updateBootBar(1.0, 'Lexica 3.0 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
 
-    // Post-boot: show welcome message
-    addMsg('system', 'LEXICA 2.4 engine loaded.');
-    addMsg('system', 'Lexica 2.4 Stack: <strong>CFG · Morphology · Ontology · Centrality · NanoCortex · NeuralMouth · Graph-RAG · N3 Bridge · Society of Mind · Qualia · Gödel</strong>');
-    const introTriples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
-    const introText=engine.synthesis.synthesize('what is lexica','what','lexica',introTriples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    const hintTriple={s:'knowledge',p:'is_a',o:'obtained by fetching a Wikipedia article',conf:1.0,raw:'Knowledge is obtained by fetching a Wikipedia article.',tag:'self',alive:true,justified_by:new Set(['self']),subjectStr:()=>'knowledge',objectStr:()=>'obtained by fetching a Wikipedia article',isNested:()=>false};
-    const hintText=engine.synthesis.synthesize('how to start','what','knowledge',[hintTriple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
-    const full=[(introText||'I am Lexica 2.4. I am idle.'),(hintText||'')].filter(Boolean).join(' ');
-    streamMsg(full,{strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:false,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
+    // Post-boot: only show intro if this is a fresh conversation (no prior messages)
+    const _activeConvo = window.ConvoManager && window.ConvoManager.getActive();
+    const _hasHistory = _activeConvo && _activeConvo.messages && _activeConvo.messages.length > 0;
+    if (!_hasHistory) {
+      const introTriples=engine.stateTracker.toTriples(engine.kg.count(),engine.sm.s.length);
+      const introText=engine.synthesis.synthesize('what is lexica','what','lexica',introTriples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
+      const hintTriple={s:'knowledge',p:'is_a',o:'obtained by fetching a Wikipedia article',conf:1.0,raw:'Knowledge is obtained by fetching a Wikipedia article.',tag:'self',alive:true,justified_by:new Set(['self']),subjectStr:()=>'knowledge',objectStr:()=>'obtained by fetching a Wikipedia article',isNested:()=>false};
+      const hintText=engine.synthesis.synthesize('how to start','what','knowledge',[hintTriple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
+      const full=[(introText||'I am Lexica 3.0. I have homeostatic drives, a goal stack, and a self-model. I am waiting for knowledge.'),(hintText||'')].filter(Boolean).join(' ');
+      streamMsg(full,{strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:false,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
+    }
     updateUI();
   })();
 });
