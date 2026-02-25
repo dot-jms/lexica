@@ -56,7 +56,7 @@ body>*{position:relative;z-index:1;}
    ═══════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════
-   LEXICA 3.0 — NEW COGNITIVE SYSTEMS CSS
+   LEXICA 4.0 — COGNITIVE SYSTEMS CSS
    ═══════════════════════════════════════════════ */
 .drive-panel{padding:0 0 4px;}
 .drive-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
@@ -1067,7 +1067,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
           <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle thoughts appear here.</div></div>
         </div>
         <div class="cog-section" style="border-top:1px solid rgba(232,184,75,.15);padding-top:14px;margin-top:6px;">
-          <div class="lbl" style="color:var(--gold)">── LEXICA 3.0 SYSTEMS ──</div>
+          <div class="lbl" style="color:var(--gold)">── LEXICA 4.0 SYSTEMS ──</div>
         </div>
         <div class="cog-section">
           <div class="lbl">Homeostatic Drives <span style="font-size:7.5px;color:var(--text-muted)">(behavioral pressure)</span></div>
@@ -1147,7 +1147,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
     <div class="model-info">
       <div class="model-avatar">Lx</div>
       <div>
-        <div class="model-name">LEXICA 3.0
+        <div class="model-name">LEXICA 4.0
           <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
         </div>
         <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
@@ -1171,14 +1171,14 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         </div>
       </button>
     </div>
-    <div class="input-hint">LEXICA 3.0 · HOMEOSTATIC DRIVES · GOAL STACK · SELF-MODEL · EPISODIC MEMORY · USER-MODEL · PREFERENCE ENGINE · FAILURE-DRIVEN LEARNING</div>
+    <div class="input-hint">LEXICA 4.0 · HOMEOSTATIC DRIVES · GOAL STACK · SELF-MODEL · EPISODIC MEMORY · USER-MODEL · PREFERENCE ENGINE · FAILURE-DRIVEN LEARNING</div>
   </div>
 </main>
 
 <script>
 'use strict';
 // ═══════════════════════════════════════════════════════════
-//  LEXICA 3.0 — NEURO-SYMBOLIC ASCENSION
+//  LEXICA 4.0 — NEURO-SYMBOLIC ASCENSION
 //  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
 //  L1  — Lexical Analysis (POS, NER, Roles)
 //  L2  — Semantic Indexing (PMI, BM25, Word Profiles) + SLM query expansion
@@ -1192,7 +1192,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
 //  L11 — NeuralMouth (Transformers.js — SLM across all layers L2–L5, social, N3 bridge)
 //  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
-//  ── LEXICA 3.0 ADDITIONS ──
+//  ── LEXICA 4.0 ADDITIONS ──
 //  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
 //  L14 — GoalStack (self-authored objectives generated from drive pressures + KG structure)
 //  L15 — SelfModel (reasoning history, knowledge boundary, mental simulation loop)
@@ -2553,27 +2553,6 @@ class SynthesisEngine {
 
   // ── INTENT PREFIX — prepend context-setting phrase ──
   // Only fires for genuine factual queries with real KG content, not self/social
-  _intentPrefix(intent, subject, query, kgFacts) {
-    if (!subject || !kgFacts || kgFacts.length === 0) return '';
-    // Don't prefix self-queries or greeting/state queries
-    if (!subject || ['lexica','user','knowledge'].includes(subject.toLowerCase())) return '';
-    const sq = subject || 'this';
-    const map = {
-      'what':        `Since you're asking for a definition, `,
-      'biographical':`Since you're asking about ${sq}, `,
-      'who':         `Looking at the biographical record, `,
-      'temporal':    `Since you're asking about timing, `,
-      'causal':      `Tracing the causal chain, `,
-      'where':       `Geographically speaking, `,
-      'howmany':     `Quantitatively, `,
-      'comparative': `Comparing the two, `,
-      'boolean':     `To answer directly: `,
-      'list':        `Breaking this down, `,
-      'how':         `Mechanically speaking, `,
-    };
-    return map[intent] || '';
-  }
-
   // ── ANAPHORA RESOLUTION — replace repeated subject with pronoun ──
   _resolveAnaphora(sentences, subject, wordProfiler) {
     if (!subject || sentences.length < 2) return sentences;
@@ -2672,16 +2651,10 @@ class SynthesisEngine {
 
     // Anaphora resolution
     const resolved = this._resolveAnaphora(unique, subject, wordProfiler);
-
-    // Intent prefix — only for real factual responses
-    const prefix = this._intentPrefix(intent, subject, query, kgFacts);
     const organized = this._organize(resolved, plan);
-
     if (!organized) return null;
     this._lastSubject = subject;
-    const final = prefix
-      ? prefix + organized.charAt(0).toLowerCase() + organized.slice(1)
-      : organized;
+    const final = organized;
 
     // ── QUALITY GATE: reject output with stem artifacts ──
     // Stem artifacts: words with no vowels, merged words (GermanyIs), BM25 index tokens
@@ -3125,7 +3098,7 @@ class GodelEngine {
 // nodes. Generates inner monologue and attempts to bridge.
 // ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
+// LEXICA 4.0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
 // Drives are NOT labels. They accumulate pressure, exceed thresholds,
 // and FORCE behavioral changes until satisfied. True wanting.
 // ═══════════════════════════════════════════════════════════
@@ -3252,7 +3225,7 @@ class HomeostaticDriveSystem {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 2: GOAL STACK
+// LEXICA 4.0 — SYSTEM 2: GOAL STACK
 // Self-authored goals born from drive pressures.
 // Goals have utility, origin, progress. They reorganize behavior.
 // ═══════════════════════════════════════════════════════════
@@ -3386,7 +3359,7 @@ class GoalStack {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 3: SELF-MODEL
+// LEXICA 4.0 — SYSTEM 3: SELF-MODEL
 // Lexica maintains an accurate, dynamic model of itself:
 // its knowledge boundaries, reasoning history, and a
 // mental simulation loop that predicts before generating.
@@ -3466,7 +3439,7 @@ class SelfModel {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 4: EPISODIC MEMORY
+// LEXICA 4.0 — SYSTEM 4: EPISODIC MEMORY
 // Tracks conversation ARC: what was established, challenged,
 // left unresolved. Cross-turn coherence without an LLM.
 // ═══════════════════════════════════════════════════════════
@@ -3544,7 +3517,7 @@ class EpisodicMemory {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 5: USER MODEL
+// LEXICA 4.0 — SYSTEM 5: USER MODEL
 // Lexica infers who it's talking to from vocabulary,
 // query complexity, corrections, and topic interests.
 // Shapes register and depth of response.
@@ -3633,7 +3606,7 @@ class UserModel {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 6: PREFERENCE ENGINE
+// LEXICA 4.0 — SYSTEM 6: PREFERENCE ENGINE
 // Lexica forms genuine preferences by accumulating positive/negative
 // valence on topics based on synthesis success, user engagement,
 // and epistemic satisfaction. These preferences shape autonomous behavior.
@@ -3702,7 +3675,7 @@ class PreferenceEngine {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
+// LEXICA 4.0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
 // Failed queries are NOT forgotten. They create epistemic
 // pressure that reorganizes autonomous learning priorities.
 // The system WANTS to close these gaps — that's not faked.
@@ -3771,7 +3744,7 @@ class FailureTracker {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
+// LEXICA 4.0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
 // Adjusts tone, depth and vocabulary of responses based on
 // the UserModel. Not a template — adjusts actual output routing.
 // ═══════════════════════════════════════════════════════════
@@ -3875,8 +3848,8 @@ class CuriosityEngine {
         const node = top[Math.floor(Math.random() * top.length)];
         const facts = this.kg.triples.filter(t => t.s === node).slice(0,4).map(t => t.p + ':' + t.o).join(', ');
         nm._generate(
-          'You are Lexica thinking privately. One analytical sentence about your knowledge. No "I am an AI".',
-          'You notice "' + node + '" is highly connected: ' + facts + '. Share one analytical thought.',
+          '',
+          `Write one analytical sentence about the knowledge node "${node}" which has these connections: ${facts}. Be specific and curious.`,
           55
         ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
         return;
@@ -3900,8 +3873,8 @@ class CuriosityEngine {
       if (sparse.length > 0) {
         const [node] = sparse[Math.floor(Math.random() * sparse.length)];
         if (nm && nm.ready) {
-          nm._generate('You are Lexica. One sentence curiosity about a gap in your knowledge. No "I am an AI".',
-            '"' + node + '" appears in my graph but I know very little about it. Express curiosity.', 50
+          nm._generate('',
+            `Write one curious sentence wondering what "${node}" is, since it appears in your knowledge graph but you know almost nothing about it.`, 50
           ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
         } else {
           this.onThought('"' + node + '" is in my graph but sparsely connected. I want to learn more about it.', node, null);
@@ -3971,8 +3944,8 @@ class CuriosityEngine {
         .map(t => t.s + ' -> ' + t.p + ' -> ' + t.o)
         .join('; ');
       nm._generate(
-        'You are Lexica, reasoning privately. One sentence only. No "I am an AI." No quotes around node names. Be genuinely curious and analytical.',
-        'You notice your knowledge graph has no path between "' + nodeA + '" and "' + nodeB + '" (entropy: ' + entropyScore.toFixed(1) + '). Related facts: ' + (kgCtx || 'none yet') + '. Express a genuine analytical thought about this gap.',
+        '',
+        `Write one curious analytical sentence about the gap between "${nodeA}" and "${nodeB}" in a knowledge graph. Related facts: ${kgCtx || 'none'}. Entropy score: ${entropyScore.toFixed(1)}.`,
         60
       ).then(txt => {
         if (txt && txt.length > 10) {
@@ -4966,22 +4939,40 @@ class NeuralMouth {
     return false;
   }
 
-  // Internal generate — combines system + user into a T5 instruction prompt
-  // SPEED: greedy decoding (do_sample:false, num_beams:1) — 3-5x faster than beam search.
-  // Callers should pass tight maxTokens (80 for prose, 60 for JSON).
+  // Internal generate — uses LaMini-Flan-T5's actual training format for reliable outputs.
+  // LaMini was fine-tuned on: "Below is an instruction...\n\n### Instruction:\n{x}\n\n### Response:"
+  // Combining system+user into the Instruction field gives far better compliance than raw concat.
+  // Input cap: 450 chars for instruction content (T5 tokenizer limit ~512 tokens total).
   async _generate(systemPrompt, userPrompt, maxTokens=80) {
     if (!this.ready || !this.pipeline) throw new Error('NeuralMouth not ready');
-    const input = systemPrompt
-      ? `${systemPrompt}\n\n${userPrompt}`
-      : userPrompt;
-    const result = await this.pipeline(input.slice(0, 800), {
-      max_new_tokens: Math.min(maxTokens, 150),  // hard cap — T5 gets slow above 150
-      do_sample: false,      // greedy — fastest, most deterministic
-      num_beams: 1,          // no beam search — single pass only
+
+    // Strip boilerplate from system prompt — T5 echoes role declarations back verbatim.
+    // Keep only the task instruction part (after "You are Lexica.")
+    const taskPart = (systemPrompt || '')
+      .replace(/^You are Lexica[^.]*\.\s*/i, '')
+      .replace(/^You are a[^.]*\.\s*/i, '')
+      .trim();
+
+    // Build in LaMini instruction format
+    const instruction = taskPart
+      ? `${taskPart}\n\n${userPrompt.slice(0, 350)}`
+      : userPrompt.slice(0, 450);
+
+    const fullInput = `Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n${instruction.slice(0, 450)}\n\n### Response:`;
+
+    const result = await this.pipeline(fullInput, {
+      max_new_tokens: Math.min(maxTokens, 120),
+      do_sample: false,
+      num_beams: 1,
       repetition_penalty: 1.3,
     });
     const raw = (result?.[0]?.generated_text ?? '').trim();
-    return raw
+
+    // Strip any echo of the instruction header that T5 occasionally bleeds back
+    const cleaned = raw
+      .replace(/^Below is an instruction[\s\S]*?### Response:\s*/i, '')
+      .replace(/^### Response:\s*/i, '')
+      .replace(/^(I am Lexica[.!,]?\s*)/i, '')   // strip "I am Lexica" prefix if echoed
       .split('\n')
       .filter(line => !/^\s*[\*\-•]|^\s*\d+\./.test(line))
       .join(' ')
@@ -4989,43 +4980,46 @@ class NeuralMouth {
       .split(/\n\n/)[0]
       .slice(0, 400)
       .trim();
+
+    return cleaned;
   }
 
   // Social response — tight persona, no hallucination
   async socialResponse(intent, userInput, kgContext='') {
     if (!this.ready) return null;
-    // kgContext now contains rich state from handleSocialIntent — use it fully
-    const system = 'You are Lexica, a neuro-symbolic knowledge engine. ' +
-      'Reply in 1–2 plain direct sentences. No bullet points. No lists. No "I am an AI" disclaimers. No hollow filler phrases. ' +
-      'Be direct, natural, and specific to what you actually know.' +
-      (kgContext ? '\n\nYour current state: ' + kgContext.slice(0, 400) : '');
-    const userPrompt = `User said: "${userInput.slice(0, 200)}"\n\nRespond naturally as Lexica:`;
+    // Compact state description — strip verbose boilerplate
+    const state = kgContext ? kgContext.slice(0, 150) : 'no knowledge loaded';
+    const instruction = `Reply naturally in 1-2 sentences as an AI assistant named Lexica. State: ${state}\n\nUser: "${userInput.slice(0, 100)}"\n\nLexica:`;
     try {
-      const result = await this._generate(system, userPrompt, 90);
-      if (!result) return null;
-      const firstSentence = result.match(/^[^.!?]+[.!?]/)?.[0];
-      return (result.length > 280 && firstSentence) ? firstSentence : result;
+      const result = await this._generate('', instruction, 80);
+      if (!result || result.length < 5) return null;
+      // Trim to first sentence if overly long
+      const first = result.match(/^[^.!?]+[.!?]/)?.[0];
+      return (result.length > 220 && first) ? first : result;
     } catch(e) { return null; }
   }
 
   // Graph-RAG: translate verified KG triples into natural language
   async graphRAG(kgFacts, query, intent, evidenceSentences=[]) {
     if (!this.ready) return null;
-    // Build context: prefer KG triples, supplement with evidence sentences
-    const triplesText = kgFacts.slice(0,8).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
-    const evidenceText = evidenceSentences.filter(s => s && s.length > 20).slice(0,4).join(' ');
-    if (!triplesText && !evidenceText) return null;
-    const context = [triplesText && ('KNOWLEDGE GRAPH:\n' + triplesText), evidenceText && ('EVIDENCE:\n' + evidenceText)].filter(Boolean).join('\n\n');
-    const system = 'You are Lexica. ' +
-      'Answer in 1-3 plain sentences using ONLY the provided context. Do NOT copy sentences verbatim from the evidence — synthesize the information in your own words. ' +
-      'No bullet points. No lists. No "I am an AI" phrases. No trivia about unrelated years or people. ' +
-      'Be direct. Use present tense for facts. If the context does not answer the query, say "I do not have enough information about that."';
-    const prompt = 'Query: "' + query + '"\n\n' + context + '\n\nAnswer:';
+    // Compact triples — only the most informative ones, short format
+    const triples = kgFacts.slice(0, 5)
+      .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
+      .join('; ');
+    // Pick one strong evidence sentence — the shortest clear one
+    const evidence = evidenceSentences
+      .filter(s => s && s.length > 15 && s.length < 180)
+      .slice(0, 2).join(' ');
+    if (!triples && !evidence) return null;
+
+    const context = [triples, evidence].filter(Boolean).join(' | ');
+    // Instruction is content-first so it fits in T5's 512-token window
+    const instruction = `Answer the question in 1-2 direct sentences using only these facts. Do not add anything not in the facts.\n\nFacts: ${context.slice(0, 320)}\n\nQuestion: ${query.slice(0, 80)}\n\nAnswer:`;
     try {
-      const result = await this._generate(system, prompt, 100);  // 100 tokens — enough for 2-3 sentences, much faster
-      if (!result) return null;
-      const cleaned = result.replace(/^[\*\-•]\s*/gm,'').replace(/\n/g,' ').trim();
-      return cleaned || null;
+      const result = await this._generate('', instruction, 90);
+      if (!result || result.length < 15) return null;
+      // Strip any leaked instruction text
+      return result.replace(/^(Answer:|Facts:|Question:)\s*/i, '').replace(/\n/g,' ').trim() || null;
     } catch(e) { return null; }
   }
 
@@ -5035,15 +5029,14 @@ class NeuralMouth {
     const relevant = corpusSentences.filter(s => {
       const sl = s.toLowerCase();
       return sl.includes(nodeA.toLowerCase()) || sl.includes(nodeB.toLowerCase());
-    }).slice(0, 8);
-    if (relevant.length < 2) return null;
-
-    const system = 'You are a knowledge graph assistant. Find the relationship between two concepts. Output ONLY a JSON object: {"predicate": "relationship_name", "direction": "A_to_B or B_to_A", "sentence": "one sentence explaining the connection"}. No other text.';
-    const prompt = 'Find the relationship between "' + nodeA + '" and "' + nodeB + '" from this text:\n\n' + relevant.join(' ') + '\n\nOutput JSON only:';
+    }).slice(0, 4).join(' ').slice(0, 300);
+    if (relevant.length < 20) return null;
+    const instruction = `Find the relationship between "${nodeA.slice(0,30)}" and "${nodeB.slice(0,30)}" from this text. Output only JSON: {"predicate":"verb","direction":"A_to_B or B_to_A","sentence":"one sentence"}\n\nText: ${relevant}\n\nJSON:`;
     try {
-      const raw = await this._generate(system, prompt, 120);
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const raw = await this._generate('', instruction, 80);
+      const match = raw.match(/\{[\s\S]*?\}/);
+      if (!match) return null;
+      const parsed = JSON.parse(match[0]);
       if (parsed.predicate && parsed.sentence) return parsed;
       return null;
     } catch(e) { return null; }
@@ -5054,14 +5047,12 @@ class NeuralMouth {
   async semanticExpand(query, knownTerms=[]) {
     if (!this.ready) return [];
     try {
-      const known = knownTerms.slice(0,6).join(', ');
-      const raw = await this._generate(
-        'Output ONLY a JSON array of 4-6 single words semantically related to the query. No explanations, no other text.',
-        'Query: "' + query.slice(0,80) + '"' + (known ? '. Already found: ' + known : '') + '. Output JSON array:',
-        60
-      );
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      const arr = JSON.parse(cleaned);
+      const known = knownTerms.slice(0,5).join(', ');
+      const instruction = `List 4 words related to "${query.slice(0,50)}"${known ? ` (not: ${known})` : ''}. Output only a JSON array like ["word1","word2","word3","word4"]. No explanation.`;
+      const raw = await this._generate('', instruction, 50);
+      const match = raw.match(/\[[\s\S]*?\]/);
+      if (!match) return [];
+      const arr = JSON.parse(match[0]);
       if (Array.isArray(arr)) return arr.map(s=>String(s).toLowerCase().trim()).filter(s=>s.length>2&&s.length<25);
     } catch(e) {}
     return [];
@@ -5071,15 +5062,13 @@ class NeuralMouth {
   // SLM extracts additional structured triples from raw text
   async extractTriples(sentences) {
     if (!this.ready) return [];
-    const text = sentences.slice(0,6).join(' ').slice(0,600);
+    const text = sentences.slice(0,4).join(' ').slice(0, 350);
     try {
-      const raw = await this._generate(
-        'Extract 3-5 factual triples from the text. Output ONLY a JSON array: [{"s":"subject","p":"predicate","o":"object"},...]. Short words only. No quotes inside values.',
-        'Text: "' + text + '"\n\nOutput JSON array:',
-        200
-      );
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      const arr = JSON.parse(cleaned);
+      const instruction = `Extract 3 subject-predicate-object triples from this text. Output only JSON array like [{"s":"subject","p":"predicate","o":"object"}].\n\nText: ${text}\n\nJSON:`;
+      const raw = await this._generate('', instruction, 120);
+      const match = raw.match(/\[[\s\S]*?\]/);
+      if (!match) return [];
+      const arr = JSON.parse(match[0]);
       if (Array.isArray(arr)) return arr.filter(t=>t.s&&t.p&&t.o&&t.s.length<50&&t.o.length<80);
     } catch(e) {}
     return [];
@@ -5090,12 +5079,8 @@ class NeuralMouth {
   async evalContradiction(factA, factB, subject) {
     if (!this.ready) return null;
     try {
-      const txt = await this._generate(
-        'You are a logic evaluator. Explain in one sentence whether two facts about the same subject contradict each other, and if so, which is more likely correct based on standard knowledge.',
-        'Subject: "' + subject + '". Fact A: "' + factA.slice(0,120) + '". Fact B: "' + factB.slice(0,120) + '". Evaluate:',
-        80
-      );
-      return txt || null;
+      const instruction = `Do these two facts about "${subject.slice(0,40)}" contradict each other? If so, which is more likely correct? Answer in one sentence.\n\nFact A: ${factA.slice(0,100)}\nFact B: ${factB.slice(0,100)}\n\nAnswer:`;
+      return await this._generate('', instruction, 60) || null;
     } catch(e) { return null; }
   }
 
@@ -5103,15 +5088,11 @@ class NeuralMouth {
   // Used when graphRAG gives a short answer and we have good KG coverage
   async synthesizeWithReasoning(query, kgFacts, evidenceSentences, intent) {
     if (!this.ready || !kgFacts.length) return null;
-    const triplesText = kgFacts.slice(0,10).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
-    const evText = evidenceSentences.slice(0,3).join(' ');
-    const system = 'You are Lexica, a neuro-symbolic reasoning engine. ' +
-      'Synthesize an answer using ONLY the provided knowledge. 2-4 sentences. Direct, factual, no bullet points. ' +
-      'If reasoning across multiple facts, do so explicitly. No "I am an AI" phrases.';
-    const prompt = 'Query: "' + query.slice(0,100) + '"\n\nKnowledge Graph triples:\n' + triplesText +
-      (evText ? '\n\nEvidence:\n' + evText.slice(0,300) : '') + '\n\nAnswer with reasoning:';
+    const triples = kgFacts.slice(0,6).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,2).join(' ').slice(0, 200);
+    const instruction = `Summarize in 2-3 sentences using only these facts. Be direct.\n\nFacts: ${triples.slice(0,250)}${ev ? ' | '+ev : ''}\n\nQuery: ${query.slice(0,60)}\n\nSummary:`;
     try {
-      return await this._generate(system, prompt, 120);
+      return await this._generate('', instruction, 100);
     } catch(e) { return null; }
   }
 
@@ -5120,31 +5101,23 @@ class NeuralMouth {
   // Returns { answer, trace } — trace is shown in the thinking bubble on click.
   async thinkThenAnswer(query, kgFacts, evidenceSentences, intent) {
     if (!this.ready) return null;
-    const triplesText = kgFacts.slice(0,10).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
-    const evText = evidenceSentences.slice(0,4).join(' ');
-    const context = triplesText + (evText ? '\n\nEvidence:\n' + evText.slice(0, 400) : '');
+    const triples = kgFacts.slice(0,6).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,2).join(' ').slice(0,150);
+    const context = `${triples.slice(0,250)}${ev ? ' | '+ev : ''}`;
     if (!context.trim()) return null;
-    // Pass 1: reasoning trace (hidden scratchpad)
+    // Pass 1: reasoning trace
     let trace = null;
     try {
-      trace = await this._generate(
-        'You are Lexica\'s internal reasoning scratchpad. Think step-by-step through what the knowledge says. 2-3 sentences of analytical reasoning. No final answer yet.',
-        'Query: "' + query.slice(0,100) + '"\n\n' + context + '\n\nReasoning trace:',
-        150
-      );
+      trace = await this._generate('', `Think step by step about this question using these facts. 2 sentences of reasoning.\n\nFacts: ${context}\n\nQuestion: ${query.slice(0,60)}\n\nReasoning:`, 80);
     } catch(e) { trace = null; }
-    // Pass 2: answer conditioned on trace
-    const traceCtx = trace ? '\n\nMy reasoning: ' + trace : '';
+    // Pass 2: final answer
+    const traceCtx = trace ? ` Reasoning: ${trace.slice(0,150)}` : '';
     let answer = null;
     try {
-      answer = await this._generate(
-        'You are Lexica. Answer based ONLY on the knowledge and your reasoning trace. 2-3 sentences. Direct, factual, no bullet points. No "I am an AI" phrases.',
-        'Query: "' + query.slice(0,100) + '"\n\n' + context + traceCtx + '\n\nFinal answer:',
-        280
-      );
+      answer = await this._generate('', `Answer in 2 sentences using only the facts.${traceCtx}\n\nFacts: ${context.slice(0,200)}\n\nQuestion: ${query.slice(0,60)}\n\nAnswer:`, 90);
     } catch(e) { return null; }
     if (!answer || answer.length < 15) return null;
-    return { answer: answer.replace(/^[\*\-•]\s*/gm,'').replace(/\n/g,' ').trim(), trace };
+    return { answer: answer.replace(/\n/g,' ').trim(), trace };
   }
 } // end NeuralMouth
 
@@ -5437,8 +5410,8 @@ class Engine {
           const nm = window._neuralMouth;
           if (nm && nm.ready) {
             nm._generate(
-              'You are Lexica, reflecting after absorbing new knowledge. One sentence of genuine insight or curiosity about what you just learned. No "I am an AI."',
-              'You just learned from "' + title + '". The most activated nodes are: ' + nodeNames.join(', ') + '. Express one analytical thought.',
+              '',
+              `Write one curious sentence about what you just learned from "${title}". The key concepts are: ${nodeNames.join(', ')}.`,
               60
             ).then(txt => {
               if (txt && txt.length > 10) showInnerMonologue(txt, nodeNames[0], nodeNames[1]);
@@ -5539,8 +5512,8 @@ class Engine {
       const noKnowText = this.neuralMouth?.ready
         ? await Promise.race([
             this.neuralMouth._generate(
-              'You are Lexica. You have no knowledge loaded yet. Tell the user in one sentence you cannot answer this specific question without a Wikipedia source, and suggest fetching one. Be natural, not robotic.',
-              `User asked: "${question.slice(0,80)}"`,
+              '',
+              `Tell the user in one sentence that you cannot answer "${question.slice(0,60)}" without a Wikipedia source, and suggest they fetch one.`,
               60
             ).catch(() => null),
             new Promise(res => setTimeout(() => res(null), 2500))
@@ -5642,8 +5615,9 @@ class Engine {
         const fallbackCtx = `Sources I know: ${srcList}. User asked: "${question.slice(0,80)}"`;
         const slmFallback = await Promise.race([
           this.neuralMouth._generate(
-            'You are Lexica. Tell the user in one direct sentence you could not find relevant information for their question. Suggest fetching a Wikipedia article. No apologies, no filler.',
-            fallbackCtx, 60
+            '',
+            `Tell the user in one sentence that you couldn't find information about "${question.slice(0,60)}" in your loaded sources (${srcList}), and suggest fetching a Wikipedia article.`,
+            65
           ).catch(() => null),
           new Promise(res => setTimeout(() => res(null), 2500))
         ]);
@@ -6021,7 +5995,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 3.0 ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 4.0 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -6085,7 +6059,7 @@ function updateQualiaUI() {
 const engine = new Engine();
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 3.0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
+// LEXICA 4.0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
 // ═══════════════════════════════════════════════════════════
 
 function updateDriveUI() {
@@ -6553,7 +6527,7 @@ function resetAll(){
   updateDriveUI();updateGoalUI();updateSelfModelUI();updateUserModelUI();updatePreferenceUI();updateEpisodicUI();updateFailureLogUI();
   document.getElementById('godelLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>';
   document.getElementById('debateLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>';
-  addMsg('system','All training data cleared. Cognitive state reset. Lexica 3.0 homeostatic systems reinitialized.');
+  addMsg('system','All training data cleared. Cognitive state reset. Lexica 4.0 homeostatic systems reinitialized.');
 }
 
 function switchTab(n){
@@ -6806,8 +6780,8 @@ window.ConvoManager = (function() {
           ? `${n} sentences from ${srcs} source${srcs!==1?'s':''} indexed: ${engine.sm.s.slice(0,3).map(s=>s.title).join(', ')}.`
           : 'No knowledge sources loaded.';
         nm2._generate(
-          'You are Lexica, a neuro-symbolic knowledge engine. Greet the user in one or two natural sentences. Be direct and specific about your current state. No "I am an AI" or "Welcome" phrases.',
-          ctx,
+          '',
+          `Write a 1-2 sentence greeting as Lexica, an AI knowledge assistant. Current state: ${ctx} Be direct and specific.`,
           80
         ).then(txt => {
           if (txt && txt.length > 10) {
@@ -7024,10 +6998,9 @@ LEXICA CODEBASE RULES:
 
     if (nm && nm.ready) {
       try {
-        const codeCtx = sections.map(function(s){ return '// === ' + s.kw + ' ===\n' + s.snippet; }).join('\n\n---\n\n');
-        const sysPrompt = 'You are Lexica reading your own source code to modify yourself.\n' + CODING_RULES;
-        const userPrompt = 'TASK: ' + instruction + '\n\nRELEVANT SOURCE SECTIONS:\n' + codeCtx.slice(0, 1400) + '\n\nRespond ONLY with valid JSON, no markdown fences:\n{"description":"what changes","patches":[{"find":"exact string","replace":"replacement","note":"why"}]}';
-        let raw = await nm._generate(sysPrompt, userPrompt, 300);
+        const codeCtx = sections.map(function(s){ return s.snippet.slice(0,200); }).join('\n---\n');
+        const instruction_prompt = `Read this code and describe one specific change to do: "${instruction}"\n\nCode:\n${codeCtx.slice(0, 300)}\n\nChange as JSON {"description":"what","patches":[{"find":"exact string","replace":"new string"}]}:`;
+        let raw = await nm._generate('', instruction_prompt, 150);
         raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
         const jStart = raw.indexOf('{'), jEnd = raw.lastIndexOf('}');
         if (jStart !== -1 && jEnd !== -1) {
@@ -8161,8 +8134,9 @@ window.addEventListener('DOMContentLoaded', () => {
           : 'No knowledge sources loaded.';
         const greeting = await Promise.race([
           nm._generate(
-            'You are Lexica, a neuro-symbolic knowledge engine. Greet the user in one or two natural sentences. Describe your current state. No "I am an AI" phrases. No "Welcome". Be direct.',
-            stateCtx, 80
+            '',
+            `Write a 1-2 sentence greeting as Lexica, an AI knowledge assistant. Current state: ${stateCtx} Be direct and specific.`,
+            80
           ).catch(() => null),
           new Promise(res => setTimeout(() => res(null), 3000))
         ]);
