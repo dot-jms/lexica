@@ -12,97 +12,10 @@
   window._neuralMouth = null;
 </script>
 <script>
-// ── CROSS-ORIGIN ISOLATION SHIM ──
-// Injects COOP/COEP headers via Service Worker so SharedArrayBuffer is available.
-// Chrome blocks blob: URL SW registration, so we use a same-origin data channel trick:
-// encode the SW source as base64 and use a "magic comment" self-registration pattern.
-(async function() {
-  if (crossOriginIsolated) return; // Already isolated — nothing to do
-  if (!('serviceWorker' in navigator)) return;
-
-  const SW_KEY = 'lexica_coi_sw_v4';
-
-  // The service worker source — must run BOTH as SW and as detector
-  const swSource = `
-/* Lexica COI Service Worker v4 */
-const CACHE = 'lexica-coi-v4';
-self.addEventListener('install', e => {
-  e.waitUntil(self.skipWaiting());
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  // Add COOP/COEP to same-origin HTML/JS responses only
-  if (url.origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).then(response => {
-      const ct = response.headers.get('content-type') || '';
-      if (!ct.includes('text/html') && !ct.includes('javascript')) return response;
-      const h = new Headers(response.headers);
-      h.set('Cross-Origin-Opener-Policy', 'same-origin');
-      h.set('Cross-Origin-Embedder-Policy', 'credentialless');
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers: h });
-    }).catch(() => fetch(e.request))
-  );
-});
-`;
-
-  try {
-    // Strategy A: Try to register SW from a blob URL (works in most browsers)
-    // blob:<origin>/uuid is same-origin so browsers permit it
-    let registered = false;
-    try {
-      const blob = new Blob([swSource], { type: 'text/javascript' });
-      const blobUrl = URL.createObjectURL(blob);
-      await navigator.serviceWorker.register(blobUrl, { scope: './' });
-      registered = true;
-      console.log('[COI] Service worker registered via blob URL');
-    } catch(blobErr) {
-      console.warn('[COI] Blob URL SW failed:', blobErr.message);
-    }
-
-    // Strategy B: Cache SW source in sessionStorage then register via a data trick
-    // Some Chrome versions block blob SW — try storing code for a companion script
-    if (!registered) {
-      try {
-        sessionStorage.setItem(SW_KEY, swSource);
-        // If page has a ?coi param, it means we were reloaded and SW should be active
-        if (!location.search.includes('coi=1')) {
-          // Can't register without a real URL — skip reload strategy
-        }
-      } catch(_) {}
-    }
-
-    // If SW is now controlling this page OR was already registered, wait briefly then check
-    const ctrl = navigator.serviceWorker.controller;
-    if (ctrl || registered) {
-      if (!navigator.serviceWorker.controller) {
-        // Wait for controller to become active
-        await new Promise(resolve => {
-          const handler = () => { navigator.serviceWorker.removeEventListener('controllerchange', handler); resolve(); };
-          navigator.serviceWorker.addEventListener('controllerchange', handler);
-          setTimeout(resolve, 3000);
-        });
-      }
-      // Only reload if we're not already crossOriginIsolated and haven't reloaded yet
-      if (!crossOriginIsolated && !sessionStorage.getItem('lexica_coi_reloaded')) {
-        sessionStorage.setItem('lexica_coi_reloaded', '1');
-        location.reload();
-        return;
-      }
-    }
-  } catch(e) {
-    console.warn('[COI] Service worker setup failed:', e);
-  }
-  // Clear reload flag so subsequent visits can try again
-  if (crossOriginIsolated) sessionStorage.removeItem('lexica_coi_reloaded');
-})();
+// Cross-origin isolation is no longer required — NeuralMouth uses Transformers.js
+// (same as NanoCortex) which runs on WebAssembly without SharedArrayBuffer threading.
+// Removing the previous COOP/COEP service worker shim which caused reload loops.
+console.log('[Lexica 4.0] Runtime:', navigator.userAgent.slice(0,60));
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -935,7 +848,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
   <div class="boot-phase-list">
     <div class="boot-phase active" id="bphase0">Symbolic Engine (CFG · Morphology · Graph)</div>
     <div class="boot-phase" id="bphase1">NanoCortex (Transformers.js · all-MiniLM-L6-v2)</div>
-    <div class="boot-phase" id="bphase2">NeuralMouth (WebLLM · quantized SLM)</div>
+    <div class="boot-phase" id="bphase2">NeuralMouth (Transformers.js · SLM)</div>
     <div class="boot-phase" id="bphase3">Ready</div>
   </div>
   <button class="boot-skip" id="bootSkipBtn" onclick="skipBoot()" style="display:none">Skip Neural Init →</button>
@@ -1277,7 +1190,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 //  L8  — Gödelian Self-Modification (theorem→rewrite loop)
 //  L9  — Curiosity Engine (entropy scan + autonomous Wikipedia learning + SLM monologue)
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
-//  L11 — NeuralMouth (WebLLM — SLM across all layers L2–L5, social, N3 bridge)
+//  L11 — NeuralMouth (Transformers.js — SLM across all layers L2–L5, social, N3 bridge)
 //  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
 //  ── LEXICA 3.0 ADDITIONS ──
 //  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
@@ -4948,209 +4861,125 @@ class NanoCortex {
 // ─────────────────────────────────────────────────────
 class NeuralMouth {
   constructor() {
-    this.engine = null;
+    this.pipeline = null;   // Transformers.js text2text-generation pipeline
     this.ready = false;
     this.loading = false;
     this.error = null;
-    this.modelId = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
-    this._queue = []; // pending requests
+    this.modelId = 'Xenova/LaMini-Flan-T5-248M';
+    this._pipelineType = 'text2text-generation';
+    // NOTE: WebLLM was replaced with Transformers.js (text2text-generation).
+    // WebLLM requires crossOriginIsolated=true which is impossible in a single
+    // HTML file on static hosting. Transformers.js needs only WebAssembly — works
+    // everywhere NanoCortex works, no server headers required.
   }
 
   async init(onProgress) {
-    if (this.ready) return true;   // idempotent — don't double-init
-    if (this.loading) return false; // already in progress
-
-    // ── Check 1: WebGPU hardware ──────────────────────────────────
-    if (!navigator.gpu) {
-      this.error = 'WebGPU not available — use Chrome 113+ or Edge 113+';
-      onProgress('NeuralMouth: WebGPU unavailable — use Chrome 113+ or Edge 113+');
-      console.warn('[NeuralMouth] WebGPU not present in navigator');
-      return false;
-    }
-    try {
-      const adapter = await navigator.gpu.requestAdapter();
-      if (!adapter) {
-        this.error = 'No WebGPU adapter found (hardware/driver issue)';
-        onProgress('NeuralMouth: No GPU adapter — symbolic fallback active');
-        console.warn('[NeuralMouth] navigator.gpu.requestAdapter() returned null');
-        return false;
-      }
-      console.log('[NeuralMouth] WebGPU adapter OK:', adapter.name || 'unnamed');
-    } catch(gpuErr) {
-      this.error = 'GPU adapter error: ' + String(gpuErr);
-      onProgress('NeuralMouth: GPU error — ' + String(gpuErr).slice(0, 60));
-      console.warn('[NeuralMouth] requestAdapter threw:', gpuErr);
-      return false;
-    }
-
-    const isolated = (typeof crossOriginIsolated !== 'undefined') ? crossOriginIsolated : false;
-    console.log('[NeuralMouth] crossOriginIsolated =', isolated,
-                '| SharedArrayBuffer =', typeof SharedArrayBuffer !== 'undefined');
-    if (!isolated) {
-      onProgress('NeuralMouth: No cross-origin isolation — trying single-thread WebLLM...');
-    }
-
+    if (this.ready) return true;
+    if (this.loading) return false;
     this.loading = true;
 
-    // ── Step 1: Load WebLLM library ────────────────────────────────
-    // Try multiple CDNs × versions. esm.sh is most reliable for complex ESM packages.
-    // jsDelivr +esm as fallback. Known real npm versions only.
-    const CDN_ATTEMPTS = [
-      // esm.sh — best for complex ESM with internal workers
-      { cdn: 'esm.sh',       url: v => `https://esm.sh/@mlc-ai/web-llm@${v}` },
-      // jsDelivr with +esm transform
-      { cdn: 'jsDelivr',     url: v => `https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@${v}/+esm` },
-      // unpkg
-      { cdn: 'unpkg',        url: v => `https://unpkg.com/@mlc-ai/web-llm@${v}/dist/webllm.js` },
+    // ── Load Transformers.js (same CDN + version as NanoCortex) ──
+    let pipelineFn = null;
+    let env = null;
+    const TRANSFORMERS_URLS = [
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@2.17.2',
     ];
-    // Verified real npm versions (newest first for best models/API)
-    const WEB_LLM_VERSIONS = ['0.2.73', '0.2.62', '0.2.46'];
-
-    let CreateMLCEngine = null;
-    let loadedCdn = null, loadedVer = null;
-
-    outerLoop:
-    for (const ver of WEB_LLM_VERSIONS) {
-      for (const { cdn, url } of CDN_ATTEMPTS) {
-        try {
-          onProgress(`NeuralMouth: Trying WebLLM v${ver} via ${cdn}...`);
-          const mod = await import(url(ver));
-          // Resolve the export — different versions export differently
-          CreateMLCEngine =
-            mod.CreateMLCEngine          ??
-            mod.default?.CreateMLCEngine ??
-            mod.createEngine             ??
-            mod.default?.createEngine    ??
-            mod.MLCEngine?.create        ??
-            mod.webllm?.CreateMLCEngine  ??
-            null;
-          if (typeof CreateMLCEngine === 'function') {
-            loadedCdn = cdn; loadedVer = ver;
-            this._webllmVersion = ver;
-            console.log(`[NeuralMouth] WebLLM v${ver} loaded via ${cdn}`);
-            break outerLoop;
-          }
-          console.warn(`[NeuralMouth] v${ver} via ${cdn}: module loaded but CreateMLCEngine not found`);
-        } catch(err) {
-          console.warn(`[NeuralMouth] v${ver} via ${cdn} failed:`, err.message || err);
+    for (const url of TRANSFORMERS_URLS) {
+      try {
+        onProgress('NeuralMouth: Loading Transformers.js...');
+        const mod = await import(url);
+        pipelineFn = mod.pipeline ?? mod.default?.pipeline ?? null;
+        env        = mod.env     ?? mod.default?.env     ?? null;
+        if (typeof pipelineFn === 'function') {
+          console.log('[NeuralMouth] Transformers.js loaded from:', url);
+          break;
         }
+      } catch(e) {
+        console.warn('[NeuralMouth] Transformers CDN failed:', url, e.message);
       }
     }
-
-    if (!CreateMLCEngine) {
-      this.error = 'WebLLM failed to load from all CDNs/versions';
+    if (!pipelineFn) {
+      this.error = 'Transformers.js failed to load';
       this.loading = false;
-      onProgress('NeuralMouth: WebLLM CDN unavailable — symbolic fallback active');
-      console.error('[NeuralMouth] All CDN × version attempts exhausted');
+      onProgress('NeuralMouth: Transformers.js unavailable — symbolic fallback active');
       return false;
     }
-
-    onProgress(`NeuralMouth: WebLLM v${loadedVer} ready (${loadedCdn}) — loading model...`);
-
-    // ── Step 2: Load model (smallest → largest) ────────────────────
-    const progressCb = (info) => {
-      const pct = info.progress != null ? Math.round(info.progress * 100) : '?';
-      const txt = info.text || 'Loading model';
-      onProgress(`NeuralMouth: ${txt} (${pct}%)`);
-      try { updateBootBar(0.5 + (info.progress || 0) * 0.45, `NeuralMouth: ${txt}...`); } catch(_) {}
-    };
-
-    // Smallest models first — fastest to load, least VRAM, most likely to succeed
-    const MODEL_CASCADE = [
-      'SmolLM2-360M-Instruct-q4f16_1-MLC',   // ~200MB VRAM
-      'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',   // ~300MB VRAM
-      'Llama-3.2-1B-Instruct-q4f16_1-MLC',   // ~700MB VRAM
-      'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',   // ~1.0GB VRAM (last resort)
-    ];
-
-    // Per-model 120s timeout — model downloads can be slow on mobile/weak connections
-    const withTimeout = (promise, ms, label) =>
-      Promise.race([promise, new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout (${ms/1000}s) loading ${label}`)), ms))]);
-
-    // Engine options — safe defaults that work across WebLLM versions
-    const baseOpts = {
-      initProgressCallback: progressCb,
-      logLevel: 'error', // suppress verbose WASM logs
-    };
-    // Single-thread mode when SharedArrayBuffer is unavailable
-    if (!isolated || typeof SharedArrayBuffer === 'undefined') {
-      baseOpts.chatOpts = {
-        context_window_size: 512,  // reduce VRAM pressure in single-thread mode
-      };
-      console.log('[NeuralMouth] Single-thread mode — reduced context window');
+    // Configure env
+    if (env) {
+      try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_) {}
     }
 
+    // ── Model cascade: smallest → largest ──
+    // All are Xenova ONNX models, text2text-generation, instruction-following.
+    // LaMini-Flan-T5 is fine-tuned for instruction following — ideal for Lexica.
+    const MODEL_CASCADE = [
+      { id: 'Xenova/LaMini-Flan-T5-248M', type: 'text2text-generation' },
+      { id: 'Xenova/flan-t5-base',         type: 'text2text-generation' },
+      { id: 'Xenova/flan-t5-small',        type: 'text2text-generation' },
+    ];
+    const progressCb = (info) => {
+      if (info.status === 'downloading' || info.status === 'progress') {
+        const pct = (info.loaded && info.total) ? Math.round(info.loaded / info.total * 100) : '?';
+        onProgress(`NeuralMouth: Downloading model (${pct}%)`);
+        try { updateBootBar(0.5 + ((info.loaded||0)/(info.total||1)) * 0.45, 'NeuralMouth: Downloading...'); } catch(_) {}
+      }
+    };
+
     let lastErr = null;
-    for (const modelId of MODEL_CASCADE) {
+    for (const { id, type } of MODEL_CASCADE) {
       try {
-        onProgress(`NeuralMouth: Loading ${modelId}...`);
-        console.log(`[NeuralMouth] Attempting model: ${modelId}`);
-        this.engine = await withTimeout(
-          CreateMLCEngine(modelId, { ...baseOpts }),
-          120_000,
-          modelId
-        );
-        this.modelId = modelId;
+        onProgress(`NeuralMouth: Loading ${id}...`);
+        console.log('[NeuralMouth] Attempting model:', id);
+        this.pipeline = await pipelineFn(type, id, { progress_callback: progressCb });
+        this.modelId = id;
+        this._pipelineType = type;
         this.ready = true;
         this.loading = false;
-        window._webllmReady = true;          // ← FIX: set global flag
-        onProgress('NeuralMouth: WebGPU SLM ready ✓ (' + modelId + ')');
-        console.log('[NeuralMouth] Loaded:', modelId, '| Isolated:', isolated);
+        window._webllmReady = true;
+        onProgress('NeuralMouth: SLM ready ✓ (' + id + ')');
+        console.log('[NeuralMouth] Loaded:', id);
         return true;
       } catch(modelErr) {
         lastErr = modelErr;
-        console.warn(`[NeuralMouth] Model ${modelId} failed:`, modelErr.message || modelErr);
-        // Clean up partial state before trying next model
-        try { if (this.engine?.unload) await this.engine.unload(); } catch(_) {}
-        this.engine = null;
+        console.warn('[NeuralMouth] Model failed:', id, modelErr.message || modelErr);
+        this.pipeline = null;
       }
     }
 
-    // All models failed
-    this.error = lastErr?.message || 'All models failed to load';
+    this.error = lastErr?.message || 'All models failed';
     this.loading = false;
     onProgress('NeuralMouth: All models failed — ' + this.error.slice(0, 80));
-    console.error('[NeuralMouth] All models failed. Last error:', lastErr);
+    console.error('[NeuralMouth] All models failed. Last:', lastErr);
     return false;
   }
 
-  // Internal generate — strict token limit, repetition penalty
+  // Internal generate — combines system + user into a T5 instruction prompt
   async _generate(systemPrompt, userPrompt, maxTokens=100) {
-    if (!this.ready || !this.engine) throw new Error('NeuralMouth not ready');
-    // Note: frequency_penalty/presence_penalty may not be supported in all WebLLM versions
-    // Use a try/catch wrapper so a bad param doesn't kill the call
-    const makeRequest = (opts) => this.engine.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userPrompt   }
-      ],
-      max_tokens: maxTokens,
-      stream: false,    // always non-streaming for internal calls
-      ...opts,
+    if (!this.ready || !this.pipeline) throw new Error('NeuralMouth not ready');
+    // T5/text2text doesn't have role-based chat — combine into one instruction.
+    // LaMini-Flan-T5 was trained on instruction-following data; plain concatenation works well.
+    const input = systemPrompt
+      ? `${systemPrompt}\n\n${userPrompt}`
+      : userPrompt;
+    const result = await this.pipeline(input.slice(0, 1024), {
+      max_new_tokens: Math.min(maxTokens, 300),
+      // Use sampling for creative outputs, greedy for short structured ones
+      do_sample: maxTokens > 40,
+      temperature: maxTokens > 40 ? 0.6 : 1.0,
+      repetition_penalty: 1.3,
+      num_beams: maxTokens <= 40 ? 2 : 1,  // beam search for short structured JSON
     });
-    let response;
-    try {
-      response = await makeRequest({
-        temperature: 0.4,
-        top_p: 0.85,
-        frequency_penalty: 0.8,
-        presence_penalty: 0.5,
-      });
-    } catch(firstErr) {
-      // If penalty params caused an error, retry with bare minimum params
-      console.warn('[NeuralMouth] _generate retry without penalties:', firstErr.message);
-      response = await makeRequest({ temperature: 0.4 });
-    }
-    const raw = response.choices[0]?.message?.content?.trim() || '';
-    // Strip bullet points, numbered lists, and anything after a blank line
+    const raw = (result?.[0]?.generated_text ?? '').trim();
     return raw
       .split('\n')
       .filter(line => !/^\s*[\*\-•]|^\s*\d+\./.test(line))
       .join(' ')
       .replace(/\s{2,}/g, ' ')
-      .split(/\n\n/)[0]          // stop at first blank line
-      .slice(0, 400)              // hard character cap
+      .split(/\n\n/)[0]
+      .slice(0, 400)
       .trim();
   }
 
@@ -6436,7 +6265,7 @@ window._retryNeuralInit = async function() {
     window._neuralMouth = engine.neuralMouth;
     if (ok) {
       engine._neuralReady = true;
-      updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
+      updateSLMStatusUI('ready', 'NeuralMouth ready (Transformers.js)', engine.neuralMouth.modelId);
     } else {
       updateSLMStatusUI('error', engine.neuralMouth.error || 'Load failed', engine.neuralMouth.modelId || '—');
     }
@@ -7197,7 +7026,7 @@ LEXICA CODEBASE RULES:
     }
     const found = sections.map(function(s){ return s.kw; }).join(', ');
     return {
-      description: 'Found relevant code at: ' + (found || 'no matches') + '. NeuralMouth (WebGPU) needed for autonomous patching.',
+      description: 'Found relevant code at: ' + (found || 'no matches') + '. NeuralMouth (Transformers.js) needed for autonomous patching.',
       patches: [],
       sections: sections
     };
@@ -8250,13 +8079,12 @@ window.addEventListener('DOMContentLoaded', () => {
     // Phase 2: NeuralMouth (WebLLM)
     // Emit diagnostics so we can always debug from console
     console.group('[NeuralMouth] Boot diagnostics');
-    console.log('WebGPU available:', !!navigator.gpu);
+    console.log('WebAssembly available:', typeof WebAssembly !== 'undefined');
     console.log('crossOriginIsolated:', typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : 'undefined');
-    console.log('SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
-    console.log('serviceWorker controller:', navigator.serviceWorker?.controller?.scriptURL || 'none');
+    console.log('Backend: Transformers.js text2text-generation (replaces WebLLM)');
     console.log('User agent:', navigator.userAgent.slice(0, 100));
     console.groupEnd();
-    updateBootBar(0.45, 'Initializing NeuralMouth (WebGPU/WebLLM)...');
+    updateBootBar(0.45, 'Initializing NeuralMouth (Transformers.js)...');
     try {
       const webllmOk = await engine.neuralMouth.init((msg) => {
         document.getElementById('bootStatus').textContent = msg;
@@ -8268,12 +8096,12 @@ window.addEventListener('DOMContentLoaded', () => {
         setBootPhase(2, true);
         setBootPhase(3, false);
         updateBootBar(0.95, 'NeuralMouth ready ✓');
-        updateSLMStatusUI('ready', 'NeuralMouth ready (WebGPU)', engine.neuralMouth.modelId);
+        updateSLMStatusUI('ready', 'NeuralMouth ready (Transformers.js)', engine.neuralMouth.modelId);
       } else {
         setBootPhase(2, false);
-        updateBootBar(0.95, 'WebLLM unavailable — symbolic fallback active');
+        updateBootBar(0.95, 'Transformers.js unavailable — symbolic fallback active');
         if (engine.nanoCortex.ready) {
-          updateSLMStatusUI('error', 'WebLLM unavailable — NanoCortex active', engine.neuralMouth.modelId);
+          updateSLMStatusUI('error', 'Transformers.js unavailable — NanoCortex active', engine.neuralMouth.modelId);
         } else {
           updateSLMStatusUI('error', 'Neural layers unavailable — full symbolic mode', '—');
         }
