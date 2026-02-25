@@ -3848,8 +3848,8 @@ class CuriosityEngine {
         const node = top[Math.floor(Math.random() * top.length)];
         const facts = this.kg.triples.filter(t => t.s === node).slice(0,4).map(t => t.p + ':' + t.o).join(', ');
         nm._generate(
-          '',
-          `Write one analytical sentence about the knowledge node "${node}" which has these connections: ${facts}. Be specific and curious.`,
+          'Write one sentence about a knowledge concept based on its connections.',
+          `Concept: ${node}. Connections: ${facts}. Sentence:`,
           55
         ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
         return;
@@ -3873,8 +3873,8 @@ class CuriosityEngine {
       if (sparse.length > 0) {
         const [node] = sparse[Math.floor(Math.random() * sparse.length)];
         if (nm && nm.ready) {
-          nm._generate('',
-            `Write one curious sentence wondering what "${node}" is, since it appears in your knowledge graph but you know almost nothing about it.`, 50
+          nm._generate('Write one curious sentence about a concept that needs more information.',
+            `Concept: ${node}. What might it be? Sentence:`, 50
           ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
         } else {
           this.onThought('"' + node + '" is in my graph but sparsely connected. I want to learn more about it.', node, null);
@@ -3944,8 +3944,8 @@ class CuriosityEngine {
         .map(t => t.s + ' -> ' + t.p + ' -> ' + t.o)
         .join('; ');
       nm._generate(
-        '',
-        `Write one curious analytical sentence about the gap between "${nodeA}" and "${nodeB}" in a knowledge graph. Related facts: ${kgCtx || 'none'}. Entropy score: ${entropyScore.toFixed(1)}.`,
+        'Write one curious sentence about why two knowledge concepts might be connected.',
+        `Concept A: ${nodeA}. Concept B: ${nodeB}. Facts: ${kgCtx || 'unknown'}. Sentence:`,
         60
       ).then(txt => {
         if (txt && txt.length > 10) {
@@ -4848,7 +4848,7 @@ class NeuralMouth {
     this.ready = false;
     this.loading = false;
     this.error = null;
-    this.modelId = 'Xenova/LaMini-Flan-T5-248M';
+    this.modelId = 'Xenova/flan-t5-base';
     this._pipelineType = 'text2text-generation';
     // NOTE: WebLLM was replaced with Transformers.js (text2text-generation).
     // WebLLM requires crossOriginIsolated=true which is impossible in a single
@@ -4897,11 +4897,12 @@ class NeuralMouth {
 
     // ── Model cascade: smallest → largest ──
     // All are Xenova ONNX models, text2text-generation, instruction-following.
-    // LaMini-Flan-T5 is fine-tuned for instruction following — ideal for Lexica.
+    // flan-t5 was fine-tuned on FLAN task collection — no ChatGPT distillation,
+    // no "I'm sorry as an AI language model" refusals. LaMini is NOT in this list
+    // because it was trained on ChatGPT outputs and inherits all refusal patterns.
     const MODEL_CASCADE = [
-      { id: 'Xenova/LaMini-Flan-T5-248M', type: 'text2text-generation' },
-      { id: 'Xenova/flan-t5-base',         type: 'text2text-generation' },
-      { id: 'Xenova/flan-t5-small',        type: 'text2text-generation' },
+      { id: 'Xenova/flan-t5-base',  type: 'text2text-generation' },  // 248M, best quality
+      { id: 'Xenova/flan-t5-small', type: 'text2text-generation' },  // 77M, fast fallback
     ];
     const progressCb = (info) => {
       if (info.status === 'downloading' || info.status === 'progress') {
@@ -4939,40 +4940,35 @@ class NeuralMouth {
     return false;
   }
 
-  // Internal generate — uses LaMini-Flan-T5's actual training format for reliable outputs.
-  // LaMini was fine-tuned on: "Below is an instruction...\n\n### Instruction:\n{x}\n\n### Response:"
-  // Combining system+user into the Instruction field gives far better compliance than raw concat.
-  // Input cap: 450 chars for instruction content (T5 tokenizer limit ~512 tokens total).
-  async _generate(systemPrompt, userPrompt, maxTokens=80) {
+  // Internal generate — uses Flan-T5's training format.
+  // Flan-T5 was trained on task-prefix instructions: "Answer the question: {q}\n\nContext: {c}\n\nAnswer:"
+  // It was NOT trained on ChatGPT outputs, so it has zero "I'm sorry as an AI" refusal behavior.
+  // Key rules:
+  //   - Task verb first: "Answer:", "Summarize:", "Extract:", "Write:", "Describe:"
+  //   - Keep total input under 450 chars (T5 512-token limit)
+  //   - No role declarations ("You are Lexica") — T5 ignores/echoes them
+  //   - No "Below is an instruction" wrapper — that's LaMini-only format
+  async _generate(taskPrefix, contentPrompt, maxTokens=80) {
     if (!this.ready || !this.pipeline) throw new Error('NeuralMouth not ready');
 
-    // Strip boilerplate from system prompt — T5 echoes role declarations back verbatim.
-    // Keep only the task instruction part (after "You are Lexica.")
-    const taskPart = (systemPrompt || '')
-      .replace(/^You are Lexica[^.]*\.\s*/i, '')
-      .replace(/^You are a[^.]*\.\s*/i, '')
-      .trim();
+    // taskPrefix is the task verb/instruction (e.g. "Answer the question:")
+    // contentPrompt is the actual content (facts, query, context)
+    // Together they must fit in ~450 chars
+    const input = taskPrefix
+      ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 480)
+      : contentPrompt.slice(0, 480);
 
-    // Build in LaMini instruction format
-    const instruction = taskPart
-      ? `${taskPart}\n\n${userPrompt.slice(0, 350)}`
-      : userPrompt.slice(0, 450);
-
-    const fullInput = `Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n${instruction.slice(0, 450)}\n\n### Response:`;
-
-    const result = await this.pipeline(fullInput, {
+    const result = await this.pipeline(input, {
       max_new_tokens: Math.min(maxTokens, 120),
       do_sample: false,
       num_beams: 1,
       repetition_penalty: 1.3,
     });
-    const raw = (result?.[0]?.generated_text ?? '').trim();
 
-    // Strip any echo of the instruction header that T5 occasionally bleeds back
-    const cleaned = raw
-      .replace(/^Below is an instruction[\s\S]*?### Response:\s*/i, '')
-      .replace(/^### Response:\s*/i, '')
-      .replace(/^(I am Lexica[.!,]?\s*)/i, '')   // strip "I am Lexica" prefix if echoed
+    const raw = (result?.[0]?.generated_text ?? '').trim();
+    return raw
+      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi, '')   // strip "I'm sorry..." openings
+      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi, '')     // strip "As an AI..." openings
       .split('\n')
       .filter(line => !/^\s*[\*\-•]|^\s*\d+\./.test(line))
       .join(' ')
@@ -4980,45 +4976,38 @@ class NeuralMouth {
       .split(/\n\n/)[0]
       .slice(0, 400)
       .trim();
-
-    return cleaned;
   }
 
   // Social response — tight persona, no hallucination
   async socialResponse(intent, userInput, kgContext='') {
     if (!this.ready) return null;
-    // Compact state description — strip verbose boilerplate
-    const state = kgContext ? kgContext.slice(0, 150) : 'no knowledge loaded';
-    const instruction = `Reply naturally in 1-2 sentences as an AI assistant named Lexica. State: ${state}\n\nUser: "${userInput.slice(0, 100)}"\n\nLexica:`;
+    const state = kgContext ? kgContext.slice(0, 120) : 'no knowledge loaded';
+    const task = `Write a short reply (1-2 sentences) as Lexica, an AI knowledge assistant.`;
+    const content = `State: ${state}\nUser said: "${userInput.slice(0, 100)}"\nLexica:`;
     try {
-      const result = await this._generate('', instruction, 80);
+      const result = await this._generate(task, content, 80);
       if (!result || result.length < 5) return null;
-      // Trim to first sentence if overly long
       const first = result.match(/^[^.!?]+[.!?]/)?.[0];
-      return (result.length > 220 && first) ? first : result;
+      return (result.length > 200 && first) ? first : result;
     } catch(e) { return null; }
   }
 
   // Graph-RAG: translate verified KG triples into natural language
   async graphRAG(kgFacts, query, intent, evidenceSentences=[]) {
     if (!this.ready) return null;
-    // Compact triples — only the most informative ones, short format
     const triples = kgFacts.slice(0, 5)
       .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
       .join('; ');
-    // Pick one strong evidence sentence — the shortest clear one
     const evidence = evidenceSentences
-      .filter(s => s && s.length > 15 && s.length < 180)
+      .filter(s => s && s.length > 15 && s.length < 150)
       .slice(0, 2).join(' ');
     if (!triples && !evidence) return null;
-
-    const context = [triples, evidence].filter(Boolean).join(' | ');
-    // Instruction is content-first so it fits in T5's 512-token window
-    const instruction = `Answer the question in 1-2 direct sentences using only these facts. Do not add anything not in the facts.\n\nFacts: ${context.slice(0, 320)}\n\nQuestion: ${query.slice(0, 80)}\n\nAnswer:`;
+    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, 280);
+    const task = `Answer the question in 1-2 sentences using only the given facts. Be direct and specific.`;
+    const content = `Facts: ${facts}\nQuestion: ${query.slice(0, 80)}\nAnswer:`;
     try {
-      const result = await this._generate('', instruction, 90);
-      if (!result || result.length < 15) return null;
-      // Strip any leaked instruction text
+      const result = await this._generate(task, content, 90);
+      if (!result || result.length < 10) return null;
       return result.replace(/^(Answer:|Facts:|Question:)\s*/i, '').replace(/\n/g,' ').trim() || null;
     } catch(e) { return null; }
   }
@@ -5026,14 +5015,14 @@ class NeuralMouth {
   // N3 Bridge: find missing predicate between two disconnected nodes
   async n3Bridge(nodeA, nodeB, corpusSentences) {
     if (!this.ready) return null;
-    const relevant = corpusSentences.filter(s => {
-      const sl = s.toLowerCase();
-      return sl.includes(nodeA.toLowerCase()) || sl.includes(nodeB.toLowerCase());
-    }).slice(0, 4).join(' ').slice(0, 300);
+    const relevant = corpusSentences
+      .filter(s => { const sl = s.toLowerCase(); return sl.includes(nodeA.toLowerCase()) || sl.includes(nodeB.toLowerCase()); })
+      .slice(0, 3).join(' ').slice(0, 250);
     if (relevant.length < 20) return null;
-    const instruction = `Find the relationship between "${nodeA.slice(0,30)}" and "${nodeB.slice(0,30)}" from this text. Output only JSON: {"predicate":"verb","direction":"A_to_B or B_to_A","sentence":"one sentence"}\n\nText: ${relevant}\n\nJSON:`;
+    const task = `Identify the relationship between two concepts. Output JSON: {"predicate":"verb","direction":"A_to_B","sentence":"one sentence"}`;
+    const content = `Text: ${relevant}\nA: ${nodeA.slice(0,30)}\nB: ${nodeB.slice(0,30)}\nJSON:`;
     try {
-      const raw = await this._generate('', instruction, 80);
+      const raw = await this._generate(task, content, 80);
       const match = raw.match(/\{[\s\S]*?\}/);
       if (!match) return null;
       const parsed = JSON.parse(match[0]);
@@ -5047,9 +5036,10 @@ class NeuralMouth {
   async semanticExpand(query, knownTerms=[]) {
     if (!this.ready) return [];
     try {
-      const known = knownTerms.slice(0,5).join(', ');
-      const instruction = `List 4 words related to "${query.slice(0,50)}"${known ? ` (not: ${known})` : ''}. Output only a JSON array like ["word1","word2","word3","word4"]. No explanation.`;
-      const raw = await this._generate('', instruction, 50);
+      const known = knownTerms.slice(0,4).join(', ');
+      const task = `List 4 related words as a JSON array. Example: ["word1","word2","word3","word4"]`;
+      const content = `Topic: ${query.slice(0,60)}${known ? `\nExclude: ${known}` : ''}\nJSON array:`;
+      const raw = await this._generate(task, content, 50);
       const match = raw.match(/\[[\s\S]*?\]/);
       if (!match) return [];
       const arr = JSON.parse(match[0]);
@@ -5062,10 +5052,11 @@ class NeuralMouth {
   // SLM extracts additional structured triples from raw text
   async extractTriples(sentences) {
     if (!this.ready) return [];
-    const text = sentences.slice(0,4).join(' ').slice(0, 350);
+    const text = sentences.slice(0,3).join(' ').slice(0, 300);
     try {
-      const instruction = `Extract 3 subject-predicate-object triples from this text. Output only JSON array like [{"s":"subject","p":"predicate","o":"object"}].\n\nText: ${text}\n\nJSON:`;
-      const raw = await this._generate('', instruction, 120);
+      const task = `Extract 3 subject-predicate-object triples from the text. Output only JSON: [{"s":"subject","p":"predicate","o":"object"}]`;
+      const content = `Text: ${text}\nJSON:`;
+      const raw = await this._generate(task, content, 100);
       const match = raw.match(/\[[\s\S]*?\]/);
       if (!match) return [];
       const arr = JSON.parse(match[0]);
@@ -5079,8 +5070,9 @@ class NeuralMouth {
   async evalContradiction(factA, factB, subject) {
     if (!this.ready) return null;
     try {
-      const instruction = `Do these two facts about "${subject.slice(0,40)}" contradict each other? If so, which is more likely correct? Answer in one sentence.\n\nFact A: ${factA.slice(0,100)}\nFact B: ${factB.slice(0,100)}\n\nAnswer:`;
-      return await this._generate('', instruction, 60) || null;
+      const task = `Determine if two facts contradict each other. Answer in one sentence saying which is more likely correct.`;
+      const content = `Subject: ${subject.slice(0,40)}\nFact A: ${factA.slice(0,100)}\nFact B: ${factB.slice(0,100)}\nAnswer:`;
+      return await this._generate(task, content, 60) || null;
     } catch(e) { return null; }
   }
 
@@ -5088,11 +5080,12 @@ class NeuralMouth {
   // Used when graphRAG gives a short answer and we have good KG coverage
   async synthesizeWithReasoning(query, kgFacts, evidenceSentences, intent) {
     if (!this.ready || !kgFacts.length) return null;
-    const triples = kgFacts.slice(0,6).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
-    const ev = evidenceSentences.slice(0,2).join(' ').slice(0, 200);
-    const instruction = `Summarize in 2-3 sentences using only these facts. Be direct.\n\nFacts: ${triples.slice(0,250)}${ev ? ' | '+ev : ''}\n\nQuery: ${query.slice(0,60)}\n\nSummary:`;
+    const triples = kgFacts.slice(0,5).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,2).join(' ').slice(0,150);
+    const task = `Answer the question in 2 sentences using only the given facts.`;
+    const content = `Facts: ${triples.slice(0,220)}${ev ? ' | '+ev : ''}\nQuestion: ${query.slice(0,60)}\nAnswer:`;
     try {
-      return await this._generate('', instruction, 100);
+      return await this._generate(task, content, 100);
     } catch(e) { return null; }
   }
 
@@ -5101,20 +5094,24 @@ class NeuralMouth {
   // Returns { answer, trace } — trace is shown in the thinking bubble on click.
   async thinkThenAnswer(query, kgFacts, evidenceSentences, intent) {
     if (!this.ready) return null;
-    const triples = kgFacts.slice(0,6).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
-    const ev = evidenceSentences.slice(0,2).join(' ').slice(0,150);
-    const context = `${triples.slice(0,250)}${ev ? ' | '+ev : ''}`;
+    const triples = kgFacts.slice(0,5).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,1).join(' ').slice(0,100);
+    const context = `${triples.slice(0,220)}${ev ? ' | '+ev : ''}`;
     if (!context.trim()) return null;
-    // Pass 1: reasoning trace
+    // Pass 1: reasoning
     let trace = null;
     try {
-      trace = await this._generate('', `Think step by step about this question using these facts. 2 sentences of reasoning.\n\nFacts: ${context}\n\nQuestion: ${query.slice(0,60)}\n\nReasoning:`, 80);
+      trace = await this._generate(
+        'Think step by step about this question using only the facts.',
+        `Facts: ${context}\nQuestion: ${query.slice(0,60)}\nReasoning:`, 70);
     } catch(e) { trace = null; }
-    // Pass 2: final answer
-    const traceCtx = trace ? ` Reasoning: ${trace.slice(0,150)}` : '';
+    // Pass 2: answer
+    const traceHint = trace ? ` ${trace.slice(0,100)}` : '';
     let answer = null;
     try {
-      answer = await this._generate('', `Answer in 2 sentences using only the facts.${traceCtx}\n\nFacts: ${context.slice(0,200)}\n\nQuestion: ${query.slice(0,60)}\n\nAnswer:`, 90);
+      answer = await this._generate(
+        `Answer the question in 2 sentences using only the facts.${traceHint}`,
+        `Facts: ${context.slice(0,200)}\nQuestion: ${query.slice(0,60)}\nAnswer:`, 90);
     } catch(e) { return null; }
     if (!answer || answer.length < 15) return null;
     return { answer: answer.replace(/\n/g,' ').trim(), trace };
@@ -5410,8 +5407,8 @@ class Engine {
           const nm = window._neuralMouth;
           if (nm && nm.ready) {
             nm._generate(
-              '',
-              `Write one curious sentence about what you just learned from "${title}". The key concepts are: ${nodeNames.join(', ')}.`,
+              'Write one curious sentence about a newly learned topic.',
+              `Topic: ${title}. Key concepts: ${nodeNames.join(', ')}. Sentence:`,
               60
             ).then(txt => {
               if (txt && txt.length > 10) showInnerMonologue(txt, nodeNames[0], nodeNames[1]);
@@ -5512,8 +5509,8 @@ class Engine {
       const noKnowText = this.neuralMouth?.ready
         ? await Promise.race([
             this.neuralMouth._generate(
-              '',
-              `Tell the user in one sentence that you cannot answer "${question.slice(0,60)}" without a Wikipedia source, and suggest they fetch one.`,
+              'Tell the user in one sentence that you need a Wikipedia source to answer their question.',
+              `Question: ${question.slice(0,60)}. Suggest fetching Wikipedia. Sentence:`,
               60
             ).catch(() => null),
             new Promise(res => setTimeout(() => res(null), 2500))
@@ -5615,8 +5612,8 @@ class Engine {
         const fallbackCtx = `Sources I know: ${srcList}. User asked: "${question.slice(0,80)}"`;
         const slmFallback = await Promise.race([
           this.neuralMouth._generate(
-            '',
-            `Tell the user in one sentence that you couldn't find information about "${question.slice(0,60)}" in your loaded sources (${srcList}), and suggest fetching a Wikipedia article.`,
+            'Tell the user in one sentence that no relevant information was found and suggest fetching Wikipedia.',
+            `Question: ${question.slice(0,60)}. Sources: ${srcList}. Sentence:`,
             65
           ).catch(() => null),
           new Promise(res => setTimeout(() => res(null), 2500))
@@ -6780,8 +6777,8 @@ window.ConvoManager = (function() {
           ? `${n} sentences from ${srcs} source${srcs!==1?'s':''} indexed: ${engine.sm.s.slice(0,3).map(s=>s.title).join(', ')}.`
           : 'No knowledge sources loaded.';
         nm2._generate(
-          '',
-          `Write a 1-2 sentence greeting as Lexica, an AI knowledge assistant. Current state: ${ctx} Be direct and specific.`,
+          'Write a 1-2 sentence greeting as an AI knowledge assistant describing your current state.',
+          `State: ${ctx}. Greeting:`,
           80
         ).then(txt => {
           if (txt && txt.length > 10) {
@@ -6808,8 +6805,8 @@ window.ConvoManager = (function() {
     if (nm && nm.ready) {
       try {
         const name = await nm._generate(
-          'Generate a very short chat title (2-5 words max). Output ONLY the title, no punctuation at end, no quotes, no extra text.',
-          'First message: "' + text.slice(0, 80) + '"',
+          'Generate a 2-5 word title for a chat conversation. Output only the title.',
+          'Message: "' + text.slice(0, 80) + '"\nTitle:',
           14
         );
         const cleaned2 = (name||'').replace(/^["']+|["']+$/g,'').trim().split('\n')[0];
@@ -6999,8 +6996,9 @@ LEXICA CODEBASE RULES:
     if (nm && nm.ready) {
       try {
         const codeCtx = sections.map(function(s){ return s.snippet.slice(0,200); }).join('\n---\n');
-        const instruction_prompt = `Read this code and describe one specific change to do: "${instruction}"\n\nCode:\n${codeCtx.slice(0, 300)}\n\nChange as JSON {"description":"what","patches":[{"find":"exact string","replace":"new string"}]}:`;
-        let raw = await nm._generate('', instruction_prompt, 150);
+        const task = `Describe a code change as JSON: {"description":"what to change","patches":[{"find":"exact string to find","replace":"replacement string"}]}`;
+        const instruction_prompt = `Task: ${instruction}\n\nCode:\n${codeCtx.slice(0, 280)}\n\nJSON:`;
+        let raw = await nm._generate(task, instruction_prompt, 150);
         raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
         const jStart = raw.indexOf('{'), jEnd = raw.lastIndexOf('}');
         if (jStart !== -1 && jEnd !== -1) {
@@ -8134,8 +8132,8 @@ window.addEventListener('DOMContentLoaded', () => {
           : 'No knowledge sources loaded.';
         const greeting = await Promise.race([
           nm._generate(
-            '',
-            `Write a 1-2 sentence greeting as Lexica, an AI knowledge assistant. Current state: ${stateCtx} Be direct and specific.`,
+            'Write a 1-2 sentence greeting as an AI knowledge assistant describing your current state.',
+            `State: ${stateCtx}. Greeting:`,
             80
           ).catch(() => null),
           new Promise(res => setTimeout(() => res(null), 3000))
