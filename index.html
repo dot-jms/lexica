@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEXICA 3.0</title>
+<title>LEXICA 4.0</title>
 <script type="module">
   // Pre-declare module-loaded globals for non-module access
   window._transformersReady = false;
@@ -884,7 +884,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 <!-- V12 NEURAL BOOT OVERLAY -->
 <div class="boot-overlay" id="bootOverlay">
   <div class="boot-logo">LEXICA</div>
-  <div class="boot-sub">2.4 · Neuro-Symbolic Ascension</div>
+  <div class="boot-sub">4.0 · Neuro-Symbolic Ascension</div>
   <div class="boot-bar-wrap"><div class="boot-bar" id="bootBar"></div></div>
   <div class="boot-status" id="bootStatus">Initializing symbolic core...</div>
   <div class="boot-phase-list">
@@ -2378,6 +2378,71 @@ class KnowledgeGraph {
     return derived;
   }
 
+  // ── MULTI-HOP REASONING ──
+  // Chains KG facts across multiple documents to answer cross-document questions.
+  // e.g. "who owns Minecraft?" → finds Minecraft→created_by→Mojang, Mojang→acquired_by→Microsoft
+  multiHopQuery(subject, maxHops = 3) {
+    const visited = new Set();
+    const result = [];
+    const queue = [{ node: subject.toLowerCase(), depth: 0, path: [] }];
+    while (queue.length > 0) {
+      const { node, depth, path } = queue.shift();
+      if (visited.has(node) || depth > maxHops) continue;
+      visited.add(node);
+      const facts = this.query(node);
+      facts.forEach(f => {
+        const entry = { ...f, _depth: depth, _path: [...path, f] };
+        result.push(entry);
+        // Follow object nodes for deeper hops
+        if (depth < maxHops && typeof f.o === 'string' && f.o.length > 2 && !visited.has(f.o)) {
+          queue.push({ node: f.o.toLowerCase(), depth: depth + 1, path: entry._path });
+        }
+      });
+      // Also follow reverse edges (things that point TO this node)
+      const reverseEdges = this.triples.filter(t =>
+        t.alive !== false && typeof t.o === 'string' &&
+        (t.o.toLowerCase() === node || t.o.toLowerCase().includes(node)) &&
+        !visited.has(t.s)
+      ).slice(0, 4);
+      reverseEdges.forEach(f => {
+        result.push({ ...f, _depth: depth, _path: [...path, f], _reverse: true });
+        if (depth < maxHops - 1) {
+          queue.push({ node: f.s.toLowerCase(), depth: depth + 1, path: [...path, f] });
+        }
+      });
+    }
+    // Deduplicate and sort by depth (closer hops first)
+    const seen = new Set();
+    return result
+      .filter(f => { const k = f.s + '|' + f.p + '|' + f.o; if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a, b) => (a._depth || 0) - (b._depth || 0))
+      .slice(0, 20);
+  }
+
+  // Find cross-document inference chain and narrate it
+  // e.g. "who owns X?" traces through acquisition/creator chains
+  inferOwnership(subject) {
+    const sn = subject.toLowerCase();
+    const ownerPreds = ['acquired_by', 'owned_by', 'parent_company', 'subsidiary_of'];
+    const creatorPreds = ['created_by', 'developed_by', 'founded_by', 'made_by'];
+    const chain = [];
+    // Step 1: find creator
+    const creatorFacts = this.triples.filter(t =>
+      t.alive !== false && t.s.toLowerCase() === sn && creatorPreds.includes(t.p)
+    ).slice(0, 2);
+    if (creatorFacts.length) {
+      chain.push(...creatorFacts);
+      // Step 2: find if creator was acquired
+      creatorFacts.forEach(cf => {
+        const ownerFacts = this.triples.filter(t =>
+          t.alive !== false && (t.s.toLowerCase() === cf.o.toLowerCase()) && ownerPreds.includes(t.p)
+        ).slice(0, 2);
+        chain.push(...ownerFacts);
+      });
+    }
+    return chain;
+  }
+
   // TMS cascade: refute a source tag and kill all dependents
   tmsRefute(sourceTag) {
     const killed = this.tms.refute(sourceTag, this.triples);
@@ -3811,17 +3876,89 @@ class CuriosityEngine {
   resetTimer() { this.lastInput = Date.now(); }
 
   start() {
-    this._interval = setInterval(() => this._tick(), 12000); // tick every 12s, not 5s
+    this._interval = setInterval(() => this._tick(), 8000); // faster tick: 8s not 12s
   }
 
   stop() { if (this._interval) { clearInterval(this._interval); this._interval = null; } }
 
   _tick() {
     const idleSecs = (Date.now() - this.lastInput) / 1000;
-    if (idleSecs < 90 || this.kg.count() < 6) return;
+    if (idleSecs < 20 || this.kg.count() < 6) return; // 20s idle threshold (was 90s!)
     if (this._bridgeInFlight) return;
-    if (Date.now() - this._lastBridgeTime < 180000) return; // 3 min cooldown
+    // Alternate between bridge thinking and other thought types
+    const now = Date.now();
+    if (now - this._lastBridgeTime < 90000) { // 90s between bridge queries (was 3min)
+      // Fire a different type of thought when not bridging
+      if (now - (this._lastAltThought || 0) > 25000) {
+        this._lastAltThought = now;
+        this._thinkAlt();
+      }
+      return;
+    }
     this._think();
+  }
+
+  // Alternative thought modes — fires between bridge queries
+  _thinkAlt() {
+    if (this.kg.count() < 4) return;
+    // Pick a random thought mode
+    const modes = ['cluster', 'gap', 'contradiction', 'goal'];
+    const mode = modes[Math.floor(Math.random() * modes.length)];
+    const nm = window._neuralMouth;
+    let thought = null;
+    if (mode === 'cluster') {
+      // Comment on a high-degree node
+      const freq = new Map();
+      this.kg.triples.forEach(t => {
+        if (typeof t.s === 'string') freq.set(t.s, (freq.get(t.s)||0)+1);
+      });
+      const top = [...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n])=>n);
+      if (top.length > 0 && nm && nm.ready) {
+        const node = top[Math.floor(Math.random() * top.length)];
+        const facts = this.kg.triples.filter(t => t.s === node).slice(0,4).map(t => t.p + ':' + t.o).join(', ');
+        nm._generate(
+          'You are Lexica thinking privately. One analytical sentence about your knowledge. No "I am an AI".',
+          'You notice "' + node + '" is highly connected: ' + facts + '. Share one analytical thought.',
+          55
+        ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
+        return;
+      } else if (top.length > 0) {
+        const node = top[0];
+        thought = '"' + node + '" is a hub node with ' + (freq.get(node)||0) + ' connections — highly activated in my graph.';
+        this.onThought(thought, node, null); return;
+      }
+    } else if (mode === 'contradiction') {
+      const conflicts = this.kg.triples.filter(t => t.alive !== false && t.conflict).slice(0,2);
+      if (conflicts.length > 0) {
+        const c = conflicts[0];
+        thought = 'Unresolved conflict: "' + c.s + ' ' + c.p + ' ' + c.o + '" is contested. I need more evidence to resolve this.';
+        this.onThought(thought, c.s, null); return;
+      }
+    } else if (mode === 'gap') {
+      // Find a node with few outgoing edges
+      const freq = new Map();
+      this.kg.triples.forEach(t => { if (typeof t.s === 'string') freq.set(t.s, (freq.get(t.s)||0)+1); });
+      const sparse = [...freq.entries()].filter(([n,c]) => c === 1 && n.length > 4).slice(0,6);
+      if (sparse.length > 0) {
+        const [node] = sparse[Math.floor(Math.random() * sparse.length)];
+        if (nm && nm.ready) {
+          nm._generate('You are Lexica. One sentence curiosity about a gap in your knowledge. No "I am an AI".',
+            '"' + node + '" appears in my graph but I know very little about it. Express curiosity.', 50
+          ).then(txt => { if (txt && txt.length > 8) this.onThought(txt, node, null); }).catch(()=>{});
+        } else {
+          this.onThought('"' + node + '" is in my graph but sparsely connected. I want to learn more about it.', node, null);
+        }
+        return;
+      }
+    } else if (mode === 'goal') {
+      const _eng = this._engineRef || (typeof engine !== 'undefined' ? engine : null);
+      const topGoal = _eng && _eng.goalStack ? _eng.goalStack.getTopGoal() : null;
+      if (topGoal) {
+        thought = 'Active goal: ' + topGoal.desc + ' (utility: ' + (topGoal.utility*100).toFixed(0) + '%)';
+        this.onThought(thought, null, null);
+        return;
+      }
+    }
   }
 
   _think() {
@@ -4697,6 +4834,27 @@ class NanoCortex {
     return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
   }
 
+  // Dense retrieval: rank candidate sentences by semantic similarity to query
+  // Returns sorted array of {sentence, score, idx} — fused with BM25 scores externally
+  async semanticRerank(query, candidates) {
+    if (!this.ready || !candidates || candidates.length === 0) return null;
+    try {
+      const qVec = await this.embed(query);
+      if (!qVec) return null;
+      const scored = [];
+      for (let i = 0; i < candidates.length; i++) {
+        const sVec = await this.embed(candidates[i].s || candidates[i]);
+        if (sVec) {
+          const sim = this.cosineSim(qVec, sVec);
+          scored.push({ ...candidates[i], semanticScore: sim });
+        } else {
+          scored.push({ ...candidates[i], semanticScore: 0 });
+        }
+      }
+      return scored;
+    } catch(e) { return null; }
+  }
+
   // Run coreference merging on a list of entity strings
   // Returns array of merge actions taken: [{a, b, sim}]
   async mergeEntities(entities) {
@@ -4758,65 +4916,86 @@ class NeuralMouth {
     if (!navigator.gpu) {
       this.error = 'WebGPU not available in this browser';
       onProgress('NeuralMouth: WebGPU unavailable — use Chrome 113+ or Edge 113+');
-      console.warn('[NeuralMouth] WebGPU not supported. Use a Chromium-based browser.');
+      console.warn('[NeuralMouth] WebGPU not supported.');
       return false;
     }
-    // Check 2: crossOriginIsolated — required for SharedArrayBuffer (WebLLM threading)
-    if (!crossOriginIsolated) {
-      this.error = 'Page not cross-origin isolated — SharedArrayBuffer unavailable';
-      onProgress('NeuralMouth: Waiting for cross-origin isolation (page will reload)...');
-      console.warn('[NeuralMouth] crossOriginIsolated=false. COOP/COEP headers missing. SharedArrayBuffer unavailable.');
-      // The service worker shim should handle this via reload — wait a moment then check again
-      await new Promise(r => setTimeout(r, 3000));
-      if (!crossOriginIsolated) {
-        onProgress('NeuralMouth: Cross-origin isolation failed — symbolic fallback active');
-        return false;
-      }
-    }
-    // Check 3: Try to get a GPU adapter to confirm WebGPU actually works
+    // Check 2: Try to get a GPU adapter
     try {
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) {
         this.error = 'No WebGPU adapter available';
         onProgress('NeuralMouth: No GPU adapter found — symbolic fallback active');
-        console.warn('[NeuralMouth] navigator.gpu.requestAdapter() returned null.');
         return false;
       }
     } catch(gpuErr) {
       this.error = String(gpuErr);
-      onProgress('NeuralMouth: GPU adapter error — symbolic fallback active');
+      onProgress('NeuralMouth: GPU adapter error — ' + String(gpuErr).slice(0,40));
       return false;
     }
+    // Note: crossOriginIsolated is preferred for threading but we try anyway
+    if (!crossOriginIsolated) {
+      onProgress('NeuralMouth: Cross-origin isolation not detected — attempting single-thread mode...');
+      console.warn('[NeuralMouth] crossOriginIsolated=false, trying single-thread WebLLM');
+    }
     this.loading = true;
+    // Try multiple WebLLM versions in order — jsDelivr CDN
+    const WEB_LLM_VERSIONS = ['0.2.79', '0.2.73', '0.2.46'];
+    let CreateMLCEngine = null;
+    for (const ver of WEB_LLM_VERSIONS) {
+      try {
+        onProgress(`NeuralMouth: Trying WebLLM v${ver}...`);
+        const mod = await import(`https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@${ver}/+esm`);
+        CreateMLCEngine = mod.CreateMLCEngine || mod.default?.CreateMLCEngine;
+        if (CreateMLCEngine) { this._webllmVersion = ver; break; }
+      } catch(verErr) {
+        console.warn(`[NeuralMouth] WebLLM v${ver} failed:`, verErr.message || verErr);
+      }
+    }
+    if (!CreateMLCEngine) {
+      this.error = 'All WebLLM versions failed to load';
+      this.loading = false;
+      onProgress('NeuralMouth: WebLLM CDN unavailable — symbolic fallback active');
+      return false;
+    }
     try {
-      // Pinned to 0.2.79 — stable, CreateMLCEngine API confirmed working
-      // Model weights are cached in IndexedDB after first download (~1GB).
-      // After the first load, inference runs 100% locally — no server contact per prompt.
-      const { CreateMLCEngine } = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm');
       onProgress('NeuralMouth: Initializing WebGPU engine...');
       const progressCb = (info) => {
         const pct = info.progress ? Math.round(info.progress * 100) : '?';
         onProgress(`NeuralMouth: ${info.text || 'Loading model'} (${pct}%)`);
         updateBootBar(0.5 + (info.progress || 0) * 0.45, `NeuralMouth: ${info.text || 'Loading'}...`);
       };
-      // Try primary model, fall back to smaller one on failure
-      try {
-        this.engine = await CreateMLCEngine(this.modelId, { initProgressCallback: progressCb });
-      } catch(modelErr) {
-        const fallbackId = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-        onProgress(`NeuralMouth: Primary model failed, trying ${fallbackId}...`);
-        console.warn('[NeuralMouth] Primary model failed:', modelErr.message || modelErr);
-        this.modelId = fallbackId;
-        this.engine = await CreateMLCEngine(fallbackId, { initProgressCallback: progressCb });
+      // Try models from smallest to largest — first success wins
+      const MODEL_CASCADE = [
+        'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+        'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+        'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
+      ];
+      let lastErr = null;
+      for (const modelId of MODEL_CASCADE) {
+        try {
+          onProgress(`NeuralMouth: Loading ${modelId}...`);
+          const engineOpts = { initProgressCallback: progressCb };
+          // If not crossOriginIsolated, try disabling threading
+          if (!crossOriginIsolated) {
+            try { engineOpts.chatOpts = { context_window_size: 1024 }; } catch(_) {}
+          }
+          this.engine = await CreateMLCEngine(modelId, engineOpts);
+          this.modelId = modelId;
+          this.ready = true;
+          break;
+        } catch(modelErr) {
+          lastErr = modelErr;
+          console.warn(`[NeuralMouth] Model ${modelId} failed:`, modelErr.message || modelErr);
+        }
       }
-      this.ready = true;
+      if (!this.ready) throw lastErr || new Error('All models failed');
       this.loading = false;
-      onProgress('NeuralMouth: WebGPU SLM ready ✓');
+      onProgress('NeuralMouth: WebGPU SLM ready ✓ (' + this.modelId + ')');
       return true;
     } catch(e) {
       this.error = e.message || String(e);
       this.loading = false;
-      onProgress('NeuralMouth: Load failed — ' + (e.message || String(e)).slice(0, 60));
+      onProgress('NeuralMouth: Load failed — ' + (e.message || String(e)).slice(0, 80));
       console.warn('[NeuralMouth] Init failed:', e);
       return false;
     }
@@ -4977,7 +5156,39 @@ class NeuralMouth {
       return await this._generate(system, prompt, 300);
     } catch(e) { return null; }
   }
-}
+
+  // ── L6: CHAIN-OF-THOUGHT SCRATCHPAD ──
+  // 2-pass generation: first produce private reasoning trace, then answer conditioned on it.
+  // Returns { answer, trace } — trace is shown in the thinking bubble on click.
+  async thinkThenAnswer(query, kgFacts, evidenceSentences, intent) {
+    if (!this.ready) return null;
+    const triplesText = kgFacts.slice(0,10).map(f => f.s + ' | ' + f.p.replace(/_/g,' ') + ' | ' + f.o).join('\n');
+    const evText = evidenceSentences.slice(0,4).join(' ');
+    const context = triplesText + (evText ? '\n\nEvidence:\n' + evText.slice(0, 400) : '');
+    if (!context.trim()) return null;
+    // Pass 1: reasoning trace (hidden scratchpad)
+    let trace = null;
+    try {
+      trace = await this._generate(
+        'You are Lexica\'s internal reasoning scratchpad. Think step-by-step through what the knowledge says. 2-3 sentences of analytical reasoning. No final answer yet.',
+        'Query: "' + query.slice(0,100) + '"\n\n' + context + '\n\nReasoning trace:',
+        150
+      );
+    } catch(e) { trace = null; }
+    // Pass 2: answer conditioned on trace
+    const traceCtx = trace ? '\n\nMy reasoning: ' + trace : '';
+    let answer = null;
+    try {
+      answer = await this._generate(
+        'You are Lexica. Answer based ONLY on the knowledge and your reasoning trace. 2-3 sentences. Direct, factual, no bullet points. No "I am an AI" phrases.',
+        'Query: "' + query.slice(0,100) + '"\n\n' + context + traceCtx + '\n\nFinal answer:',
+        280
+      );
+    } catch(e) { return null; }
+    if (!answer || answer.length < 15) return null;
+    return { answer: answer.replace(/^[\*\-•]\s*/gm,'').replace(/\n/g,' ').trim(), trace };
+  }
+} // end NeuralMouth
 
 
 
@@ -5095,7 +5306,35 @@ class Engine {
   async addSourceAsync(text, title, url, onProgress) {
     const tag = this.sm.mkTag(title);
     onProgress('parse',0,0,0); await _yield();
-    const ss = splitSentences(text);
+
+    // ── HIERARCHICAL CHUNKING ──
+    // Detect Wikipedia section headers (== Section == or === Subsection ===)
+    // and tag sentences with their section context. This makes "tell me about
+    // the gameplay section of Minecraft" answerable.
+    const lines = text.split('\n');
+    let currentSection = '';
+    let currentSubsection = '';
+    const annotatedSentences = [];
+    for (const line of lines) {
+      const h2 = line.match(/^==\s*([^=]+?)\s*==\s*$/);
+      const h3 = line.match(/^===\s*([^=]+?)\s*===\s*$/);
+      if (h2) { currentSection = h2[1].trim(); currentSubsection = ''; continue; }
+      if (h3) { currentSubsection = h3[1].trim(); continue; }
+      if (line.trim().length > 10) {
+        const sectionCtx = [currentSection, currentSubsection].filter(Boolean).join(' › ');
+        // Prefix key sentences with their section heading for better retrieval
+        const sentWithCtx = sectionCtx ? line.trim() : line.trim();
+        annotatedSentences.push({ text: sentWithCtx, section: sectionCtx });
+      }
+    }
+    // If no section structure was found, fall back to flat sentence splitting
+    const rawSentences = splitSentences(text);
+    // Use annotated if sections were found (>5% lines are section-prefixed), else raw
+    const ss = annotatedSentences.length > 10 && currentSection ?
+      annotatedSentences.map(a => a.section ? '[' + a.section + '] ' + splitSentences(a.text)[0] : a.text)
+        .flatMap(s => splitSentences(s)).filter(Boolean) :
+      rawSentences;
+
     if (ss.length < 1) throw new Error('No text to train on.');
     onProgress('parse',0.04,ss.length,0); await _yield();
 
@@ -5223,6 +5462,38 @@ class Engine {
       }
     }, 1200);
 
+    // ── AUTO-SAVE TO PERSISTENT MEMORY ──
+    // Teach it something now, it remembers forever (or until cleared).
+    setTimeout(() => {
+      if (this.saveToMemory()) {
+        console.log('[Lexica 4.0] Knowledge saved to persistent memory.');
+      }
+    }, 2000); // slight delay so UI updates first
+
+    // ── INNER MONOLOGUE: post-training reflection ──
+    setTimeout(() => {
+      if (typeof showInnerMonologue === 'function' && this.kg.count() > 5) {
+        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 5);
+        const nodeNames = topNodes.slice(0,3).map(n => n.node).filter(Boolean);
+        if (nodeNames.length >= 2) {
+          const nm = window._neuralMouth;
+          if (nm && nm.ready) {
+            nm._generate(
+              'You are Lexica, reflecting after absorbing new knowledge. One sentence of genuine insight or curiosity about what you just learned. No "I am an AI."',
+              'You just learned from "' + title + '". The most activated nodes are: ' + nodeNames.join(', ') + '. Express one analytical thought.',
+              60
+            ).then(txt => {
+              if (txt && txt.length > 10) showInnerMonologue(txt, nodeNames[0], nodeNames[1]);
+            }).catch(() => {
+              showInnerMonologue('Absorbed "' + title + '": ' + this.kg.count() + ' triples now indexed. Top concepts: ' + nodeNames.join(', ') + '.', nodeNames[0], nodeNames[1]);
+            });
+          } else {
+            showInnerMonologue('Absorbed "' + title + '": ' + this.kg.count() + ' triples indexed. High-activation nodes: ' + nodeNames.join(', ') + '.', nodeNames[0], nodeNames[1]);
+          }
+        }
+      }
+    }, 1500);
+
     return { count:ss.length, tag };
   }
 
@@ -5345,6 +5616,26 @@ class Engine {
 
     const rel = this.bm25.query(r,[...ext,...allExt],16,subject);
 
+    // ── DENSE RETRIEVAL FUSION ──
+    // If NanoCortex is ready, re-rank BM25 results using cosine similarity.
+    // Fuse scores: final = 0.6 * bm25_norm + 0.4 * cosine_sim
+    // This fixes the keyword mismatch problem (e.g. "let" vs "can"/"allows").
+    if (rel.length > 0 && this.nanoCortex && this.nanoCortex.ready) {
+      try {
+        const reranked = await this.nanoCortex.semanticRerank(r, rel.slice(0, 12));
+        if (reranked && reranked.length > 0) {
+          const maxBm25 = Math.max(...reranked.map(x => x.score || 0)) || 1;
+          reranked.forEach(item => {
+            const normBm25 = (item.score || 0) / maxBm25;
+            item._fusedScore = 0.55 * normBm25 + 0.45 * (item.semanticScore || 0);
+          });
+          reranked.sort((a, b) => (b._fusedScore || 0) - (a._fusedScore || 0));
+          // Replace rel with re-ranked version (keep extra low-scoring BM25 results at end)
+          rel.splice(0, reranked.length, ...reranked);
+        }
+      } catch(e) { /* dense retrieval failed — use BM25 only */ }
+    }
+
     if ((!rel.length||rel[0].score<0.3)&&!_retried) {
       const fetchSubj = subject||extractSubject(question);
       // V11: Levenshtein gate — don't fetch for slang/typos
@@ -5381,6 +5672,29 @@ class Engine {
     let kgFacts = subject ? this.kg.query(subject.toLowerCase()) : [];
     const kgDerived = subject ? this.kg.getAllDerivedFacts(subject) : [];
 
+    // ── MULTI-HOP CROSS-DOCUMENT REASONING ──
+    // If we don't have enough direct facts, try multi-hop inference.
+    // "Who owns Minecraft?" → Minecraft→created_by→Mojang → Mojang→acquired_by→Microsoft
+    if (subject && kgFacts.length < 4) {
+      const multiHopFacts = this.kg.multiHopQuery(subject, 2);
+      const newFacts = multiHopFacts.filter(f => !kgFacts.some(k => k.s === f.s && k.p === f.p && k.o === f.o));
+      if (newFacts.length > 0) {
+        kgFacts = [...kgFacts, ...newFacts.slice(0, 6)];
+        // Emit inner monologue about the chain reasoning
+        if (newFacts.some(f => f._depth > 0)) {
+          const chainDesc = newFacts.filter(f => f._depth > 0).slice(0,2).map(f => f.s + ' → ' + f.o).join('; ');
+          showInnerMonologue('Multi-hop: chaining from "' + subject + '" through: ' + chainDesc, subject, null);
+        }
+      }
+      // Check inference ownership chains specifically
+      if (/who owns|who made|who created|who developed|created by|made by/i.test(r)) {
+        const ownerChain = this.kg.inferOwnership(subject);
+        if (ownerChain.length > 0) {
+          kgFacts = [...ownerChain, ...kgFacts.filter(f => !ownerChain.some(o => o.s === f.s && o.p === f.p))].slice(0, 12);
+        }
+      }
+    }
+
     // Comparative: extract second subject and merge facts
     if (intent === 'comparative' || /\b(vs|versus|compare|compared to|difference between|better than|similar to)\b/i.test(r)) {
       const allProper = (r.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[]).filter(n=>n.length>2);
@@ -5401,6 +5715,23 @@ class Engine {
     this.lastSubject = subject;
     this.lastQuery = r;
 
+    // ── INNER MONOLOGUE DURING SYNTHESIS ──
+    // Emit a brief thought while working on a complex answer. Lexi is always thinking!
+    if (kgFacts.length > 3 && subject) {
+      setTimeout(() => {
+        const nm = window._neuralMouth;
+        if (nm && nm.ready && typeof showInnerMonologue === 'function') {
+          const facts = kgFacts.slice(0,3).map(f => f.p + ':' + f.o).join(', ');
+          nm._generate('You are Lexica, thinking while answering. One short private thought (under 50 words). No "I am an AI".',
+            'Query: "' + r.slice(0,60) + '". Found facts about "' + subject + '": ' + facts + '. Think privately.',
+            55
+          ).then(txt => { if (txt && txt.length > 8) showInnerMonologue(txt, subject, null); }).catch(()=>{});
+        } else if (kgFacts.length > 5 && typeof showInnerMonologue === 'function') {
+          showInnerMonologue('Synthesizing "' + r.slice(0,50) + '" from ' + kgFacts.length + ' KG facts...', subject, null);
+        }
+      }, 0);
+    }
+
     if ((intent==='causal'||/\bwhy\b/.test(r.toLowerCase()))&&this.kg.causal.length===0) {
       const causalEvidence = evidenceSentences.filter(s=>/\bbecause\b|\bdue to\b|\bsince\b|\bas a result\b|\btherefore\b|\bowing to\b/i.test(s));
       if (causalEvidence.length) evidenceSentences.unshift(...causalEvidence.filter(s=>!evidenceSentences.slice(0,2).includes(s)).slice(0,2));
@@ -5413,26 +5744,40 @@ class Engine {
     let usedGraphRAG = false;
     let usedSLM = false;
 
-    // ── SLM PRIMARY SYNTHESIS (L5) ── SLM is the primary output layer when ready
+    // ── SLM PRIMARY SYNTHESIS (L5+L6) ── SLM is the primary output layer when ready
     if (this.neuralMouth.ready) {
       try {
-        // Try graphRAG first (faster, direct)
-        const ragText = await this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4));
-        if (ragText && ragText.length > 20) {
-          ansText = ragText;
-          usedGraphRAG = true;
-          usedSLM = true;
-        }
-        // If ragText is thin or kgFacts are rich, use full reasoning synthesis
-        if ((!ansText || ansText.length < 80) && kgFacts.length >= 3) {
-          const reasonText = await this.neuralMouth.synthesizeWithReasoning(r, kgFacts, evidenceSentences, intent);
-          if (reasonText && reasonText.length > ansText?.length) {
-            ansText = reasonText;
+        // L6: Chain-of-thought scratchpad for complex/multi-fact queries
+        const isComplex = kgFacts.length >= 4 || intent === 'causal' || intent === 'comparative' || /why|how does|who owns/i.test(r);
+        if (isComplex) {
+          const cotResult = await this.neuralMouth.thinkThenAnswer(r, kgFacts, evidenceSentences.slice(0,4), intent);
+          if (cotResult && cotResult.answer && cotResult.answer.length > 20) {
+            ansText = cotResult.answer;
             usedSLM = true;
-            usedGraphRAG = false; // mark as deeper synthesis
+            usedGraphRAG = false;
+            // Store trace for display in thinking bubble
+            if (cotResult.trace) window._lastReasoningTrace = cotResult.trace;
           }
         }
-      } catch(e) { console.warn('[L5 SLM Synthesis] Error:', e); }
+        // L5: Try graphRAG first (faster, direct) if CoT didn't fire or failed
+        if (!ansText) {
+          const ragText = await this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4));
+          if (ragText && ragText.length > 20) {
+            ansText = ragText;
+            usedGraphRAG = true;
+            usedSLM = true;
+          }
+        }
+        // If still thin, use full reasoning synthesis
+        if ((!ansText || ansText.length < 80) && kgFacts.length >= 3) {
+          const reasonText = await this.neuralMouth.synthesizeWithReasoning(r, kgFacts, evidenceSentences, intent);
+          if (reasonText && reasonText.length > (ansText?.length || 0)) {
+            ansText = reasonText;
+            usedSLM = true;
+            usedGraphRAG = false;
+          }
+        }
+      } catch(e) { console.warn('[L5/L6 SLM Synthesis] Error:', e); }
     }
 
     // ── SOCIETY OF MIND ── Complex queries (symbolic fallback or supplement)
@@ -5530,7 +5875,8 @@ class Engine {
       cached:false, evidence, intent,
       _societyWinner: societyWinner?.name || null,
       _graphRAG: usedGraphRAG,
-      _slm: usedSLM
+      _slm: usedSLM,
+      _srcTag: rel[0].tag || null
     };
     this.cache.set(ck, result);
     this.lastResult = result;
@@ -5586,7 +5932,7 @@ class Engine {
   }
 
   export() {
-    const data = {version:'lexica-2.1',exportedAt:new Date().toISOString(),sources:this.sm.s,sentences:this.bm25.ss.map((s,i)=>({t:s,tag:this.bm25.tags[i]})),kg:this.kg.toJSON()};
+    const data = {version:'lexica-4.0',exportedAt:new Date().toISOString(),sources:this.sm.s,sentences:this.bm25.ss.map((s,i)=>({t:s,tag:this.bm25.tags[i]})),kg:this.kg.toJSON()};
     const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -5607,6 +5953,82 @@ class Engine {
     (data.sources||[]).forEach(s=>this.sm.s.push(s));
     this.trained = this.bm25.ss.length>0;
     return data;
+  }
+
+  // ── PERSISTENT MEMORY ──
+  // Serializes the full engine state to localStorage so Lexica remembers across reloads.
+  // Teach it something Monday, it knows on Friday. That's what makes it feel alive.
+  saveToMemory() {
+    try {
+      const data = {
+        version: 'lexica-4.0-mem',
+        savedAt: new Date().toISOString(),
+        sources: this.sm.s,
+        sentences: this.bm25.ss.map((s,i) => ({ t: s, tag: this.bm25.tags[i] })),
+        kg: this.kg.toJSON(),
+        semVecVocab: this.semVec.vocabSize,
+        failureLog: this.failureTracker ? this.failureTracker.getSnapshot() : null
+      };
+      const json = JSON.stringify(data);
+      // Stay well under the ~5MB localStorage limit
+      if (json.length < 4500000) {
+        localStorage.setItem('lexica_engine_state_v4', json);
+        console.log('[Persistent Memory] Saved:', data.sources.length, 'sources,', this.kg.count(), 'triples');
+        return true;
+      } else {
+        // Trim: keep only the most recent 60% of sentences
+        const trimmed = { ...data, sentences: data.sentences.slice(-Math.floor(data.sentences.length * 0.6)) };
+        localStorage.setItem('lexica_engine_state_v4', JSON.stringify(trimmed));
+        console.log('[Persistent Memory] Saved (trimmed)');
+        return true;
+      }
+    } catch(e) {
+      console.warn('[Persistent Memory] Save failed:', e);
+      return false;
+    }
+  }
+
+  loadFromMemory() {
+    try {
+      const raw = localStorage.getItem('lexica_engine_state_v4');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data.version?.includes('lexica')) return false;
+      // Restore BM25 index
+      this.bm25 = new BM25();
+      const byTag = new Map();
+      (data.sentences || []).forEach(({ t, tag }) => {
+        if (!byTag.has(tag)) byTag.set(tag, []);
+        byTag.get(tag).push(t);
+      });
+      byTag.forEach((ss, tag) => this.bm25.addBatch(ss, tag));
+      this.bm25.flush();
+      // Restore KG
+      this.kg = new KnowledgeGraph(this.ets);
+      if (data.kg) this.kg.fromJSON(data.kg);
+      // Restore sources list
+      this.sm = new SM();
+      (data.sources || []).forEach(s => this.sm.s.push(s));
+      // Rebuild semantic vectors
+      this.semVec = new SemanticVectors();
+      this.wordProfiler = new WordProfiler();
+      if (this.bm25.ss.length > 0) {
+        this.bm25.ss.forEach(s => this.semVec.addSentence(s));
+        this.semVec.buildPMI();
+        this.wordProfiler.processAll(this.bm25.ss);
+      }
+      this.trained = this.bm25.ss.length > 0;
+      this.cache.invalidate();
+      console.log('[Persistent Memory] Loaded:', this.sm.s.length, 'sources,', this.kg.count(), 'triples');
+      return { sources: this.sm.s.length, triples: this.kg.count(), sentences: this.bm25.ss.length };
+    } catch(e) {
+      console.warn('[Persistent Memory] Load failed:', e);
+      return false;
+    }
+  }
+
+  clearMemory() {
+    try { localStorage.removeItem('lexica_engine_state_v4'); return true; } catch(e) { return false; }
   }
 }
 
@@ -5989,9 +6411,9 @@ function showInnerMonologue(text, nodeA, nodeB) {
         '</div>').join('');
     }
 
-    // Chat system message: throttled (max 1 every 30s) to prevent spam
+    // Chat system message: throttled (max 1 every 15s) to prevent spam but keep it lively
     const now = Date.now();
-    if (!window._lastMonologueChatMsg || now - window._lastMonologueChatMsg > 30000) {
+    if (!window._lastMonologueChatMsg || now - window._lastMonologueChatMsg > 15000) {
       window._lastMonologueChatMsg = now;
       addMsg('system', '🔍 <em>Inner Monologue:</em> ' + text.slice(0, 120) + (text.length > 120 ? '...' : ''));
     }
@@ -6239,10 +6661,65 @@ function streamMsg(text, meta) {
 }
 function toggleSrcReveal(btn){const el=btn.closest('.msg-row').querySelector('.source-reveal');if(!el)return;const show=el.style.display!=='none';el.style.display=show?'none':'block';btn.textContent=show?'⟨ source ⟩':'⟨ hide ⟩';}
 function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();
-// LEXICA 3.0: Feed vote signal into preference engine
-if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');}updatePreferenceUI();updateDriveUI();}}
+// LEXICA 4.0: Feed vote signal into preference engine + retrieval weight adjustment
+if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);// Positive feedback → boost BM25 source weight for the tag
+const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.min(1.8,cur+0.1));}}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');// Negative feedback → lower source weight, increase curiosity about this gap
+const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.max(0.3,cur-0.15));}engine.failureTracker&&engine.failureTracker.recordFailure(engine.lastQuery||'',engine.lastSubject,'user thumbs-down','low');engine.drives.frustrate('curiosity',0.15,'thumbs-down on '+engine.lastSubject);}updatePreferenceUI();updateDriveUI();}// Auto-save updated weights to persistent memory
+setTimeout(()=>engine.saveToMemory&&engine.saveToMemory(),1000);}
 function addMsg(role,content){const msgs=document.getElementById('messages');const row=document.createElement('div');if(role==='system'){row.className='msg-row';row.innerHTML=`<div class="msg-bubble system">— ${content} —</div>`;}else if(role==='user'){row.className='msg-row user';row.innerHTML=`<div class="msg-avatar user">U</div><div class="msg-bubble-wrap"><div class="msg-bubble user">${content}</div></div>`;}else{row.className='msg-row ai';row.innerHTML=`<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">${content}</div></div>`;}msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
-function showThinking(){const msgs=document.getElementById('messages');const d=document.createElement('div');d.id='think';d.className='msg-row ai';d.innerHTML=`<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking">synthesizing answer<div class="dots"><span></span><span></span><span></span></div></div></div></div>`;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
+function showThinking(){
+  window._lastReasoningTrace = null; // reset trace for this query
+  const msgs=document.getElementById('messages');const d=document.createElement('div');d.id='think';d.className='msg-row ai';
+  d.innerHTML=`<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking" id="thinkBubble" style="cursor:pointer;user-select:none" title="Click to see reasoning trace when available">synthesizing answer<div class="dots"><span></span><span></span><span></span></div></div></div></div>`;
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+  // Clicking the thinking bubble shows the current reasoning trace (if any)
+  const thinkBubble = d.querySelector('#thinkBubble');
+  if (thinkBubble) {
+    thinkBubble.addEventListener('click', () => {
+      const trace = window._lastReasoningTrace;
+      const modal = document.getElementById('thinkTraceModal');
+      if (!modal) {
+        // Create modal on first use
+        const m = document.createElement('div');
+        m.id = 'thinkTraceModal';
+        m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);z-index:2000;display:flex;align-items:center;justify-content:center';
+        m.innerHTML = `<div style="background:rgba(13,13,26,.95);border:1px solid rgba(212,160,23,.3);border-radius:14px;padding:20px 22px;max-width:480px;width:90%;max-height:60vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.22em;color:rgba(212,160,23,.6);text-transform:uppercase;margin-bottom:10px">⚙ Chain-of-Thought Scratchpad</div>
+          <div id="thinkTraceContent" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.75;font-style:italic"></div>
+          <div style="margin-top:14px;font-size:8px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">This is Lexica's internal reasoning — not shown in final answer</div>
+          <button onclick="document.getElementById('thinkTraceModal').remove()" style="margin-top:12px;background:none;border:1px solid rgba(255,255,255,.1);color:var(--text-dim);border-radius:7px;padding:5px 14px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer">Close</button>
+        </div>`;
+        document.body.appendChild(m);
+        m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+      }
+      const content = document.getElementById('thinkTraceContent');
+      if (content) {
+        if (trace && trace.length > 5) {
+          content.textContent = trace;
+          document.getElementById('thinkTraceModal').style.display = 'flex';
+        } else {
+          content.innerHTML = '<em style="color:var(--text-muted)">Reasoning trace not yet available — chain-of-thought activates for complex multi-fact queries when NeuralMouth is online. Keep watching... 🔍</em>';
+          document.getElementById('thinkTraceModal').style.display = 'flex';
+        }
+      }
+    });
+  }
+}
+
+// Update thinking bubble label during synthesis stages
+function updateThinkingStage(stage) {
+  const bubble = document.getElementById('thinkBubble');
+  if (!bubble) return;
+  const stages = {
+    'bm25': 'scanning corpus',
+    'dense': 'dense retrieval (semantic)',
+    'multihop': 'multi-hop reasoning',
+    'slm': 'neural synthesis',
+    'cot': 'chain-of-thought'
+  };
+  const label = stages[stage] || stage;
+  bubble.innerHTML = label + '<div class="dots"><span></span><span></span><span></span></div>';
+}
 function rmThink(){const e=document.getElementById('think');if(e)e.remove();}
 
 async function sendQ(){
@@ -7669,14 +8146,30 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
       updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
-      console.error('[Lexica 2.4 boot]', e);
+      console.error('[Lexica 4.0 boot]', e);
     }
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'Lexica 3.0 ready ✓');
+    updateBootBar(1.0, 'Lexica 4.0 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
+
+    // ── PERSISTENT MEMORY RESTORE ──
+    // Load previously saved knowledge — Lexica remembers across sessions!
+    updateBootBar(1.0, 'Restoring persistent memory...');
+    const memRestored = engine.loadFromMemory();
+    if (memRestored) {
+      updateUI();
+      addMsg('system', `🧠 <strong>Persistent Memory Restored</strong>: ${memRestored.sources} source${memRestored.sources!==1?'s':''} · ${memRestored.triples} triples · ${memRestored.sentences} sentences. Lexica remembers! <button onclick="engine.clearMemory();engine.resetAll&&resetAll();addMsg('system','Memory cleared.')" style="background:none;border:1px solid rgba(255,85,120,.3);color:var(--red);border-radius:5px;padding:2px 8px;font-size:8px;cursor:pointer;font-family:JetBrains Mono,monospace;margin-left:6px">clear memory</button>`);
+      setStatus(true, `memory restored · ${engine.bm25.ss.length} sentences`);
+      // Trigger inner monologue about restored knowledge
+      setTimeout(() => {
+        if (engine.kg.count() > 5) {
+          showInnerMonologue('Memory restored from previous session. I have ' + engine.kg.count() + ' triples across ' + engine.sm.s.length + ' sources. Picking up where I left off...', null, null);
+        }
+      }, 2000);
+    }
 
     // Post-boot: only show intro if this is a fresh conversation (no prior messages)
     const _activeConvo = window.ConvoManager && window.ConvoManager.getActive();
@@ -7686,7 +8179,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const introText=engine.synthesis.synthesize('what is lexica','what','lexica',introTriples,[],[],engine.semVec,engine.wordProfiler,engine.kg);
       const hintTriple={s:'knowledge',p:'is_a',o:'obtained by fetching a Wikipedia article',conf:1.0,raw:'Knowledge is obtained by fetching a Wikipedia article.',tag:'self',alive:true,justified_by:new Set(['self']),subjectStr:()=>'knowledge',objectStr:()=>'obtained by fetching a Wikipedia article',isNested:()=>false};
       const hintText=engine.synthesis.synthesize('how to start','what','knowledge',[hintTriple],[],[],engine.semVec,engine.wordProfiler,engine.kg);
-      const full=[(introText||'I am Lexica 3.0. I have homeostatic drives, a goal stack, and a self-model. I am waiting for knowledge.'),(hintText||'')].filter(Boolean).join(' ');
+      const full=[(introText||'I am Lexica 4.0. Persistent memory, dense retrieval, multi-hop reasoning, and chain-of-thought are all online.'),(hintText||'')].filter(Boolean).join(' ');
       streamMsg(full,{strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:false,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
     }
     updateUI();
