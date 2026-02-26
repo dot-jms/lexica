@@ -17,6 +17,7 @@
 // Removing the previous COOP/COEP service worker shim which caused reload loops.
 console.log('[Lexica 4.0] Runtime:', navigator.userAgent.slice(0,60));
 </script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -907,7 +908,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 5v4l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
   </button>
   <div class="rail-spacer"></div>
-  <div class="rail-version">2.4</div>
+  <div class="rail-version">4.0</div>
 </div>
 
 <div class="drawer" id="drawer">
@@ -932,7 +933,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
     <!-- TOOLS PANEL -->
     <div class="drawer-panel" id="panelTools" style="display:none">
       <div class="tools-head">
-        <div class="tools-brand">LEXICA <span>2.3</span></div>
+        <div class="tools-brand">LEXICA <span>4.0</span></div>
         <div class="tab-bar">
           <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
           <button class="tab-btn" onclick="switchTab('paste')">📝</button>
@@ -941,6 +942,8 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
           <button class="tab-btn" onclick="switchTab('words')">🔍</button>
           <button class="tab-btn" onclick="switchTab('cognition')">🧠</button>
           <button class="tab-btn" onclick="switchTab('graph')">⬡</button>
+          <button class="tab-btn" onclick="switchTab('pdf')" title="PDF Ingestion">📄</button>
+          <button class="tab-btn" onclick="switchTab('kgedit')" title="KG Editor">🗄</button>
         </div>
       </div>
       <div class="tab-pane active" id="tab-wiki">
@@ -967,7 +970,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
           <div class="lbl">Training Text <span id="charCount" style="color:var(--text-dim)"></span></div>
           <textarea id="trainText" rows="10" placeholder="Paste any text to train Lexica..."></textarea>
           <div class="file-drop" onclick="document.getElementById('fileUp').click()">
-            <input type="file" id="fileUp" accept=".txt,.md">
+            <input type="file" id="fileUp" accept=".txt,.md,.pdf">
             <div class="fi">📄</div><p>Drop .txt or .md file</p>
           </div>
           <div style="margin-top:8px"><input type="text" id="pasteTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
@@ -1006,6 +1009,40 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         <div class="section">
           <div class="lbl">Reset</div>
           <button class="btn-danger" onclick="resetAll()">✕ Clear All Training Data</button>
+        </div>
+      </div>
+      <!-- PDF INGESTION TAB -->
+      <div class="tab-pane" id="tab-pdf">
+        <div class="section">
+          <div class="lbl">PDF Ingestion <span style="font-size:9px;color:var(--text-muted)">(browser-local, no upload)</span></div>
+          <div class="file-drop" id="pdfDrop" onclick="document.getElementById('pdfFileUp').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor=''" ondrop="onPdfDrop(event)">
+            <input type="file" id="pdfFileUp" accept=".pdf" onchange="onPdfFileSelect(this)">
+            <div class="fi">📄</div>
+            <p>Drop PDF or click to select</p>
+          </div>
+          <div id="pdfStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);min-height:16px"></div>
+          <div style="margin-top:8px"><input type="text" id="pdfTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">
+              Pages: <span id="pdfPages">—</span>
+            </div>
+            <div style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">
+              Chars: <span id="pdfChars">—</span>
+            </div>
+          </div>
+          <div id="pdfPreview" style="margin-top:8px;max-height:80px;overflow:hidden;font-size:9.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;line-height:1.5;white-space:pre-wrap;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;padding:8px;display:none"></div>
+          <button class="btn-primary" id="pdfTrainBtn" onclick="trainFromPDF()" style="opacity:0.5;pointer-events:none">⚡ Train on PDF</button>
+        </div>
+      </div>
+      <!-- KG TRIPLE EDITOR TAB -->
+      <div class="tab-pane" id="tab-kgedit">
+        <div class="section">
+          <div class="lbl">Knowledge Graph Editor <span id="kgEditCount" style="color:var(--gold);font-size:10px"></span></div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input type="text" id="kgSearchInput" placeholder="Search triples..." style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:7px 11px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10.5px;outline:none" oninput="kgEditSearch(this.value)">
+            <button class="btn-sm" onclick="kgEditSearch(document.getElementById('kgSearchInput').value)">→</button>
+          </div>
+          <div id="kgEditList" style="max-height:420px;overflow-y:auto"></div>
         </div>
       </div>
       <div class="tab-pane" id="tab-words">
@@ -4019,23 +4056,42 @@ function classifyIntent(q){
   // ── USER STATE & EMOTIONAL INTENTS ──
   if(/^i (am|'m|was|feel|felt)\s+/i.test(ql)&&extractUserState(ql))return'user_emotion';
   if(/\b(bored|boring|suggest|recommend|entertain|something to do|amuse me|what (should|can) i)\b/i.test(ql))return'abstract_need';
+  // ── FUZZY GREETINGS — catch "Hellooo?", "Heyyy" etc. before anything else ──
+  if(/^h+[ae]+l+[oa]*[!? ]*$|^h+e+y+[!? ]*$|^h+o+l+[ao]+[!? ]*$/i.test(ql.trim()))return'greeting';
   // ── SELF-DIRECTED / META INTENTS — catch before factual routing ──
-  // These all refer to Lexica itself, not to external knowledge
   if(/\b(who|what)\s+(are|is)\s+you\b/i.test(ql))return'self_status';
   if(/\bwhat\s+(are\s+you|do\s+you)\s+(thinking|doing|feeling|knowing|learning|working)\b/i.test(ql))return'self_status';
   if(/\b(tell|say)\s+(me\s+)?(about\s+)?yourself\b/i.test(ql))return'self_status';
   if(/\byour\s+(name|identity|purpose|goal|function|job|role|capabilities?)\b/i.test(ql))return'self_status';
   if(/^(how are you|how do you feel|what are you doing|what('s| is) your (status|state)|are you (busy|ready|alive|working))\b/i.test(ql))return'self_status';
   if(/\byou\s+(are|were)\s+(an?\s+)?(ai|bot|robot|computer|machine|program|software|assistant)\b/i.test(ql))return'self_status';
+  // "Who made/created/built you?" — identity, not KG lookup
+  if(/\b(who|what)\s+(made|created|built|designed|trained|developed|programmed)\s+you\b/i.test(ql))return'self_status';
+  // "Why did you learn/fetch X?" — meta question about Lexica's behavior
+  if(/\bwhy\s+(did|do|have|are)\s+you\s+(learn|fetch|add|auto|download|know|load|pick|choose)\b/i.test(ql))return'self_status';
+  // "Do you know HOW TO X" — capability question, not KG query
+  if(/\bdo\s+you\s+know\s+how\s+(to|do)\b/i.test(ql))return'self_status';
   if(/\bi\s+(got\s+you|gotchu|got\s+it|see|understand|ok|okay)\b/i.test(ql))return'acknowledgement';
   if(/\b(i\s+gotchu|gotchu|gotcha)\b/i.test(ql))return'acknowledgement';
+  // ── CONVERSATIONAL PUSHBACK — reactions to previous output, not knowledge queries ──
+  // Must be caught before factual intents so "That's not what I asked" doesn't hit KG.
+  if(/^that\s+(is|was|'s)\s+(not|wrong|incorrect|off|bad|weird|strange)\b/i.test(ql))return'passive_ack';
+  if(/^(that's not|thats not|no,?\s+(that|you|it)|nope,?\s+(that|you))\b/i.test(ql))return'passive_ack';
+  if(/^(because|cause|since)\s+.{0,70}$/i.test(ql)&&!ql.includes('?'))return'passive_ack';
+  if(/^(huh|wait|really\??|seriously\??|uh|hmm+|hm+)\s*[!?]*\s*$/i.test(ql))return'passive_ack';
+  if(/^(you'?re?|you are)\s+(hiding|lying|wrong|broken|confused|weird|funny|cool|great|good|bad)\b/i.test(ql))return'passive_ack';
+  if(/^(there'?s|there is|there are|is there)\s+.{0,40}\?$/i.test(ql))return'passive_ack';
+  if(/^(no,?\s+)?(you|it)\s+(are|is|were|was)\b.{0,40}$/i.test(ql)&&ql.length<50)return'passive_ack';
+  if(/\bi\s+(also|just|already|never|always|only)\s+(asked|said|told|meant|want|did)\b/i.test(ql))return'passive_ack';
   if(/^i (like|love|hate|prefer|enjoy|dislike|know about|feel about|want|need)\b/.test(ql))return'statement';
   if(/^i think\b/.test(ql))return'statement';
   if(/^(ok|okay|alright|sure|got it|i see|makes sense|understood|right|i know|interesting|k|yep|yup|nope|lol|haha|yes|no)\s*[.!?]?\s*$/.test(ql))return'passive_ack';
   if(/^(that('s| is)|wow|oh cool|oh interesting|hmm|hm)\b/.test(ql))return'passive_ack';
   if(/^why\s*[?!]?\s*$/.test(ql))return'passive_ack';
   // ── FACTUAL INTENTS ──
-  if(/^(?:is|was|are|were|did|does|do|can|could|has|have|had)\s/.test(ql))return'boolean';
+  // Boolean gate: only if question is clearly about an external topic, not Lexica
+  if(/^(?:is|was|are|were|did|does|do|can|could|has|have|had)\s/.test(ql)&&!/\byou\b/.test(ql))return'boolean';
+  if(/^(?:can|could|does|do|did)\s+you\b/.test(ql))return'self_status'; // "can you X" = self
   if(/\b(vs|versus|compare|difference between|better than|same as|similar to)\b/.test(ql))return'comparative';
   if(/\bwhy\b|\bbecause\b|\bcause of\b|\breason\b/.test(ql))return'causal';
   if(/^tell me about\b|^describe\b|^explain\b|^who is\b|^who's\b|^what is\b|^what's\b/.test(ql))return'biographical';
@@ -4072,6 +4128,12 @@ const AUTO_FETCH_STOPLIST=new Set([
 const SUBJECT_STOPLIST=new Set([...AUTO_FETCH_STOPLIST,
   'yeah','idiot','stupid','dumb','wtf','lol','bro','dude','cool','awesome',
   'thing','stuff','nothing','something','everything','anything',
+  // Sentence starters that extractSubject mistakenly capitalises into proper nouns
+  'that','this','there','because','since','although','though','however',
+  'you','your','yourself','he','she','they','we','i','me',
+  // Common misidentified "subjects" from conversational sentences
+  'hello','hey','hellooo','heyyy','know','think','said','asked','told',
+  'someone','anyone','everyone','nobody','everybody','somebody',
 ]);
 function isGarbageSubject(subj){
   if(!subj)return true;
@@ -4119,7 +4181,10 @@ function isFillerInput(q){
 function extractSubject(q){
   // Normalize contractions before anything else
   q=q.replace(/what's\b/gi,'what is').replace(/who's\b/gi,'who is').replace(/where's\b/gi,'where is').replace(/that's\b/gi,'that is');
-  const skip=new Set(['when','what','where','who','how','why','did','does','was','were','is','are','has','have','had','can','could','would','should','will','tell','explain','describe','list','give','show','find','released','launched','created','made','built','founded','born','died','first','year','date','time','many','much','long','old','the','make','create','develop','build','find','invent','write','design','creator','maker','developer','founder','about','me']);
+  const skip=new Set(['when','what','where','who','how','why','did','does','was','were','is','are','has','have','had','can','could','would','should','will','tell','explain','describe','list','give','show','find','released','launched','created','made','built','founded','born','died','first','year','date','time','many','much','long','old','the','make','create','develop','build','find','invent','write','design','creator','maker','developer','founder','about','me',
+    // Conversational words that get capitalised and mistaken for proper nouns
+    'know','think','said','asked','told','hello','hey','hellooo','there','that','because','since','you','your','someone','anyone','everyone','nobody',
+  ]);
   const proper=(q.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[]).filter(n=>n.length>2&&!skip.has(n.toLowerCase()));
   if(proper.length)return proper[0];
   const w=tokenize(q).filter(w=>!STOPWORDS.has(w)&&!skip.has(w)&&w.length>2);
@@ -4368,24 +4433,11 @@ function handleSocialIntent(intent,input,engine){
     return parts.join(' ');
   };
 
-  // All intents go through SLM when available — no canned responses
-  if (engine.neuralMouth?.ready) {
+  // All intents go through SLM when available — but ONLY for knowledge-grounded contexts
+  // Pure social (greeting, passive_ack, conversational) get symbolic fallback — SLM hallucinates on these
+  const slmIntents = new Set(['gratitude','abstract_need','statement','declarative_statement','user_emotion']);
+  if(engine.neuralMouth?.ready && slmIntents.has(intent) && n > 0) {
     const ctx = buildSLMContext();
-    // Map intent to a direct SLM prompt
-    const intentPrompt = {
-      greeting:              `User said: "${input}". Greet them as Lexica, a knowledge synthesis system. Mention your current state naturally. Be brief (1-2 sentences).`,
-      farewell:              `User said: "${input}". Give a brief, natural farewell as Lexica.`,
-      gratitude:             `User said: "${input}". Acknowledge briefly (1 sentence) then offer a relevant follow-up if you know anything useful.`,
-      user_emotion:          `User said: "${input}". Respond empathetically in 1 sentence. If you can connect it to something in your knowledge, do so.`,
-      self_status:           `User asked: "${input}". Describe your current operational state naturally in 1-2 sentences.`,
-      abstract_need:         `User said: "${input}". Suggest something relevant from your knowledge base in 1-2 sentences.`,
-      statement:             `User said: "${input}". Respond naturally in 1-2 sentences, connecting to your knowledge if relevant.`,
-      acknowledgement:       `User said: "${input}". Respond briefly and naturally in 1 sentence.`,
-      reaction:              `User said: "${input}". Respond briefly and naturally in 1 sentence.`,
-      passive_ack:           `User said: "${input}". Respond briefly and naturally in 1 sentence.`,
-      declarative_statement: `User said: "${input}". Respond to their statement in 1-2 sentences, using your knowledge where relevant.`,
-    }[intent] || `User said: "${input}". Respond briefly as Lexica in 1-2 sentences.`;
-
     return engine.neuralMouth.socialResponse(intent, input, ctx).then(slmText => {
       if (slmText && slmText.length > 5) {
         return {...base, conf:socialConf, text:slmText, synthesized:true, _slm:true, strategy:'slm'};
@@ -4440,26 +4492,33 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
     return{...base,conf:{l:'medium',lbl:'suggestion',cls:'conf-med'},text:suggest.text,kgUsed:suggest.kgUsed,synthesized:suggest.synthesized};
   }
   if(intent==='self_status'){
-    // Build a factual description from actual engine state
     const srcList = engine.sm.s.slice(0,4).map(s=>s.title).join(', ') || 'none';
-    const stateDesc = `${n} sentences from ${srcs} source${srcs!==1?'s':''} (${srcList}). ${engine.kg.count()} knowledge triples. I am a neuro-symbolic knowledge engine named Lexica.`;
-    if(engine.neuralMouth?.ready){
-      return engine.neuralMouth._generate(
-        'Describe what an AI knowledge assistant is and does, in 1-2 sentences.',
-        `State: ${stateDesc}\nQuestion: "${input}"\nAnswer:`,
-        90
-      ).then(txt=>{
-        const answer = txt && txt.length>10 ? txt : stateDesc;
-        return{...base,conf:socialConf,text:answer,synthesized:!!txt,_slm:!!txt,strategy:txt?'slm':'social'};
-      }).catch(()=>({...base,conf:socialConf,text:stateDesc,synthesized:false}));
+    const kgCount = engine.kg.count();
+    const ql = input.toLowerCase();
+    // Answer based on actual question — don't use SLM (it answers "what are you" literally as a dictionary definition)
+    let text;
+    if(/who\s+(made|created|built|designed|trained|developed|programmed)/i.test(ql)) {
+      text = 'I was built by Anthropic and run in your browser — no server needed.';
+    } else if(/why\s+(did|do|have|are)\s+you\s+(learn|fetch|add|auto|download|load|pick)/i.test(ql)) {
+      text = 'I auto-fetch Wikipedia articles when you ask about topics I have no knowledge on. Type a specific topic to load it manually instead.';
+    } else if(/do\s+you\s+know\s+how|can\s+you\s+(code|program|write code)/i.test(ql)) {
+      text = `I cannot write or run code, but I can discuss programming topics if you load a relevant Wikipedia article. Currently I know: ${srcList}.`;
+    } else if(/can\s+you\s+(stop|fix|speed|faster|less|reduce|lag|slow)/i.test(ql)) {
+      text = `SLM inference runs in your browser — each response takes 1-3s depending on model size. Nothing I can do about that I'm afraid.`;
+    } else if(/who\s+are\s+you|what\s+are\s+you|tell.*yourself/i.test(ql)) {
+      text = `I'm Lexica — a neuro-symbolic knowledge engine that runs entirely in your browser. I learn from Wikipedia articles you load, build a knowledge graph, and answer questions from it. Right now I have ${kgCount} triples from ${n} sentences across ${srcs} source${srcs!==1?'s':''}: ${srcList}.`;
+    } else {
+      text = `Lexica — ${kgCount} triples · ${n} sentences · ${srcs} source${srcs!==1?'s':''}: ${srcList}.`;
     }
-    return{...base,conf:socialConf,text:stateDesc,synthesized:false};
+    return{...base,conf:socialConf,text,synthesized:false};
   }
   if(intent==='passive_ack'||intent==='acknowledgement'||intent==='reaction'){
-    if(engine.trained&&engine.ctx.lastSubj){
-      const facts=engine.kg.query(engine.ctx.lastSubj.toLowerCase()).slice(0,2);
+    // For conversational pushback, give a brief contextual reply rather than silence or KG dump
+    const lastSubj = engine.ctx.lastSubj;
+    if(lastSubj&&engine.trained){
+      const facts=engine.kg.query(lastSubj.toLowerCase()).slice(0,2);
       if(facts.length){
-        const txt=engine.synthesis.synthesize(engine.ctx.lastSubj,'factoid',engine.ctx.lastSubj,facts,[],[],engine.semVec,engine.wordProfiler,engine.kg);
+        const txt=engine.synthesis.synthesize(lastSubj,'factoid',lastSubj,facts,[],[],engine.semVec,engine.wordProfiler,engine.kg);
         if(txt&&txt.length>10)return{...base,conf:socialConf,text:txt,synthesized:true,kgUsed:true};
       }
     }
@@ -4787,6 +4846,35 @@ class NanoCortex {
     return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
   }
 
+  // UPGRADE 5: Subject disambiguation via embedding cosine similarity
+  // Instead of pure regex (which extracts "Hello" from "I know, why hello kitty though?"),
+  // we embed the full query and compare to all KG node names.
+  // Returns the best-matching KG node name or falls back to regex extraction.
+  async disambiguateSubject(query, kgNodes, regexFallback) {
+    if (!this.ready || !kgNodes || kgNodes.length === 0) return regexFallback;
+    try {
+      const qVec = await this.embed(query);
+      if (!qVec) return regexFallback;
+      let bestNode = null, bestSim = 0;
+      // Only check top 50 most frequent nodes to stay fast
+      const candidates = kgNodes.slice(0, 50);
+      for (const node of candidates) {
+        if (!node || node.length < 2) continue;
+        const nVec = await this.embed(node);
+        if (!nVec) continue;
+        const sim = this.cosineSim(qVec, nVec);
+        if (sim > bestSim) { bestSim = sim; bestNode = node; }
+      }
+      // Only use embedding result if it's meaningfully better than random (sim > 0.35)
+      // AND the regex fallback is weak (not a clean proper noun match)
+      if (bestNode && bestSim > 0.35) {
+        console.log('[NanoCortex disambig]', query, '→', bestNode, '(sim:', bestSim.toFixed(3), ')');
+        return bestNode;
+      }
+    } catch(e) {}
+    return regexFallback;
+  }
+
   // Dense retrieval: rank candidate sentences by semantic similarity to query
   // Returns sorted array of {sentence, score, idx} — fused with BM25 scores externally
   async semanticRerank(query, candidates) {
@@ -4907,14 +4995,16 @@ class NeuralMouth {
       try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_) {}
     }
 
-    // ── Model cascade: smallest → largest ──
-    // All are Xenova ONNX models, text2text-generation, instruction-following.
-    // flan-t5 was fine-tuned on FLAN task collection — no ChatGPT distillation,
-    // no "I'm sorry as an AI language model" refusals. LaMini is NOT in this list
-    // because it was trained on ChatGPT outputs and inherits all refusal patterns.
+    // ── Model cascade: best → fallback ──
+    // SmolLM2-360M-Instruct: causal decoder, instruction-tuned on HuggingFace Smol Corpus.
+    // Dramatically better than Flan-T5 for multi-turn reasoning, comparison, speculation.
+    // Uses chat_template format: <|im_start|>system...user...assistant<|im_end|>
+    // Flan-T5 kept as fallback for low-memory environments.
     const MODEL_CASCADE = [
-      { id: 'Xenova/flan-t5-base',  type: 'text2text-generation' },  // 248M, best quality
-      { id: 'Xenova/flan-t5-small', type: 'text2text-generation' },  // 77M, fast fallback
+      { id: 'HuggingFaceTB/SmolLM2-360M-Instruct', type: 'text-generation',      isDecoder: true  },
+      { id: 'HuggingFaceTB/SmolLM2-135M-Instruct', type: 'text-generation',      isDecoder: true  },
+      { id: 'Xenova/flan-t5-base',                  type: 'text2text-generation', isDecoder: false },
+      { id: 'Xenova/flan-t5-small',                 type: 'text2text-generation', isDecoder: false },
     ];
     const progressCb = (info) => {
       if (info.status === 'downloading' || info.status === 'progress') {
@@ -4925,18 +5015,19 @@ class NeuralMouth {
     };
 
     let lastErr = null;
-    for (const { id, type } of MODEL_CASCADE) {
+    for (const { id, type, isDecoder } of MODEL_CASCADE) {
       try {
         onProgress(`NeuralMouth: Loading ${id}...`);
         console.log('[NeuralMouth] Attempting model:', id);
         this.pipeline = await pipelineFn(type, id, { progress_callback: progressCb });
         this.modelId = id;
         this._pipelineType = type;
+        this._isDecoder = isDecoder;
         this.ready = true;
         this.loading = false;
         window._webllmReady = true;
         onProgress('NeuralMouth: SLM ready ✓ (' + id + ')');
-        console.log('[NeuralMouth] Loaded:', id);
+        console.log('[NeuralMouth] Loaded:', id, '| decoder:', isDecoder);
         return true;
       } catch(modelErr) {
         lastErr = modelErr;
@@ -4952,35 +5043,64 @@ class NeuralMouth {
     return false;
   }
 
-  // Internal generate — uses Flan-T5's training format.
-  // Flan-T5 was trained on task-prefix instructions: "Answer the question: {q}\n\nContext: {c}\n\nAnswer:"
-  // It was NOT trained on ChatGPT outputs, so it has zero "I'm sorry as an AI" refusal behavior.
-  // Key rules:
-  //   - Task verb first: "Answer:", "Summarize:", "Extract:", "Write:", "Describe:"
-  //   - Keep total input under 450 chars (T5 512-token limit)
-  //   - No role declarations ("You are Lexica") — T5 ignores/echoes them
-  //   - No "Below is an instruction" wrapper — that's LaMini-only format
+  // Internal generate — dual-mode: SmolLM2 chat template OR Flan-T5 task-prefix.
+  // SmolLM2 uses ChatML format: <|im_start|>system / user / assistant<|im_end|>
+  // Flan-T5 uses task-prefix: "Answer the question:\n\nFacts: ...\nAnswer:"
+  // _isDecoder is set during model cascade loading.
   async _generate(taskPrefix, contentPrompt, maxTokens=80) {
     if (!this.ready || !this.pipeline) throw new Error('NeuralMouth not ready');
 
-    // taskPrefix is the task verb/instruction (e.g. "Answer the question:")
-    // contentPrompt is the actual content (facts, query, context)
-    // Together they must fit in ~450 chars
-    const input = taskPrefix
-      ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 480)
-      : contentPrompt.slice(0, 480);
+    let raw = '';
+    if (this._isDecoder) {
+      // ── SmolLM2 / causal decoder path ──
+      // Use proper ChatML messages format for best quality
+      const systemMsg = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct and brief — no lists, no markdown, no disclaimers.';
+      const userMsg = taskPrefix ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 600) : contentPrompt.slice(0, 600);
+      const messages = [
+        { role: 'system', content: systemMsg },
+        { role: 'user',   content: userMsg },
+      ];
+      try {
+        const result = await this.pipeline(messages, {
+          max_new_tokens: Math.min(maxTokens, 150),
+          do_sample: false,
+          temperature: 1.0,
+          repetition_penalty: 1.2,
+        });
+        // SmolLM2 returns the full generated text including the prompt
+        const genText = result?.[0]?.generated_text;
+        if (Array.isArray(genText)) {
+          // Messages format: last element is the assistant response
+          raw = (genText[genText.length - 1]?.content ?? '').trim();
+        } else {
+          raw = (genText ?? '').trim();
+          // Strip everything before <|im_start|>assistant if present
+          const assistantIdx = raw.lastIndexOf('<|im_start|>assistant');
+          if (assistantIdx !== -1) raw = raw.slice(assistantIdx + 21).replace(/<\|im_end\|>.*$/s, '').trim();
+        }
+      } catch(e) {
+        console.warn('[NeuralMouth decoder] generate failed:', e);
+        throw e;
+      }
+    } else {
+      // ── Flan-T5 / seq2seq path (fallback) ──
+      const input = taskPrefix
+        ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 480)
+        : contentPrompt.slice(0, 480);
+      const result = await this.pipeline(input, {
+        max_new_tokens: Math.min(maxTokens, 120),
+        do_sample: false,
+        num_beams: 1,
+        repetition_penalty: 1.3,
+      });
+      raw = (result?.[0]?.generated_text ?? '').trim();
+    }
 
-    const result = await this.pipeline(input, {
-      max_new_tokens: Math.min(maxTokens, 120),
-      do_sample: false,
-      num_beams: 1,
-      repetition_penalty: 1.3,
-    });
-
-    const raw = (result?.[0]?.generated_text ?? '').trim();
     return raw
-      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi, '')   // strip "I'm sorry..." openings
-      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi, '')     // strip "As an AI..." openings
+      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi, '')
+      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi, '')
+      .replace(/^(Sure[,!]\s*[^.!?]*[.!?]\s*)/i, '')
+      .replace(/^Lexica:\s*/i, '')
       .split('\n')
       .filter(line => !/^\s*[\*\-•]|^\s*\d+\./.test(line))
       .join(' ')
@@ -5005,16 +5125,53 @@ class NeuralMouth {
   }
 
   // Graph-RAG: translate verified KG triples into natural language
-  async graphRAG(kgFacts, query, intent, evidenceSentences=[]) {
+  // UPGRADE 3: conversationHistory (last 5 turns) fed as context for continuity
+  async graphRAG(kgFacts, query, intent, evidenceSentences=[], conversationHistory=[]) {
     if (!this.ready) return null;
-    const triples = kgFacts.slice(0, 5)
+    const triples = kgFacts.slice(0, 6)
       .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
       .join('; ');
     const evidence = evidenceSentences
       .filter(s => s && s.length > 15 && s.length < 150)
-      .slice(0, 2).join(' ');
+      .slice(0, 3).join(' ');
     if (!triples && !evidence) return null;
-    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, 280);
+    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, 320);
+
+    if (this._isDecoder && conversationHistory.length > 0) {
+      // SmolLM2: use full chat template with conversation history
+      const systemMsg = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct. No lists, no markdown.';
+      const historyMsgs = conversationHistory.slice(-4).flatMap(turn => [
+        { role: 'user',      content: turn.q.slice(0, 120) },
+        { role: 'assistant', content: turn.a.slice(0, 150) },
+      ]);
+      const userMsg = `Facts: ${facts}\n\nQuestion: ${query.slice(0, 100)}`;
+      const messages = [
+        { role: 'system', content: systemMsg },
+        ...historyMsgs,
+        { role: 'user',   content: userMsg },
+      ];
+      try {
+        const result = await this.pipeline(messages, {
+          max_new_tokens: 120,
+          do_sample: false,
+          temperature: 1.0,
+          repetition_penalty: 1.2,
+        });
+        const genText = result?.[0]?.generated_text;
+        let raw = '';
+        if (Array.isArray(genText)) {
+          raw = (genText[genText.length - 1]?.content ?? '').trim();
+        } else {
+          raw = (genText ?? '').trim();
+          const ai = raw.lastIndexOf('<|im_start|>assistant');
+          if (ai !== -1) raw = raw.slice(ai + 21).replace(/<\|im_end\|>.*$/s, '').trim();
+        }
+        if (raw && raw.length > 10)
+          return raw.replace(/^(Answer:|Facts:|Question:|Sure[,!]\s*)/i, '').replace(/\n/g,' ').trim();
+      } catch(e) { /* fall through to task-prefix path */ }
+    }
+
+    // Flan-T5 or decoder fallback: task-prefix format
     const task = `Answer the question in 1-2 sentences using only the given facts. Be direct and specific.`;
     const content = `Facts: ${facts}\nQuestion: ${query.slice(0, 80)}\nAnswer:`;
     try {
@@ -5478,10 +5635,10 @@ class Engine {
     const directive = handleDirective(question, this);
     if (directive) return directive;
 
-    // ── SELF-DIRECTED GATE: questions about Lexica itself never reach KG routing ──
-    // Catches: "can you X yourself", "can you stop lagging", "are you an AI", etc.
+    // ── SELF-DIRECTED GATE: hard-to-classify self-reference questions ──
+    // Narrow: only catch questions that classifyIntent missed but clearly refer to Lexica itself
     const isSelfDirected = /\b(you|your(self)?|lexica)\b/i.test(question) &&
-      /\b(are you|were you|can you|could you|do you|did you|will you|would you|are you|what (are|is) you|who (are|is) you|stop|speed|faster|lag|slow|fix yourself|code yourself|modify yourself|improve yourself)\b/i.test(question);
+      /\b(stop|speed\s+up|faster|less\s+lag|stop\s+lag|fix\s+yourself|code\s+yourself|modify\s+yourself|improve\s+yourself)\b/i.test(question);
     if (isSelfDirected) {
       const intent0self = classifyIntent(question);
       const sr0 = await Promise.resolve(handleSocialIntent(
@@ -5552,7 +5709,12 @@ class Engine {
     const {r,used} = this.ctx.resolve(question);
     const rClean = r.replace(/^(okay|ok|yeah|alright|right|so|well|but|like|and|hmm+|uh+|um+)[,\s]+/gi,'').trim()||r;
     const intent = classifyIntent(rClean);
-    const subject = extractSubject(rClean)||extractSubject(r)||this.ctx.lastSubj;
+    let subject = extractSubject(rClean)||extractSubject(r)||this.ctx.lastSubj;
+    // UPGRADE 5: NanoCortex embedding disambiguation — corrects "Hello" → "Hello Kitty"
+    if (subject && this.nanoCortex?.ready && this.kg.triples.length > 5) {
+      const kgNodes = [...new Set(this.kg.triples.filter(t=>t.alive!==false).map(t=>t.s))];
+      subject = await this.nanoCortex.disambiguateSubject(rClean, kgNodes, subject);
+    }
     const ext = expandQuery(r);
     const qStems = sWords(r);
     const semExt = this.semVec.semanticExpand(qStems,4,0.22);
@@ -5644,17 +5806,24 @@ class Engine {
     let kgFacts = subject ? this.kg.query(subject.toLowerCase()) : [];
     const kgDerived = subject ? this.kg.getAllDerivedFacts(subject) : [];
 
-    // ── MULTI-HOP CROSS-DOCUMENT REASONING ──
-    // If we don't have enough direct facts, try multi-hop inference.
-    // "Who owns Minecraft?" → Minecraft→created_by→Mojang → Mojang→acquired_by→Microsoft
-    if (subject && kgFacts.length < 4) {
-      const multiHopFacts = this.kg.multiHopQuery(subject, 2);
+    // ── UPGRADE 8: MULTI-HOP CROSS-DOCUMENT REASONING WITH SOURCE ATTRIBUTION ──
+    // "Who owns Minecraft?" → Minecraft→created_by→Mojang (source A) → Mojang→acquired_by→Microsoft (source B)
+    // Track which sources contributed to each hop for transparency in answer attribution.
+    let _crossDocSources = new Set();
+    if (subject && kgFacts.length < 6) {
+      const multiHopFacts = this.kg.multiHopQuery(subject, 3); // increased from 2 to 3 hops
       const newFacts = multiHopFacts.filter(f => !kgFacts.some(k => k.s === f.s && k.p === f.p && k.o === f.o));
       if (newFacts.length > 0) {
-        kgFacts = [...kgFacts, ...newFacts.slice(0, 6)];
+        kgFacts = [...kgFacts, ...newFacts.slice(0, 8)];
+        // Track cross-document sources for attribution
+        newFacts.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
+        kgFacts.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
         // Emit inner monologue about the chain reasoning
         if (newFacts.some(f => f._depth > 0)) {
-          const chainDesc = newFacts.filter(f => f._depth > 0).slice(0,2).map(f => f.s + ' → ' + f.o).join('; ');
+          const chainDesc = newFacts.filter(f => f._depth > 0).slice(0,3).map(f => {
+            const srcTitle = this.sm.get(f.tag)?.title || '';
+            return f.s + ' → ' + f.o + (srcTitle ? ' ['+srcTitle+']' : '');
+          }).join('; ');
           showInnerMonologue('Multi-hop: chaining from "' + subject + '" through: ' + chainDesc, subject, null);
         }
       }
@@ -5662,10 +5831,12 @@ class Engine {
       if (/who owns|who made|who created|who developed|created by|made by/i.test(r)) {
         const ownerChain = this.kg.inferOwnership(subject);
         if (ownerChain.length > 0) {
-          kgFacts = [...ownerChain, ...kgFacts.filter(f => !ownerChain.some(o => o.s === f.s && o.p === f.p))].slice(0, 12);
+          ownerChain.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
+          kgFacts = [...ownerChain, ...kgFacts.filter(f => !ownerChain.some(o => o.s === f.s && o.p === f.p))].slice(0, 14);
         }
       }
     }
+    const _isCrossDoc = _crossDocSources.size > 1; // answer synthesized from multiple sources
 
     // Comparative: extract second subject and merge facts
     if (intent === 'comparative' || /\b(vs|versus|compare|compared to|difference between|better than|similar to)\b/i.test(r)) {
@@ -5713,7 +5884,7 @@ class Engine {
       try {
         // Hard 3s timeout — SLM must not stall the response
         const ragText = await Promise.race([
-          this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4)),
+          this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)),
           new Promise(res => setTimeout(() => res(null), 3000))
         ]);
         if (ragText && ragText.length > 20) {
@@ -5826,7 +5997,9 @@ class Engine {
       _societyWinner: societyWinner?.name || null,
       _graphRAG: usedGraphRAG,
       _slm: usedSLM,
-      _srcTag: rel[0].tag || null
+      _srcTag: rel[0].tag || null,
+      _crossDoc: _isCrossDoc,
+      _crossDocSrcs: _isCrossDoc ? [..._crossDocSources].map(tag => this.sm.get(tag)?.title || tag).filter(Boolean) : null,
     };
     this.cache.set(ck, result);
     this.lastResult = result;
@@ -5906,27 +6079,37 @@ class Engine {
   }
 
   // ── PERSISTENT MEMORY ──
-  // Serializes the full engine state to localStorage so Lexica remembers across reloads.
-  // Teach it something Monday, it knows on Friday. That's what makes it feel alive.
+  // UPGRADE 4: Growing session memory with fingerprint-based triple deduplication.
+  // KG grows across sessions — new triples are merged in, duplicates skipped.
+  // Version: lexica-4.1-mem (bump from 4.0 to pick up new triple fingerprint field)
   saveToMemory() {
     try {
+      // Compute triple fingerprints for deduplication on next load
+      const triples = this.kg.toJSON();
+      if (triples?.triples) {
+        triples.triples = triples.triples.map(t => ({
+          ...t,
+          _fp: (t.s + '|' + t.p + '|' + String(t.o)).toLowerCase()
+        }));
+      }
       const data = {
-        version: 'lexica-4.0-mem',
+        version: 'lexica-4.1-mem',
         savedAt: new Date().toISOString(),
         sources: this.sm.s,
         sentences: this.bm25.ss.map((s,i) => ({ t: s, tag: this.bm25.tags[i] })),
-        kg: this.kg.toJSON(),
+        kg: triples,
         semVecVocab: this.semVec.vocabSize,
-        failureLog: this.failureTracker ? this.failureTracker.getSnapshot() : null
+        failureLog: this.failureTracker ? this.failureTracker.getSnapshot() : null,
+        episodicSnapshot: this.episodicMemory ? {
+          established: [...(this.episodicMemory.established?.entries?.() || [])].slice(0,50),
+        } : null
       };
       const json = JSON.stringify(data);
-      // Stay well under the ~5MB localStorage limit
       if (json.length < 4500000) {
         localStorage.setItem('lexica_engine_state_v4', json);
         console.log('[Persistent Memory] Saved:', data.sources.length, 'sources,', this.kg.count(), 'triples');
         return true;
       } else {
-        // Trim: keep only the most recent 60% of sentences
         const trimmed = { ...data, sentences: data.sentences.slice(-Math.floor(data.sentences.length * 0.6)) };
         localStorage.setItem('lexica_engine_state_v4', JSON.stringify(trimmed));
         console.log('[Persistent Memory] Saved (trimmed)');
@@ -5953,9 +6136,20 @@ class Engine {
       });
       byTag.forEach((ss, tag) => this.bm25.addBatch(ss, tag));
       this.bm25.flush();
-      // Restore KG
+      // Restore KG with fingerprint-based deduplication
       this.kg = new KnowledgeGraph(this.ets);
-      if (data.kg) this.kg.fromJSON(data.kg);
+      if (data.kg) {
+        this.kg.fromJSON(data.kg);
+        // Deduplicate by fingerprint — removes exact duplicates from repeated saves
+        const seen = new Set();
+        this.kg.triples = this.kg.triples.filter(t => {
+          const fp = t._fp || (t.s + '|' + t.p + '|' + String(t.o)).toLowerCase();
+          if (seen.has(fp)) return false;
+          seen.add(fp);
+          return true;
+        });
+        console.log('[Persistent Memory] KG deduplicated:', this.kg.triples.length, 'unique triples');
+      }
       // Restore sources list
       this.sm = new SM();
       (data.sources || []).forEach(s => this.sm.s.push(s));
@@ -6539,14 +6733,163 @@ function resetAll(){
   addMsg('system','All training data cleared. Cognitive state reset. Lexica 4.0 homeostatic systems reinitialized.');
 }
 
+
+// ─────────────────────────────────────────────────────
+// UPGRADE 2: PDF INGESTION
+// Uses PDF.js to extract text client-side — no server.
+// ─────────────────────────────────────────────────────
+let _pdfText = null;
+
+async function extractPDFText(file) {
+  // Configure worker
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  } else {
+    throw new Error('PDF.js not loaded');
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n';
+  }
+  return { text: fullText, pages: pdf.numPages };
+}
+
+function onPdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdfDrop').style.borderColor = '';
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type === 'application/pdf') loadPDFFile(file);
+}
+
+function onPdfFileSelect(input) {
+  const file = input.files?.[0];
+  if (file) loadPDFFile(file);
+}
+
+async function loadPDFFile(file) {
+  const status = document.getElementById('pdfStatus');
+  const preview = document.getElementById('pdfPreview');
+  const trainBtn = document.getElementById('pdfTrainBtn');
+  const titleInput = document.getElementById('pdfTitle');
+  status.textContent = 'Extracting text...';
+  preview.style.display = 'none';
+  trainBtn.style.opacity = '0.5';
+  trainBtn.style.pointerEvents = 'none';
+  _pdfText = null;
+  try {
+    const { text, pages } = await extractPDFText(file);
+    _pdfText = text;
+    document.getElementById('pdfPages').textContent = pages;
+    document.getElementById('pdfChars').textContent = text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length;
+    if (!titleInput.value) titleInput.value = file.name.replace(/\.pdf$/i, '');
+    preview.textContent = text.slice(0, 300) + (text.length > 300 ? '...' : '');
+    preview.style.display = 'block';
+    status.textContent = `✓ Ready — ${pages} pages extracted`;
+    trainBtn.style.opacity = '1';
+    trainBtn.style.pointerEvents = '';
+  } catch(e) {
+    status.textContent = 'Error: ' + (e.message || 'Could not read PDF');
+    console.error('[PDF]', e);
+  }
+}
+
+async function trainFromPDF() {
+  if (!_pdfText) { addMsg('system', 'No PDF loaded.'); return; }
+  const title = document.getElementById('pdfTitle').value.trim() || 'PDF Document';
+  setStatus(false, 'training...');
+  showTrainOverlay(title);
+  try {
+    await engine.addSourceAsync(_pdfText, title, '', (phase, pct, cnt, triples) => {
+      updateTrainOverlay(phase, pct, cnt, triples);
+    });
+    updateUI();
+    setStatus(true, `synthesis ready · ${engine.bm25.ss.length} sentences`);
+    addMsg('system', `Trained on PDF: <strong>${title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences`);
+    _pdfText = null;
+    document.getElementById('pdfStatus').textContent = '';
+    document.getElementById('pdfPreview').style.display = 'none';
+    document.getElementById('pdfTitle').value = '';
+    document.getElementById('pdfPages').textContent = '—';
+    document.getElementById('pdfChars').textContent = '—';
+    document.getElementById('pdfTrainBtn').style.opacity = '0.5';
+    document.getElementById('pdfTrainBtn').style.pointerEvents = 'none';
+    hideTrainOverlay();
+    switchTab('sources');
+  } catch(e) {
+    hideTrainOverlay();
+    addMsg('system', 'PDF training error: ' + e.message);
+    setStatus(false, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// UPGRADE 7: KG TRIPLE EDITOR
+// Browse, search, delete, edit triples.
+// ─────────────────────────────────────────────────────
+function kgEditSearch(query) {
+  const list = document.getElementById('kgEditList');
+  const countEl = document.getElementById('kgEditCount');
+  if (!engine.kg) return;
+  const all = engine.kg.triples.filter(t => t.alive !== false);
+  countEl.textContent = all.length + ' triples';
+  const q = (query || '').toLowerCase().trim();
+  const filtered = q
+    ? all.filter(t =>
+        t.s.toLowerCase().includes(q) ||
+        t.p.toLowerCase().includes(q) ||
+        String(t.o).toLowerCase().includes(q)
+      )
+    : all.slice(0, 200);
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">' + (q ? 'No matching triples.' : 'No triples yet.') + '</div>';
+    return;
+  }
+  list.innerHTML = filtered.slice(0, 300).map((t, i) => {
+    const idx = engine.kg.triples.indexOf(t);
+    const sourceTitle = engine.sm.get(t.tag)?.title || t.tag || '';
+    return `<div class="coref-entry" style="margin-bottom:5px" id="kgrow-${idx}">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="coref-node" style="cursor:pointer" onclick="kgEditSetSubj('${t.s.replace(/'/g,"\'")}')" title="Click to search">${t.s}</span>
+        <span style="color:var(--gold);font-size:9px;font-family:'JetBrains Mono',monospace">${t.p.replace(/_/g,' ')}</span>
+        <span class="coref-node" style="cursor:pointer" onclick="kgEditSetSubj('${String(t.o).replace(/'/g,"\'")}')" title="Click to search">${String(t.o).slice(0,60)}</span>
+        <span style="flex:1"></span>
+        <span style="font-size:8.5px;color:var(--text-muted)">${sourceTitle}</span>
+        <button onclick="kgDeleteTriple(${idx})" style="background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.3);border-radius:5px;padding:2px 7px;color:rgba(255,120,120,.9);font-size:9px;cursor:pointer">✕</button>
+      </div>
+      ${t.conf !== undefined ? `<div style="font-size:8px;color:var(--text-muted);margin-top:2px">conf: ${(t.conf||0).toFixed(2)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function kgEditSetSubj(s) {
+  const input = document.getElementById('kgSearchInput');
+  if (input) { input.value = s; kgEditSearch(s); }
+}
+
+function kgDeleteTriple(idx) {
+  const t = engine.kg.triples[idx];
+  if (!t) return;
+  t.alive = false;
+  engine.cache.invalidate();
+  kgEditSearch(document.getElementById('kgSearchInput')?.value || '');
+  document.getElementById('kgEditCount').textContent = engine.kg.triples.filter(t=>t.alive!==false).length + ' triples';
+  addMsg('system', `Deleted triple: ${t.s} → ${t.p} → ${t.o}`);
+}
+
 function switchTab(n){
-  const names=['wiki','paste','sources','data','words','cognition','graph'];
+  const names=['wiki','paste','sources','data','words','cognition','graph','pdf','kgedit'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===n));
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   const pane=document.getElementById('tab-'+n);
   if(pane)pane.classList.add('active');
-  // refresh hypergraph when graph tab opened
   if(n==='graph'&&typeof hgRefresh==='function'){setTimeout(()=>{if(typeof resizeHgCanvas==='function')resizeHgCanvas();hgRefresh();},60);}
+  if(n==='kgedit'){kgEditSearch(document.getElementById('kgSearchInput')?.value||'');}
 }
 
 function updateUI(){
@@ -6593,6 +6936,7 @@ function streamMsg(text, meta) {
   const conflBadge=meta.conflict?'<span class="badge conflict">⚠ conflict</span>':'';
   const tmsBadge=meta.intent==='tms_cascade'?'<span class="badge tms">⛓ TMS</span>':'';
   const graphragBadge=meta._graphRAG?'<span class="badge graphrag">📊 Graph-RAG</span>':'';
+  const crossDocBadge=meta._crossDoc?'<span class="badge" style="background:rgba(147,112,219,.15);border:1px solid rgba(147,112,219,.3);color:#b39ddb" title="'+(meta._crossDocSrcs||[]).join(' + ')+'">🔗 cross-doc</span>':'';
   const slmBadge=meta._slm?'<span class="badge slm">🧬 SLM</span>':'';
   const srcBtn=meta.src?'<button class="src-btn" onclick="toggleSrcReveal(this)">⟨ source ⟩</button>':'';
   const _srcTitle=meta.srcTitle?('<div class="source-title-line">📄 '+meta.srcTitle+'</div>'):'';
@@ -6601,7 +6945,7 @@ function streamMsg(text, meta) {
   const fbId='fb-'+Date.now();
   const fbHtml='<div class="feedback-row" id="'+fbId+'"><button class="fb-btn good" onclick="voteFb(this,\''+fbId+'\',true)">👍</button><button class="fb-btn bad" onclick="voteFb(this,\''+fbId+'\',false)">👎</button></div>';
   const bubId='bub-'+Date.now();
-  row.innerHTML='<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap" style="min-width:0"><div class="msg-bubble ai'+(meta.synthesized?' synthesized':'')+'" id="'+bubId+'" data-src="'+(meta.src?meta.src.replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'')+'" ></div><div class="msg-meta">'+time+synthBadge+stratBadge+graphragBadge+slmBadge+kgBadge+confBadge+ctxBadge+cacheBadge+conflBadge+autoFetchBadge+tmsBadge+srcBtn+'</div>'+srcReveal+fbHtml+'</div>';
+  row.innerHTML='<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap" style="min-width:0"><div class="msg-bubble ai'+(meta.synthesized?' synthesized':'')+'" id="'+bubId+'" data-src="'+(meta.src?meta.src.replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'')+'" ></div><div class="msg-meta">'+time+synthBadge+stratBadge+graphragBadge+crossDocBadge+slmBadge+kgBadge+confBadge+ctxBadge+cacheBadge+conflBadge+autoFetchBadge+tmsBadge+srcBtn+'</div>'+srcReveal+fbHtml+'</div>';
   msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;
   const bubble=row.querySelector('.msg-bubble.ai');
   const speed=Math.max(5,Math.min(20,1600/text.length));let i=0;
@@ -7452,7 +7796,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (window.ConvoManager) window.ConvoManager.init();
   const ta=document.getElementById('trainText'),cc=document.getElementById('charCount');
   ta.addEventListener('input',()=>{const n=ta.value.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';});
-  document.getElementById('fileUp').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{ta.value=ev.target.result;const n=ev.target.result.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';addMsg('system','Loaded: '+f.name);};r.readAsText(f);});
+  document.getElementById('fileUp').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;if(f.name.toLowerCase().endsWith('.pdf')){loadPDFFile(f);switchTab('pdf');return;}const r=new FileReader();r.onload=ev=>{ta.value=ev.target.result;const n=ev.target.result.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';addMsg('system','Loaded: '+f.name);};r.readAsText(f);});
   document.getElementById('importFile').addEventListener('change',async function(e){
     const f=e.target.files[0];if(!f)return;addMsg('system','Importing '+f.name+'...');setStatus(false,'importing...');
     try{const data=await engine.import(f);updateUI();setStatus(true,'synthesis ready · '+engine.bm25.ss.length+' sentences');addMsg('system','Imported. '+engine.bm25.ss.length+' sentences · '+engine.kg.count()+' triples · '+(data.sources?.length||0)+' sources.');switchTab('sources');}
