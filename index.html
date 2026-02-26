@@ -646,6 +646,13 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 /* typing state glow changes handled via JS speed */
 
 .input-hint{text-align:center;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-top:7px;letter-spacing:.06em}
+.attach-btn{width:38px;height:38px;border-radius:50%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-dim);font-size:18px;line-height:1;cursor:pointer;flex-shrink:0;transition:all .15s;display:flex;align-items:center;justify-content:center;position:relative}
+.attach-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:var(--text)}
+.attach-popover{position:absolute;bottom:calc(100% + 8px);left:0;background:var(--glass-bg);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:12px;padding:6px;min-width:160px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);display:none}
+.attach-popover.open{display:block}
+.attach-option{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);transition:background .12s}
+.attach-option:hover{background:rgba(255,255,255,.06)}
+.attach-option-icon{font-size:16px;width:22px;text-align:center}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
 
 /* ── TRAIN OVERLAY ── */
@@ -942,7 +949,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
           <button class="tab-btn" onclick="switchTab('words')">🔍</button>
           <button class="tab-btn" onclick="switchTab('cognition')">🧠</button>
           <button class="tab-btn" onclick="switchTab('graph')">⬡</button>
-          <button class="tab-btn" onclick="switchTab('pdf')" title="PDF Ingestion">📄</button>
+
           <button class="tab-btn" onclick="switchTab('kgedit')" title="KG Editor">🗄</button>
         </div>
       </div>
@@ -1015,7 +1022,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
       <div class="tab-pane" id="tab-pdf">
         <div class="section">
           <div class="lbl">PDF Ingestion <span style="font-size:9px;color:var(--text-muted)">(browser-local, no upload)</span></div>
-          <div class="file-drop" id="pdfDrop" onclick="document.getElementById('pdfFileUp').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor=''" ondrop="onPdfDrop(event)">
+          <div class="file-drop" id="pdfDrop" onclick="document.getElementById('pdfFileUpHidden').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor=''" ondrop="onPdfDrop(event)">
             <input type="file" id="pdfFileUp" accept=".pdf" onchange="onPdfFileSelect(this)">
             <div class="fi">📄</div>
             <p>Drop PDF or click to select</p>
@@ -1057,57 +1064,31 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         </div>
       </div>
       <div class="tab-pane" id="tab-cognition">
+
+        <!-- ── SECTION 1: NEURAL ENGINE ── -->
         <div class="cog-section">
-          <div class="lbl">Neural Status</div>
+          <div class="lbl">Neural Engine</div>
           <div class="slm-status-bar" id="slmStatusBar">
             <div class="slm-dot loading" id="slmDot"></div>
             <div class="slm-label" id="slmLabel">Initializing...</div>
             <div class="slm-model-name" id="slmModelName">—</div>
             <button id="slmRetryBtn" onclick="window._retryNeuralInit && window._retryNeuralInit()" style="display:none;margin-left:auto;padding:2px 8px;background:rgba(110,168,255,.12);border:1px solid rgba(110,168,255,.3);border-radius:6px;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(110,168,255,.22)'" onmouseout="this.style.background='rgba(110,168,255,.12)'">↻ retry</button>
           </div>
+          <!-- SLM Ensemble roster -->
+          <div id="slmEnsemblePanel" style="margin-top:8px;display:none">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:5px;letter-spacing:.04em">ENSEMBLE ROLES</div>
+            <div id="slmEnsembleRoles"></div>
+          </div>
         </div>
+
+        <!-- ── SECTION 2: INNER STATE (Qualia + Drives unified) ── -->
         <div class="cog-section">
-          <div class="lbl">Synthetic Qualia</div>
-          <div id="qualiaStateDisplay" style="padding:10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">Awaiting first thought...</div>
-          <div class="cog-state-row" id="qualiaMetrics"></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Graph Centrality <span style="font-size:7.5px;color:var(--text-muted)">(eigenvector)</span></div>
-          <div id="centralityPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Train to see centrality.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Ontological Taxonomy</div>
-          <div id="ontologyPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No nodes classified yet.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">N3 Bridge Log</div>
-          <div id="n3Log"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">N3 bridge queries appear here.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Ingestion Queue</div>
-          <div id="ingestionPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Gödelian Self-Modifications</div>
-          <div id="godelLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No self-modifications yet.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Society of Mind · Debate</div>
-          <div id="debateLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No debates yet.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">NanoCortex · Coref Merges</div>
-          <div id="corefLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Coref merges appear after training.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Inner Monologue Log</div>
-          <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Idle thoughts appear here.</div></div>
-        </div>
-        <div class="cog-section" style="border-top:1px solid rgba(232,184,75,.15);padding-top:14px;margin-top:6px;">
-          <div class="lbl" style="color:var(--gold)">── LEXICA 4.0 SYSTEMS ──</div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Homeostatic Drives <span style="font-size:7.5px;color:var(--text-muted)">(behavioral pressure)</span></div>
+          <div class="lbl">Inner State</div>
+          <!-- Qualia event summary -->
+          <div id="qualiaStateDisplay" style="padding:8px 10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:8px">Awaiting first thought...</div>
+          <!-- Qualia numeric metrics -->
+          <div class="cog-state-row" id="qualiaMetrics" style="margin-bottom:8px"></div>
+          <!-- Drive bars inline -->
           <div id="drivePanel" class="drive-panel">
             <div class="drive-row">
               <span class="drive-label">Curiosity</span>
@@ -1135,30 +1116,64 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
             </div>
           </div>
         </div>
+
+        <!-- ── SECTION 3: ACTIVE MIND (live cognition) ── -->
         <div class="cog-section">
-          <div class="lbl">Goal Stack <span style="font-size:7.5px;color:var(--text-muted)">(self-authored objectives)</span></div>
-          <div id="goalStack"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No goals yet. Train to awaken drive-based objectives.</div></div>
+          <div class="lbl">Active Mind</div>
+          <!-- Inner monologue -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">INNER MONOLOGUE</div>
+          <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Idle...</div></div>
+          <!-- Society of Mind -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin:10px 0 3px;letter-spacing:.04em">SOCIETY OF MIND · LAST DEBATE</div>
+          <div id="debateLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No debates yet.</div></div>
+          <!-- N3 Bridge -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin:10px 0 3px;letter-spacing:.04em">N3 BRIDGE</div>
+          <div id="n3Log"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No bridges yet.</div></div>
         </div>
+
+        <!-- ── SECTION 4: SELF & CONTEXT ── -->
         <div class="cog-section">
-          <div class="lbl">Self-Model <span style="font-size:7.5px;color:var(--text-muted)">(dynamic introspection)</span></div>
-          <div id="selfModelPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Self-model builds from reasoning history.</div></div>
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Self &amp; Context <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="selfContextGroup">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GOALS</div>
+            <div id="goalStack" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No goals yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">SELF-MODEL</div>
+            <div id="selfModelPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Builds from reasoning history.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">USER MODEL</div>
+            <div id="userModelPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Modeling begins after first message.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">PREFERENCES</div>
+            <div id="preferencePanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Form after successful syntheses.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">EPISODIC MEMORY</div>
+            <div id="episodicPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Conversation arc builds as you talk.</div></div>
+          </div>
         </div>
+
+        <!-- ── SECTION 5: KNOWLEDGE STRUCTURE ── -->
         <div class="cog-section">
-          <div class="lbl">User Model <span style="font-size:7.5px;color:var(--text-muted)">(who am I talking to)</span></div>
-          <div id="userModelPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Modeling begins after first message.</div></div>
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Knowledge Structure <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="knowledgeStructGroup">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GRAPH CENTRALITY</div>
+            <div id="centralityPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Train to see centrality.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">ONTOLOGY</div>
+            <div id="ontologyPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No nodes classified yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">COREF MERGES</div>
+            <div id="corefLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Appear after training.</div></div>
+          </div>
         </div>
+
+        <!-- ── SECTION 6: SYSTEM LOGS ── -->
         <div class="cog-section">
-          <div class="lbl">Preferences <span style="font-size:7.5px;color:var(--text-muted)">(learned valences)</span></div>
-          <div id="preferencePanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Preferences form after successful syntheses.</div></div>
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">System Logs <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="systemLogsGroup" style="display:none">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">INGESTION QUEUE</div>
+            <div id="ingestionPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Idle.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GÖDELIAN SELF-MODIFICATIONS</div>
+            <div id="godelLog" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No self-modifications yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">FAILURE LOG</div>
+            <div id="failureLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No failures recorded.</div></div>
+          </div>
         </div>
-        <div class="cog-section">
-          <div class="lbl">Episodic Memory <span style="font-size:7.5px;color:var(--text-muted)">(conversation arc)</span></div>
-          <div id="episodicPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Conversation arc builds as you talk.</div></div>
-        </div>
-        <div class="cog-section">
-          <div class="lbl">Failure Log <span style="font-size:7.5px;color:var(--text-muted)">(drives gap-closing)</span></div>
-          <div id="failureLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No failures recorded.</div></div>
-        </div>
+
       </div>
       <div class="tab-pane" id="tab-graph">
         <div class="hg-wrap" style="margin:-16px -16px 0;border-radius:0;border-left:none;border-right:none;border-top:none">
@@ -1198,6 +1213,16 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
   <div class="messages" id="messages"></div>
   <div class="input-area">
     <div class="input-row">
+      <div style="position:relative">
+        <button class="attach-btn" id="attachBtn" onclick="toggleAttachPopover()" title="Attach file">+</button>
+        <div class="attach-popover" id="attachPopover">
+          <div class="attach-option" onclick="attachPickPDF()">
+            <span class="attach-option-icon">📄</span>
+            <span>Upload PDF</span>
+          </div>
+        </div>
+        <input type="file" id="pdfFileUpHidden" accept=".pdf" style="display:none" onchange="onPdfFileSelect(this);closeAttachPopover()">
+      </div>
       <div class="input-wrap">
         <canvas id="inputGlowCanvas"></canvas>
         <input type="text" class="input-field" id="qInput" placeholder="Ask anything about your sources..." onkeypress="if(event.key==='Enter')sendQ()" oninput="resetIdleTimer();updateOrbTyping(this.value)">
@@ -1208,12 +1233,20 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
         </div>
       </button>
     </div>
-    <div class="input-hint">LEXICA 4.0 · HOMEOSTATIC DRIVES · GOAL STACK · SELF-MODEL · EPISODIC MEMORY · USER-MODEL · PREFERENCE ENGINE · FAILURE-DRIVEN LEARNING</div>
+    <div class="input-hint">LEXICA 4.0 · ENSEMBLE SYNTHESIS · HOMEOSTATIC DRIVES · GOAL STACK · EPISODIC MEMORY · NEURO-SYMBOLIC</div>
   </div>
 </main>
 
 <script>
 'use strict';
+// ─────────────────────────────────────────────────────
+// YIELD TO MAIN — prevents UI freezing during heavy computation
+// Uses scheduler.yield() when available (Chrome 129+), falls back to setTimeout
+// ─────────────────────────────────────────────────────
+const yieldToMain = (typeof scheduler !== 'undefined' && scheduler.yield)
+  ? () => scheduler.yield()
+  : () => new Promise(r => setTimeout(r, 0));
+
 // ═══════════════════════════════════════════════════════════
 //  LEXICA 4.0 — NEURO-SYMBOLIC ASCENSION
 //  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
@@ -5110,6 +5143,91 @@ class NeuralMouth {
       .trim();
   }
 
+  // ── ENSEMBLE SYNTHESIS ──
+  // Runs 3 specialized role prompts in parallel, selects best by grounding score.
+  // Thinker: systematic reasoning, links facts. Narrator: fluid prose output. Critic: challenges and refines.
+  // Only fires when SmolLM2 decoder is loaded (fast enough for parallel calls).
+  async ensembleGraphRAG(kgFacts, query, intent, evidenceSentences=[], conversationHistory=[]) {
+    if (!this.ready || !this._isDecoder) return null; // only for decoder models
+    const triples = kgFacts.slice(0, 6)
+      .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
+      .join('; ');
+    const evidence = evidenceSentences.filter(s=>s&&s.length>15&&s.length<150).slice(0,2).join(' ');
+    if (!triples && !evidence) return null;
+    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, 300);
+    const historyMsgs = (conversationHistory||[]).slice(-3).flatMap(turn => [
+      { role: 'user', content: turn.q.slice(0, 100) },
+      { role: 'assistant', content: turn.a.slice(0, 100) },
+    ]);
+
+    const roles = [
+      {
+        name: 'Thinker',
+        system: 'You are a precise reasoning engine. Given facts, reason step by step to produce a 1-2 sentence answer. Only use the given facts.',
+        emoji: '🧠'
+      },
+      {
+        name: 'Narrator',
+        system: 'You are a clear, direct communicator. Given facts, express the answer in natural flowing prose in 1-2 sentences. No lists, no markdown.',
+        emoji: '📢'
+      },
+      {
+        name: 'Critic',
+        system: 'You are a skeptical fact-checker. Answer the question only from the given facts, noting if something cannot be fully confirmed. Be brief.',
+        emoji: '🔍'
+      },
+    ];
+
+    const userMsg = `Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}`;
+    const calls = roles.map(role => {
+      const messages = [
+        { role: 'system', content: role.system },
+        ...historyMsgs,
+        { role: 'user', content: userMsg },
+      ];
+      return this.pipeline(messages, {
+        max_new_tokens: 110,
+        do_sample: false,
+        repetition_penalty: 1.15,
+      }).then(result => {
+        const genText = result?.[0]?.generated_text;
+        let raw = '';
+        if (Array.isArray(genText)) {
+          raw = (genText[genText.length - 1]?.content ?? '').trim();
+        } else {
+          raw = (genText ?? '').trim();
+          const ai = raw.lastIndexOf('<|im_start|>assistant');
+          if (ai !== -1) raw = raw.slice(ai + 21).replace(/<\|im_end\|>.*$/s, '').trim();
+        }
+        raw = raw.replace(/^(Sure[,!]\s*|Answer:|Facts:|Lexica:)/i, '').replace(/\n/g,' ').trim();
+        return { name: role.name, emoji: role.emoji, text: raw };
+      }).catch(() => ({ name: role.name, emoji: role.emoji, text: '' }));
+    });
+
+    const results = await Promise.all(calls);
+    const valid = results.filter(r => r.text && r.text.length > 12);
+    if (!valid.length) return null;
+
+    // Score by: length (not too short, not too long) + KG grounding
+    const scored = valid.map(r => {
+      const tl = r.text.toLowerCase();
+      let score = Math.min(r.text.length, 200) * 0.01;
+      kgFacts.forEach(f => {
+        if (typeof f.s === 'string' && tl.includes(f.s.toLowerCase())) score += 0.4;
+        if (typeof f.o === 'string' && tl.includes(String(f.o).toLowerCase())) score += 0.3;
+      });
+      // Penalize very short or canned responses
+      if (r.text.length < 20) score *= 0.3;
+      if (/^(no |i don't|i cannot|based on the given|the given facts)/i.test(r.text)) score *= 0.5;
+      return { ...r, score };
+    });
+    scored.sort((a,b) => b.score - a.score);
+
+    // Store ensemble results for the cognition tab
+    this.lastEnsemble = scored;
+    return { text: scored[0].text, winner: scored[0].name, all: scored };
+  }
+
   // Social response — tight persona, no hallucination
   async socialResponse(intent, userInput, kgContext='') {
     if (!this.ready) return null;
@@ -5709,6 +5827,7 @@ class Engine {
     const {r,used} = this.ctx.resolve(question);
     const rClean = r.replace(/^(okay|ok|yeah|alright|right|so|well|but|like|and|hmm+|uh+|um+)[,\s]+/gi,'').trim()||r;
     const intent = classifyIntent(rClean);
+    await yieldToMain(); // Let UI render before heavy work
     let subject = extractSubject(rClean)||extractSubject(r)||this.ctx.lastSubj;
     // UPGRADE 5: NanoCortex embedding disambiguation — corrects "Hello" → "Hello Kitty"
     if (subject && this.nanoCortex?.ready && this.kg.triples.length > 5) {
@@ -5871,9 +5990,9 @@ class Engine {
       if (causalEvidence.length) evidenceSentences.unshift(...causalEvidence.filter(s=>!evidenceSentences.slice(0,2).includes(s)).slice(0,2));
     }
 
-    // ── SLM PRIMARY SYNTHESIS (L5) ── Single graphRAG call — fast, grounded, direct
-    // CoT / synthesizeWithReasoning removed from hot path: they added 3–5x latency
-    // for marginal quality gains. graphRAG with rich context is sufficient.
+    // ── SLM PRIMARY SYNTHESIS ── 
+    // SmolLM2 decoder: try ensemble (3 parallel role-prompts, best wins) for rich queries
+    // Flan-T5 fallback: single graphRAG call (seq2seq can't do parallel chat roles well)
     let ansText = null;
     let societyWinner = null;
     let usedSociety = false;
@@ -5884,13 +6003,20 @@ class Engine {
       try {
         // Hard 3s timeout — SLM must not stall the response
         const ragText = await Promise.race([
-          this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)),
+          // Try ensemble first (if SmolLM2 decoder is loaded), fall back to graphRAG
+          this.neuralMouth._isDecoder
+            ? this.neuralMouth.ensembleGraphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)).then(e => e?.text || null)
+            : this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)),
           new Promise(res => setTimeout(() => res(null), 3000))
         ]);
         if (ragText && ragText.length > 20) {
           ansText = ragText;
           usedGraphRAG = true;
           usedSLM = true;
+          // Update ensemble panel in cognition tab (async, non-blocking)
+          if (this.neuralMouth?.lastEnsemble) {
+            setTimeout(() => updateEnsemblePanel(this.neuralMouth.lastEnsemble), 0);
+          }
           // CoT trace: fully async, never blocks
           if (kgFacts.length >= 4) {
             this.neuralMouth.thinkThenAnswer(r, kgFacts, evidenceSentences.slice(0,3), intent)
@@ -6734,6 +6860,49 @@ function resetAll(){
 }
 
 
+
+// ─────────────────────────────────────────────────────
+// "+" ATTACHMENT POPOVER
+// ─────────────────────────────────────────────────────
+function toggleAttachPopover() {
+  const pop = document.getElementById('attachPopover');
+  pop.classList.toggle('open');
+}
+function closeAttachPopover() {
+  document.getElementById('attachPopover')?.classList.remove('open');
+}
+function attachPickPDF() {
+  closeAttachPopover();
+  document.getElementById('pdfFileUpHidden').click();
+}
+// Close popover on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('attachBtn')?.contains(e.target)) closeAttachPopover();
+}, true);
+
+
+// ─────────────────────────────────────────────────────
+// ENSEMBLE PANEL UI — shows the 3-role debate in cognition tab
+// ─────────────────────────────────────────────────────
+function updateEnsemblePanel(ensemble) {
+  if (!ensemble || !ensemble.length) return;
+  const panel = document.getElementById('slmEnsemblePanel');
+  const roles = document.getElementById('slmEnsembleRoles');
+  if (!panel || !roles) return;
+  panel.style.display = 'block';
+  roles.innerHTML = ensemble.map((r, i) => `
+    <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:7px;${i===0?'opacity:1':'opacity:0.55'}">
+      <div style="min-width:18px;text-align:center;margin-top:1px">${r.emoji}</div>
+      <div style="flex:1">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:${i===0?'var(--gold)':'var(--text-muted)'};letter-spacing:.05em;margin-bottom:2px">
+          ${r.name.toUpperCase()}${i===0?' ✓ selected':''} <span style="color:var(--text-muted)">(score: ${r.score?.toFixed(2)||'—'})</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);line-height:1.5">"${(r.text||'').slice(0,120)}${(r.text||'').length>120?'...':''}"</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 // ─────────────────────────────────────────────────────
 // UPGRADE 2: PDF INGESTION
 // Uses PDF.js to extract text client-side — no server.
@@ -6741,12 +6910,18 @@ function resetAll(){
 let _pdfText = null;
 
 async function extractPDFText(file) {
-  // Configure worker
-  if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-  } else {
-    throw new Error('PDF.js not loaded');
+  if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+  // Use blob worker to avoid cross-origin worker restrictions (no "fake worker" error)
+  if (!window._pdfWorkerSrcSet) {
+    try {
+      const workerCode = `importScripts('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js')`;
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+    } catch(e) {
+      // Some environments block blob URLs — fall back to fake worker (slower but works)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+    window._pdfWorkerSrcSet = true;
   }
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -6773,29 +6948,53 @@ function onPdfFileSelect(input) {
 }
 
 async function loadPDFFile(file) {
-  const status = document.getElementById('pdfStatus');
-  const preview = document.getElementById('pdfPreview');
-  const trainBtn = document.getElementById('pdfTrainBtn');
-  const titleInput = document.getElementById('pdfTitle');
-  status.textContent = 'Extracting text...';
-  preview.style.display = 'none';
-  trainBtn.style.opacity = '0.5';
-  trainBtn.style.pointerEvents = 'none';
-  _pdfText = null;
+  const title = file.name.replace(/\.pdf$/i, '');
+  addMsg('system', `📄 Reading <strong>${title}</strong>...`);
+  setStatus(false, 'reading pdf...');
   try {
     const { text, pages } = await extractPDFText(file);
     _pdfText = text;
-    document.getElementById('pdfPages').textContent = pages;
-    document.getElementById('pdfChars').textContent = text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length;
-    if (!titleInput.value) titleInput.value = file.name.replace(/\.pdf$/i, '');
-    preview.textContent = text.slice(0, 300) + (text.length > 300 ? '...' : '');
-    preview.style.display = 'block';
-    status.textContent = `✓ Ready — ${pages} pages extracted`;
-    trainBtn.style.opacity = '1';
-    trainBtn.style.pointerEvents = '';
+    // Update hidden tab fields too
+    const titleInput = document.getElementById('pdfTitle');
+    const status = document.getElementById('pdfStatus');
+    if (titleInput && !titleInput.value) titleInput.value = title;
+    if (status) status.textContent = `✓ ${pages} pages · ${text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length} chars`;
+    const preview = document.getElementById('pdfPreview');
+    if (preview) { preview.textContent = text.slice(0, 300) + '...'; preview.style.display = 'block'; }
+    const trainBtn = document.getElementById('pdfTrainBtn');
+    if (trainBtn) { trainBtn.style.opacity = '1'; trainBtn.style.pointerEvents = ''; }
+    // Show confirmation with auto-train button in chat
+    const confId = 'pdfconf-' + Date.now();
+    addMsg('system', `📄 <strong>${title}</strong> extracted — ${pages} pages · ${text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length} chars<br><button id="${confId}" onclick="trainFromPDFImmediate('${title.replace(/'/g,"\'")}','${confId}')" style="margin-top:8px;padding:5px 14px;background:rgba(110,168,255,.15);border:1px solid rgba(110,168,255,.3);border-radius:8px;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer">⚡ Train on this PDF</button>`);
+    setStatus(true, 'pdf ready');
   } catch(e) {
-    status.textContent = 'Error: ' + (e.message || 'Could not read PDF');
+    addMsg('system', 'PDF error: ' + (e.message || 'Could not read PDF'));
+    setStatus(false, 'error');
     console.error('[PDF]', e);
+  }
+}
+
+async function trainFromPDFImmediate(title, btnId) {
+  if (!_pdfText) { addMsg('system', 'No PDF text loaded.'); return; }
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Training...'; }
+  setStatus(false, 'training...');
+  try {
+    showTrainOverlay(title);
+    await engine.addSourceAsync(_pdfText, title, '', (phase, pct, cnt, triples) => {
+      updateTrainOverlay(phase, pct, cnt, triples);
+    });
+    hideTrainOverlay();
+    updateUI();
+    setStatus(true, `synthesis ready · ${engine.bm25.ss.length} sentences`);
+    addMsg('system', `✓ Trained on <strong>${title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences`);
+    _pdfText = null;
+    if (btn) btn.parentElement?.removeChild(btn);
+    switchTab('sources');
+  } catch(e) {
+    hideTrainOverlay();
+    addMsg('system', 'PDF training error: ' + e.message);
+    setStatus(false, 'error');
   }
 }
 
@@ -6883,7 +7082,7 @@ function kgDeleteTriple(idx) {
 }
 
 function switchTab(n){
-  const names=['wiki','paste','sources','data','words','cognition','graph','pdf','kgedit'];
+  const names=['wiki','paste','sources','data','words','cognition','graph','kgedit'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===n));
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   const pane=document.getElementById('tab-'+n);
@@ -7035,6 +7234,8 @@ async function sendQ(){
   }
 
   showThinking();
+  // Yield to browser so the "thinking" indicator renders before computation starts
+  await yieldToMain();
   let r;
   try {
     r=await engine.query(q);
