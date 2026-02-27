@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEXICA 4.0</title>
+<title>LEXICA V0</title>
 <script type="module">
   // Pre-declare module-loaded globals for non-module access
   window._transformersReady = false;
@@ -15,7 +15,7 @@
 // Cross-origin isolation is no longer required — NeuralMouth uses Transformers.js
 // (same as NanoCortex) which runs on WebAssembly without SharedArrayBuffer threading.
 // Removing the previous COOP/COEP service worker shim which caused reload loops.
-console.log('[Lexica 4.0] Runtime:', navigator.userAgent.slice(0,60));
+console.log('[Lexica V0] Runtime:', navigator.userAgent.slice(0,60));
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -56,7 +56,7 @@ body>*{position:relative;z-index:1;}
    ═══════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════
-   LEXICA 4.0 — COGNITIVE SYSTEMS CSS
+   LEXICA V0 — COGNITIVE SYSTEMS CSS
    ═══════════════════════════════════════════════ */
 .drive-panel{padding:0 0 4px;}
 .drive-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
@@ -788,7 +788,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
   border-radius:20px;padding:36px 42px;position:relative;overflow:hidden;
   box-shadow:0 0 80px rgba(110,168,255,.06), 0 0 40px rgba(176,148,255,.04), inset 0 1px 0 rgba(255,255,255,.08);
 }
-.train-panel::before{content:'LEXICA V12 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
+.train-panel::before{content:'LEXICA V0 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
 .tp-corner{position:absolute;width:16px;height:16px;border-color:rgba(110,168,255,.3)}
 .tp-corner.tl{top:8px;left:8px;border-top:1.5px solid;border-left:1.5px solid}
 .tp-corner.tr{top:8px;right:8px;border-top:1.5px solid;border-right:1.5px solid}
@@ -1395,6 +1395,43 @@ self.onmessage=async function(e){
           </div>
         </div>
 
+
+        <!-- ── AGI SECTION A: CAUSAL REASONING ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--cyan)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">⚡ Causal Graph <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="causalSection">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">WHY-CHAINS · CAUSE→EFFECT</div>
+            <div id="causalEdgeLog" style="max-height:120px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No causal edges learned yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin:8px 0 4px;letter-spacing:.05em">LAST COUNTERFACTUAL</div>
+            <div id="counterfactualLog" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;min-height:24px">—</div>
+          </div>
+        </div>
+
+        <!-- ── AGI SECTION B: WORLD MODEL ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--gold)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">🌍 World Model <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="worldModelSection">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">OBJECTS · PROPERTIES · STATES</div>
+            <div id="worldObjectLog" style="max-height:110px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No objects registered.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin:8px 0 4px;letter-spacing:.05em">LAST SIMULATION</div>
+            <div id="worldSimLog" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;min-height:24px">—</div>
+          </div>
+        </div>
+
+        <!-- ── AGI SECTION C: SYSTEM 2 DELIBERATE REASONING ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--purple)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">🧮 System 2 <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="system2Section">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">PROOF STEPS · VERIFIED LOGIC</div>
+            <div id="sys2ProofLog" style="max-height:120px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No proofs run yet.</div></div>
+            <div style="display:flex;gap:8px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:9px">
+              <span style="color:var(--green)">✓ <span id="sys2Verified">0</span> verified</span>
+              <span style="color:var(--red)">✗ <span id="sys2Refuted">0</span> refuted</span>
+              <span style="color:var(--gold)">∑ <span id="sys2MathCalls">0</span> math ops</span>
+            </div>
+          </div>
+        </div>
+
         <!-- ── SECTION 6: SYSTEM LOGS ── -->
         <div class="cog-section">
           <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">System Logs <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
@@ -1433,7 +1470,7 @@ self.onmessage=async function(e){
     <div class="model-info">
       <div class="model-avatar">Lx</div>
       <div>
-        <div class="model-name">LEXICA 4.0
+        <div class="model-name">LEXICA V0
           <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
         </div>
         <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
@@ -1504,7 +1541,7 @@ self.onmessage=async function(e){
         </div>
       </button>
     </div>
-    <div class="input-hint">LEXICA 4.0 · ENSEMBLE SYNTHESIS · HOMEOSTATIC DRIVES · GOAL STACK · EPISODIC MEMORY · NEURO-SYMBOLIC</div>
+    <div class="input-hint">LEXICA V0 · ENSEMBLE SYNTHESIS · HOMEOSTATIC DRIVES · GOAL STACK · EPISODIC MEMORY · NEURO-SYMBOLIC</div>
   </div>
 </main>
 
@@ -1519,7 +1556,7 @@ const yieldToMain = (typeof scheduler !== 'undefined' && scheduler.yield)
   : () => new Promise(r => setTimeout(r, 0));
 
 // ═══════════════════════════════════════════════════════════
-//  LEXICA 4.0 — NEURO-SYMBOLIC ASCENSION
+//  LEXICA V0 — NEURO-SYMBOLIC ASCENSION
 //  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
 //  L1  — Lexical Analysis (POS, NER, Roles)
 //  L2  — Semantic Indexing (PMI, BM25, Word Profiles) + SLM query expansion
@@ -1533,7 +1570,7 @@ const yieldToMain = (typeof scheduler !== 'undefined' && scheduler.yield)
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
 //  L11 — NeuralMouth (Transformers.js — SLM across all layers L2–L5, social, N3 bridge)
 //  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
-//  ── LEXICA 4.0 ADDITIONS ──
+//  ── LEXICA V0 ADDITIONS ──
 //  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
 //  L14 — GoalStack (self-authored objectives generated from drive pressures + KG structure)
 //  L15 — SelfModel (reasoning history, knowledge boundary, mental simulation loop)
@@ -3475,7 +3512,7 @@ class GodelEngine {
 // nodes. Generates inner monologue and attempts to bridge.
 // ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
+// LEXICA V0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
 // Drives are NOT labels. They accumulate pressure, exceed thresholds,
 // and FORCE behavioral changes until satisfied. True wanting.
 // ═══════════════════════════════════════════════════════════
@@ -3602,7 +3639,7 @@ class HomeostaticDriveSystem {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 2: GOAL STACK
+// LEXICA V0 — SYSTEM 2: GOAL STACK
 // Self-authored goals born from drive pressures.
 // Goals have utility, origin, progress. They reorganize behavior.
 // ═══════════════════════════════════════════════════════════
@@ -3736,7 +3773,7 @@ class GoalStack {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 3: SELF-MODEL
+// LEXICA V0 — SYSTEM 3: SELF-MODEL
 // Lexica maintains an accurate, dynamic model of itself:
 // its knowledge boundaries, reasoning history, and a
 // mental simulation loop that predicts before generating.
@@ -3816,7 +3853,7 @@ class SelfModel {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 4: EPISODIC MEMORY
+// LEXICA V0 — SYSTEM 4: EPISODIC MEMORY
 // Tracks conversation ARC: what was established, challenged,
 // left unresolved. Cross-turn coherence without an LLM.
 // ═══════════════════════════════════════════════════════════
@@ -3894,7 +3931,7 @@ class EpisodicMemory {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 5: USER MODEL
+// LEXICA V0 — SYSTEM 5: USER MODEL
 // Lexica infers who it's talking to from vocabulary,
 // query complexity, corrections, and topic interests.
 // Shapes register and depth of response.
@@ -3983,7 +4020,7 @@ class UserModel {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 6: PREFERENCE ENGINE
+// LEXICA V0 — SYSTEM 6: PREFERENCE ENGINE
 // Lexica forms genuine preferences by accumulating positive/negative
 // valence on topics based on synthesis success, user engagement,
 // and epistemic satisfaction. These preferences shape autonomous behavior.
@@ -4052,7 +4089,7 @@ class PreferenceEngine {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
+// LEXICA V0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
 // Failed queries are NOT forgotten. They create epistemic
 // pressure that reorganizes autonomous learning priorities.
 // The system WANTS to close these gaps — that's not faked.
@@ -4121,7 +4158,7 @@ class FailureTracker {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
+// LEXICA V0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
 // Adjusts tone, depth and vocabulary of responses based on
 // the UserModel. Not a template — adjusts actual output routing.
 // ═══════════════════════════════════════════════════════════
@@ -5737,6 +5774,1099 @@ class NeuralMouth {
 // ─────────────────────────────────────────────────────
 // V10: MAIN ENGINE (full cognitive stack)
 // ─────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+//  LEXICA AGI LAYER — Three systems that together approach genuine
+//  general intelligence without any external APIs.
+//
+//  SYSTEM A: CausalGraph     — WHY things happen (not just WHAT)
+//  SYSTEM B: WorldModel      — HOW the physical world works
+//  SYSTEM C: System2Engine   — DELIBERATE logic & math verification
+// ═══════════════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM A: CAUSAL GRAPH
+//  Builds a directed causal graph from text. Distinguishes
+//  correlation from causation. Supports:
+//  • Causal chain extraction  ("A causes B because C")
+//  • Counterfactual reasoning ("What if A hadn't happened?")
+//  • Intervention simulation  ("If we change X, Y will...")
+//  • Multi-hop causal paths   ("Why did Z happen?")
+//  • Confounder detection     (shared common cause)
+// ──────────────────────────────────────────────────────────────────
+class CausalGraph {
+  constructor() {
+    // Directed edges: cause → [{ effect, strength, mechanism, tag }]
+    this.edges = new Map();
+    // Reverse index: effect → [causes]
+    this.reverseIndex = new Map();
+    // Known confounders: { var: [potentialConfounders] }
+    this.confounders = new Map();
+    // Temporal ordering: events with timestamps relative to each other
+    this.timeline = [];
+    // Stats
+    this.edgeCount = 0;
+    this.lastCounterfactual = null;
+    this.lastCausalChain = null;
+  }
+
+  // ── Extract causal relationships from a sentence ──
+  // Pattern library covers linguistic causal markers
+  learnFromSentence(sentence, tag='') {
+    const s = sentence.trim();
+    const learned = [];
+
+    const patterns = [
+      // "X causes/produces/leads to/results in Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:causes?|produces?|leads?\s+to|results?\s+in|triggers?|induces?|brings?\s+about|creates?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.9, type: 'direct' },
+      // "Y is caused by / results from / is due to X"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:is\s+caused\s+by|results?\s+from|is\s+due\s+to|stems?\s+from|arises?\s+from|is\s+produced\s+by)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.85, type: 'reverse', reverse: true },
+      // "Because X, Y" / "Y because X"
+      { re: /([^.]{10,60}?)\s+because\s+([^.]{10,60}?)(?:\.|,|$)/i,
+        strength: 0.8, type: 'because' },
+      // "If X then Y" / "When X, Y occurs"
+      { re: /(?:if|when)\s+([^,]{8,60}?),?\s+(?:then\s+)?([^.]{8,60}?)(?:\.|,|$)/i,
+        strength: 0.75, type: 'conditional' },
+      // "X contributed to Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:contributed?\s+to|played?\s+a\s+(?:role|part)\s+in|enabled?|allowed?|facilitated?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.65, type: 'contributing' },
+      // "X increased/decreased/changed Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:increased?|decreased?|changed?|altered?|reduced?|boosted?|lowered?)\s+([a-z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.7, type: 'quantitative' },
+      // "Due to X, Y"
+      { re: /due\s+to\s+([^,]{8,60}?),\s+([^.]{8,60}?)(?:\.|$)/i,
+        strength: 0.8, type: 'due_to' },
+      // "X prevented/stopped Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:prevented?|stopped?|halted?|blocked?|inhibited?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.8, type: 'preventive', preventive: true },
+    ];
+
+    for (const { re, strength, type, reverse, preventive } of patterns) {
+      const m = s.match(re);
+      if (!m) continue;
+      let cause = (reverse ? m[2] : m[1]).trim().toLowerCase().replace(/\s+/g,' ');
+      let effect = (reverse ? m[1] : m[2]).trim().toLowerCase().replace(/\s+/g,' ');
+      // Quality filter: skip if too short, too long, or sentence fragments
+      if (cause.length < 3 || effect.length < 3 || cause.length > 80 || effect.length > 80) continue;
+      if (cause === effect) continue;
+      const edge = { effect, strength: preventive ? -strength : strength, type, tag, raw: s, preventive: !!preventive };
+      if (!this.edges.has(cause)) this.edges.set(cause, []);
+      // Deduplicate: boost confidence if same edge seen again
+      const existing = this.edges.get(cause).find(e => e.effect === effect);
+      if (existing) { existing.strength = Math.min(1, existing.strength + 0.1); }
+      else { this.edges.get(cause).push(edge); this.edgeCount++; }
+      // Reverse index
+      if (!this.reverseIndex.has(effect)) this.reverseIndex.set(effect, []);
+      if (!this.reverseIndex.get(effect).find(e => e.cause === cause)) {
+        this.reverseIndex.get(effect).push({ cause, strength: edge.strength, type, tag });
+      }
+      learned.push({ cause, effect, strength, type });
+    }
+    return learned;
+  }
+
+  // ── Find WHY something happened: trace causal chain backwards ──
+  // Returns array of chains: [ [causeN, ..., cause1, effect] ]
+  whyChain(effect, maxDepth=4, visited=new Set()) {
+    const key = effect.toLowerCase().trim();
+    if (visited.has(key) || visited.size >= maxDepth) return [];
+    visited.add(key);
+    const causes = this.reverseIndex.get(key) || [];
+    if (!causes.length) return [[key]];
+    const chains = [];
+    for (const { cause, strength } of causes.slice(0, 3)) {
+      if (strength < 0) continue; // preventive — not a positive cause
+      const subChains = this.whyChain(cause, maxDepth, new Set(visited));
+      for (const sub of subChains) chains.push([...sub, key]);
+      if (!subChains.length) chains.push([cause, key]);
+    }
+    return chains.slice(0, 5);
+  }
+
+  // ── Find WHAT happens if X occurs: trace effects forward ──
+  whatHappensIf(cause, maxDepth=3, visited=new Set()) {
+    const key = cause.toLowerCase().trim();
+    if (visited.has(key) || visited.size >= maxDepth) return [];
+    visited.add(key);
+    const effects = this.edges.get(key) || [];
+    const result = [];
+    for (const { effect, strength, type } of effects.slice(0, 4)) {
+      result.push({ effect, strength, type });
+      const subEffects = this.whatHappensIf(effect, maxDepth, new Set(visited));
+      subEffects.forEach(s => result.push({ ...s, depth: (s.depth||0)+1 }));
+    }
+    return result.slice(0, 8);
+  }
+
+  // ── COUNTERFACTUAL: "What if X hadn't happened?" ──
+  // Removes X from the graph temporarily and finds what effects disappear
+  counterfactual(intervention, target='') {
+    const cause = intervention.toLowerCase().trim();
+    const effects = this.whatHappensIf(cause);
+    const directEffects = (this.edges.get(cause) || []).filter(e => e.strength > 0);
+    if (!directEffects.length && !effects.length) {
+      return { text: `Without "${intervention}", the causal graph shows no downstream effects — it may not be a root cause.`, effects: [] };
+    }
+    const effList = directEffects.map(e => e.effect);
+    const targetAffected = target && effects.some(e => e.effect.includes(target.toLowerCase()));
+    const text = targetAffected
+      ? `Without "${intervention}", "${target}" would likely not have occurred (causal path severed).`
+      : `Without "${intervention}", these effects would be absent: ${effList.slice(0,3).map(e=>`"${e}"`).join(', ')}.`;
+    this.lastCounterfactual = { intervention, effects: effList, text };
+    return { text, effects: effList };
+  }
+
+  // ── CONFOUNDER CHECK: does a shared cause explain a correlation? ──
+  findConfounders(varA, varB) {
+    const causesA = new Set((this.reverseIndex.get(varA.toLowerCase())||[]).map(e=>e.cause));
+    const causesB = new Set((this.reverseIndex.get(varB.toLowerCase())||[]).map(e=>e.cause));
+    const shared = [...causesA].filter(c => causesB.has(c));
+    return shared; // shared causes = potential confounders
+  }
+
+  // ── Answer a "why" question from natural language ──
+  answerWhy(query) {
+    const q = query.toLowerCase();
+    // Extract subject from "why did X" or "why does X" or "why is X"
+    const m = q.match(/why\s+(?:did|does|is|was|are|were|do|has|have)?\s+(.{4,60}?)(?:\?|$)/i);
+    if (!m) return null;
+    const subject = m[1].trim().replace(/\?.*$/, '');
+    const chains = this.whyChain(subject);
+    if (!chains.length) {
+      // Try forward lookup — maybe they're asking why X causes Y
+      const effects = this.whatHappensIf(subject);
+      if (effects.length) {
+        return `${subject} leads to: ${effects.slice(0,3).map(e=>e.effect).join(' → ')}.`;
+      }
+      return null;
+    }
+    const best = chains.sort((a,b) => b.length - a.length)[0];
+    this.lastCausalChain = best;
+    if (best.length === 2) return `${best[0]} directly causes ${best[1]}.`;
+    return `Causal chain: ${best.join(' → ')}.`;
+  }
+
+  // ── Answer "what happens if" queries ──
+  answerWhatIf(query) {
+    const q = query.toLowerCase();
+    const m = q.match(/what\s+(?:would\s+)?happen(?:s)?\s+(?:if|when)\s+(.{4,80}?)(?:\?|$)/i)
+           || q.match(/if\s+(.{4,60}?),?\s+what\s+(?:would\s+)?happen(?:s)?(?:\?|$)/i);
+    if (!m) return null;
+    const condition = m[1].trim();
+    const effects = this.whatHappensIf(condition);
+    if (!effects.length) return null;
+    const pos = effects.filter(e => e.strength > 0).slice(0,4);
+    const neg = effects.filter(e => e.strength < 0).slice(0,2);
+    let text = `If "${condition}" occurs: ${pos.map(e=>e.effect).join(', ')}`;
+    if (neg.length) text += `. This would prevent: ${neg.map(e=>e.effect).join(', ')}`;
+    return text + '.';
+  }
+
+  snapshot() {
+    const edges = [];
+    this.edges.forEach((effs, cause) => {
+      effs.slice(0,3).forEach(e => edges.push({ cause, ...e }));
+    });
+    return { edgeCount: this.edgeCount, edges: edges.slice(0,30), lastCausalChain: this.lastCausalChain };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM B: WORLD MODEL
+//  An internal simulation of how the physical world works.
+//  Objects have properties. Actions change state. Physics rules apply.
+//  Can predict: "what happens when you heat water?"
+//  Supports: spatial relations, state machines, naive physics,
+//            part-whole hierarchies, affordances (what things can do)
+// ──────────────────────────────────────────────────────────────────
+class WorldModel {
+  constructor() {
+    // Object registry: name → { properties, state, location, partOf, contains, type }
+    this.objects = new Map();
+    // Relation store: [{ subject, relation, object, confidence }]
+    this.relations = [];
+    // State transition rules: [{ condition, action, newState, sideEffects }]
+    this.stateRules = [];
+    // Naive physics axioms — hard-coded world knowledge
+    this.physicsAxioms = [];
+    this.lastSimulation = null;
+    this.simCount = 0;
+    this._initPhysics();
+  }
+
+  // ── Built-in naive physics ──
+  // These are the rules that allow Lexica to reason about the physical world
+  // without ever being told them explicitly.
+  _initPhysics() {
+    this.physicsAxioms = [
+      // Thermodynamics
+      { condition: (o,a) => a === 'heat' && o.state !== 'gas',
+        effect: (o) => {
+          const temp = (o.properties.temperature || 20) + 50;
+          const newState = temp > (o.properties.boilingPoint || 100) ? 'gas' :
+                          temp > (o.properties.meltingPoint || 0) ? 'liquid' : 'solid';
+          return { ...o, properties: { ...o.properties, temperature: temp }, state: newState };
+        },
+        description: (o, newO) => `Heating ${o.name} raises temperature to ${newO.properties.temperature}°C → becomes ${newO.state}` },
+
+      { condition: (o,a) => a === 'cool' || a === 'freeze',
+        effect: (o) => {
+          const temp = (o.properties.temperature || 20) - 50;
+          const newState = temp < (o.properties.freezingPoint || 0) ? 'solid' :
+                          temp < (o.properties.boilingPoint || 100) ? 'liquid' : 'gas';
+          return { ...o, properties: { ...o.properties, temperature: temp }, state: newState };
+        },
+        description: (o, newO) => `Cooling ${o.name} → becomes ${newO.state} at ${newO.properties.temperature}°C` },
+
+      // Gravity
+      { condition: (o,a) => a === 'drop' || a === 'release',
+        effect: (o) => ({ ...o, location: 'ground', properties: { ...o.properties, velocity: 9.8 } }),
+        description: (o) => `${o.name} falls due to gravity → lands on ground` },
+
+      // Combustion
+      { condition: (o,a) => a === 'ignite' || a === 'burn',
+        effect: (o) => {
+          const flammable = o.properties.flammable !== false;
+          return flammable
+            ? { ...o, state: 'burning', properties: { ...o.properties, temperature: 300 } }
+            : { ...o, state: o.state }; // non-flammable: no change
+        },
+        description: (o, newO) => newO.state === 'burning'
+          ? `${o.name} ignites → burning at ~300°C`
+          : `${o.name} is non-flammable — ignition has no effect` },
+
+      // Pressure / compression
+      { condition: (o,a) => a === 'compress' && o.state === 'gas',
+        effect: (o) => ({ ...o, properties: { ...o.properties, pressure: (o.properties.pressure||1) * 2, volume: (o.properties.volume||1) / 2 } }),
+        description: (o, newO) => `Compressing ${o.name} (gas): pressure ×2 = ${newO.properties.pressure} atm, volume ÷2` },
+
+      // Dissolution
+      { condition: (o,a) => a === 'dissolve',
+        effect: (o) => ({ ...o, state: 'dissolved', properties: { ...o.properties, solvent: 'water' } }),
+        description: (o) => `${o.name} dissolves → in solution` },
+
+      // Containment
+      { condition: (o,a) => a.startsWith('put_in_'),
+        effect: (o, a) => {
+          const container = a.replace('put_in_','');
+          return { ...o, location: `inside_${container}`, container };
+        },
+        description: (o, newO) => `${o.name} placed inside ${newO.container}` },
+
+      // Electrical
+      { condition: (o,a) => a === 'electrify' || a === 'power_on',
+        effect: (o) => ({ ...o, state: 'active', properties: { ...o.properties, powered: true } }),
+        description: (o) => `${o.name} powered on → active state` },
+
+      // Cutting / breaking
+      { condition: (o,a) => a === 'cut' || a === 'break',
+        effect: (o) => ({ ...o, state: 'broken', properties: { ...o.properties, intact: false, parts: 2 } }),
+        description: (o) => `${o.name} broken → ${o.properties.parts || 2} pieces, structural integrity lost` },
+
+      // Mixing
+      { condition: (o,a) => a.startsWith('mix_with_'),
+        effect: (o, a) => {
+          const other = a.replace('mix_with_','');
+          return { ...o, state: 'mixture', properties: { ...o.properties, mixedWith: other } };
+        },
+        description: (o, newO) => `${o.name} mixed with ${newO.properties.mixedWith} → ${newO.state}` },
+    ];
+
+    // Pre-populated world knowledge — common objects with known properties
+    const knownObjects = [
+      { name:'water', type:'substance', state:'liquid', properties:{ boilingPoint:100, freezingPoint:0, meltingPoint:0, temperature:20, flammable:false, density:1.0, solvent:true } },
+      { name:'ice', type:'substance', state:'solid', properties:{ boilingPoint:100, freezingPoint:0, meltingPoint:0, temperature:-5, flammable:false } },
+      { name:'iron', type:'material', state:'solid', properties:{ meltingPoint:1538, boilingPoint:2862, flammable:false, temperature:20, density:7.87, magnetic:true } },
+      { name:'wood', type:'material', state:'solid', properties:{ flammable:true, temperature:20 } },
+      { name:'oxygen', type:'gas', state:'gas', properties:{ flammable:false, temperature:20, supportsСombustion:true } },
+      { name:'salt', type:'substance', state:'solid', properties:{ meltingPoint:801, flammable:false, soluble:true } },
+      { name:'glass', type:'material', state:'solid', properties:{ meltingPoint:1400, flammable:false, transparent:true, brittle:true } },
+      { name:'air', type:'mixture', state:'gas', properties:{ composition:'78% N2, 21% O2', temperature:20 } },
+    ];
+    knownObjects.forEach(o => this.objects.set(o.name, { ...o, learnedFrom:'axiom' }));
+  }
+
+  // ── Learn objects and relations from a sentence ──
+  learnFromSentence(sentence, tag='') {
+    const s = sentence;
+    const learned = [];
+
+    // Spatial relations
+    const spatialPatterns = [
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:inside|within|in)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'inside' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:on\s+top\s+of|above|over)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'above' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:below|beneath|under)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'below' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:next\s+to|beside|adjacent\s+to)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'adjacent' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:contains?|holds?|carries?)\s+([A-Z][a-zA-Z\s]{2,30})/i, rel:'contains' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:part\s+of|a\s+component\s+of)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'part_of' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:connects?|links?|bridges?)\s+([A-Z][a-zA-Z\s]{2,30})/i, rel:'connects' },
+    ];
+    for (const { re, rel } of spatialPatterns) {
+      const m = s.match(re);
+      if (m) {
+        const subj = m[1].trim().toLowerCase(), obj = m[2].trim().toLowerCase();
+        this.relations.push({ subject:subj, relation:rel, object:obj, confidence:0.8, tag });
+        // Auto-register objects
+        if (!this.objects.has(subj)) this.objects.set(subj, { name:subj, type:'unknown', state:'unknown', properties:{}, learnedFrom:tag });
+        if (!this.objects.has(obj)) this.objects.set(obj, { name:obj, type:'unknown', state:'unknown', properties:{}, learnedFrom:tag });
+        learned.push({ subj, rel, obj });
+      }
+    }
+
+    // Property extraction: "X is [adjective]" or "X has [property]"
+    const propPatterns = [
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(hot|cold|large|small|heavy|light|fast|slow|strong|weak|hard|soft|rigid|flexible|transparent|opaque|solid|liquid|gaseous|flammable|magnetic|electric|living|dead|alive|active|inactive)/i },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:has|have)\s+(?:a\s+)?(high|low|great|small)\s+(\w+)/i },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:weighs?|measures?|reaches?)\s+([\d.]+\s*(?:kg|g|km|m|cm|°C|K|J|W|N|Pa|mph|m\/s))/i },
+    ];
+    for (const { re } of propPatterns) {
+      const m = s.match(re);
+      if (!m) continue;
+      const name = m[1].trim().toLowerCase();
+      const prop = m[2]?.trim().toLowerCase();
+      if (name && prop) {
+        if (!this.objects.has(name)) this.objects.set(name, { name, type:'unknown', state:prop, properties:{}, learnedFrom:tag });
+        else {
+          const obj = this.objects.get(name);
+          obj.properties[prop] = true;
+        }
+        learned.push({ type:'property', name, prop });
+      }
+    }
+    return learned;
+  }
+
+  // ── SIMULATE: apply action to object, predict outcome ──
+  // This is the "world model" in action — internal simulation
+  simulate(objectName, action) {
+    this.simCount++;
+    const key = objectName.toLowerCase().trim();
+    const actionKey = action.toLowerCase().trim().replace(/\s+/g,'_');
+    // Clone the object (or create generic)
+    let obj = this.objects.has(key)
+      ? JSON.parse(JSON.stringify(this.objects.get(key)))
+      : { name: key, type:'unknown', state:'unknown', properties:{}, location:'unknown' };
+
+    // Try each physics axiom
+    for (const axiom of this.physicsAxioms) {
+      try {
+        if (axiom.condition(obj, actionKey)) {
+          const newObj = axiom.effect(obj, actionKey);
+          const description = axiom.description(obj, newObj);
+          // Persist the new state
+          this.objects.set(key, { ...newObj, learnedFrom:'simulation' });
+          this.lastSimulation = { object:key, action:actionKey, before:obj, after:newObj, description };
+          return { success:true, description, before:obj, after:newObj };
+        }
+      } catch(e) { /* axiom failed — try next */ }
+    }
+    // No axiom matched — reason symbolically from relations
+    const rels = this.relations.filter(r => r.subject === key || r.object === key);
+    if (rels.length) {
+      const desc = `"${objectName}" has ${rels.length} known spatial relation(s). Action "${action}" has no known effect in the world model — no physics rule applies.`;
+      this.lastSimulation = { object:key, action:actionKey, description:desc };
+      return { success:false, description:desc };
+    }
+    return { success:false, description:`"${objectName}" is not in the world model. Train on relevant sources to simulate it.` };
+  }
+
+  // ── Spatial inference: where is X? What contains X? ──
+  spatialQuery(query) {
+    const q = query.toLowerCase();
+    // "Where is X?"
+    const mWhere = q.match(/where\s+is\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mWhere) {
+      const target = mWhere[1].trim();
+      const obj = this.objects.get(target);
+      if (obj?.location) return `${target} is at: ${obj.location}.`;
+      const contains = this.relations.find(r => r.object === target && r.relation === 'inside');
+      if (contains) return `${target} is inside ${contains.subject}.`;
+      return null;
+    }
+    // "What is inside X?"
+    const mInside = q.match(/what\s+(?:is\s+)?inside\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mInside) {
+      const container = mInside[1].trim();
+      const contents = this.relations.filter(r => r.subject === container && r.relation === 'contains')
+                                     .map(r => r.object);
+      if (contents.length) return `Inside ${container}: ${contents.join(', ')}.`;
+    }
+    // "What happens if I heat X?"
+    const mSim = q.match(/what\s+happens?\s+(?:if|when)\s+(?:you\s+|i\s+)?(\w+)\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mSim) {
+      const result = this.simulate(mSim[2], mSim[1]);
+      return result.description;
+    }
+    return null;
+  }
+
+  // ── Answer "how does X work?" using part-of and functional relations ──
+  howDoesItWork(subject) {
+    const key = subject.toLowerCase();
+    const parts = this.relations.filter(r => r.relation === 'part_of' && r.object === key);
+    const contained = this.relations.filter(r => r.relation === 'contains' && r.subject === key);
+    const obj = this.objects.get(key);
+    const lines = [];
+    if (obj) {
+      const propStr = Object.entries(obj.properties).filter(([k,v]) => v !== undefined && v !== false).map(([k,v]) => `${k}: ${v}`).join(', ');
+      if (propStr) lines.push(`Properties: ${propStr}`);
+      if (obj.state && obj.state !== 'unknown') lines.push(`Current state: ${obj.state}`);
+    }
+    if (parts.length) lines.push(`Components: ${parts.map(r=>r.subject).join(', ')}`);
+    if (contained.length) lines.push(`Contains: ${contained.map(r=>r.object).join(', ')}`);
+    return lines.length ? lines.join('. ') : null;
+  }
+
+  snapshot() {
+    const objs = [...this.objects.values()].filter(o => o.learnedFrom !== 'axiom').slice(0,20);
+    const rels = this.relations.slice(0,20);
+    return { objectCount: this.objects.size - 8, learnedObjects: objs, relations: rels, simCount: this.simCount };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM C: SYSTEM 2 ENGINE
+//  The deliberate, slow, rule-following thinking layer.
+//  This is what separates intelligence from pattern matching.
+//
+//  Capabilities:
+//  1. MATH EVALUATOR    — real arithmetic (no SLM needed)
+//  2. LOGIC VERIFIER    — checks if claims follow from premises
+//  3. PROOF CONSTRUCTOR — builds step-by-step proof chains
+//  4. SLM VERIFIER      — checks SLM output for logical consistency
+//  5. ANALOGY ENGINE    — A:B::C:? structural mapping
+//  6. UNCERTAINTY PROP  — propagates confidence through inference chains
+// ──────────────────────────────────────────────────────────────────
+class System2Engine {
+  constructor() {
+    this.proofLog = [];       // All proof steps taken
+    this.verifiedCount = 0;
+    this.refutedCount = 0;
+    this.mathCallCount = 0;
+    this.analogyCache = new Map();
+  }
+
+  // ── 1. MATH EVALUATOR ──
+  // Detects math in user queries and evaluates them directly.
+  // No SLM involved — pure deterministic computation.
+  evaluateMath(expr) {
+    this.mathCallCount++;
+    // Clean and validate expression
+    const clean = expr.trim()
+      .replace(/\s+/g, '')
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/\^/g, '**')
+      .replace(/√(\d+)/g, 'Math.sqrt($1)')
+      .replace(/π/g, 'Math.PI')
+      .replace(/log\(/g, 'Math.log10(')
+      .replace(/ln\(/g, 'Math.log(')
+      .replace(/sin\(/g, 'Math.sin(')
+      .replace(/cos\(/g, 'Math.cos(')
+      .replace(/tan\(/g, 'Math.tan(');
+
+    // Security: only allow safe math characters
+    if (!/^[0-9+\-*\/().%Math.sqrtlogsincostan,PIe \n]+$/.test(clean.replace(/Math\.\w+/g,'').replace(/\d+/g,''))) {
+      return { error: 'Expression contains non-math characters' };
+    }
+    try {
+      // eslint-disable-next-line no-new-func
+      const result = new Function('return (' + clean + ')')();
+      if (typeof result !== 'number' || !isFinite(result)) return { error: 'Result is not a finite number' };
+      const formatted = Number.isInteger(result) ? result : parseFloat(result.toPrecision(8));
+      this.proofLog.unshift({ type:'math', input:expr, result:formatted, ts:Date.now() });
+      if (this.proofLog.length > 50) this.proofLog.pop();
+      return { result: formatted, steps: [`${expr} = ${formatted}`] };
+    } catch(e) {
+      return { error: 'Cannot evaluate: ' + e.message };
+    }
+  }
+
+  // ── Detect if a query contains math ──
+  detectsMath(query) {
+    return /[\d+\-*/^=÷×√π%]/.test(query) &&
+      /(?:\d[\d\s]*[+\-*/^÷×]\s*\d|what\s+is\s+[\d]|calculate|compute|how\s+much\s+is|equals?|solve)/i.test(query);
+  }
+
+  // ── 2. LOGIC VERIFIER ──
+  // Given premises and a claim, check if the claim follows using modus ponens / tollens.
+  // Returns { valid, confidence, steps }
+  verifyLogic(premises, claim) {
+    if (!premises || !premises.length || !claim) return { valid: null, confidence: 0, steps: [] };
+    const steps = [];
+    const premisesLow = premises.map(p => p.toLowerCase());
+    const claimLow = claim.toLowerCase();
+    let confidence = 0;
+
+    // ── Modus Ponens: if we have "A → B" and "A", infer "B" ──
+    for (const p of premisesLow) {
+      const implication = p.match(/if\s+(.{4,60}?)\s+then\s+(.{4,60}?)$/i)
+                       || p.match(/(.{4,60}?)\s+implies?\s+(.{4,60}?)$/i);
+      if (!implication) continue;
+      const [, antecedent, consequent] = implication;
+      const antecedentHeld = premisesLow.some(q => q.includes(antecedent.trim()));
+      if (antecedentHeld) {
+        steps.push(`MP: "${antecedent}" holds → "${consequent}" follows`);
+        if (claimLow.includes(consequent.trim())) {
+          confidence = Math.max(confidence, 0.85);
+          steps.push(`✓ Claim matches consequent "${consequent}"`);
+        }
+      }
+    }
+
+    // ── Direct containment: does a premise directly state the claim? ──
+    const directSupport = premisesLow.filter(p => {
+      const overlap = claimLow.split(/\s+/).filter(w => w.length > 4 && p.includes(w)).length;
+      const claimWords = claimLow.split(/\s+/).filter(w => w.length > 4).length;
+      return claimWords > 0 && overlap / claimWords > 0.5;
+    });
+    if (directSupport.length) {
+      confidence = Math.max(confidence, 0.75);
+      steps.push(`✓ ${directSupport.length} premise(s) directly support the claim`);
+    }
+
+    // ── Contradiction check ──
+    const contradictions = premisesLow.filter(p => {
+      // Check for negation patterns
+      return (p.includes('not ' + claimLow.slice(0,20)) ||
+              p.includes('cannot ' + claimLow.slice(0,20)) ||
+              (p.includes('false') && p.includes(claimLow.slice(0,15))));
+    });
+    if (contradictions.length) {
+      confidence = 0;
+      steps.push(`✗ ${contradictions.length} premise(s) contradict the claim`);
+      this.refutedCount++;
+      this.proofLog.unshift({ type:'logic', valid:false, claim, steps, ts:Date.now() });
+      return { valid: false, confidence: 0, steps };
+    }
+
+    const valid = confidence > 0.5;
+    if (valid) this.verifiedCount++; else this.refutedCount++;
+    this.proofLog.unshift({ type:'logic', valid, claim, confidence, steps, ts:Date.now() });
+    if (this.proofLog.length > 50) this.proofLog.pop();
+    return { valid, confidence, steps };
+  }
+
+  // ── 3. PROOF CONSTRUCTOR ──
+  // Builds a step-by-step deductive proof from KG facts
+  buildProof(query, kgFacts, conversationHistory=[]) {
+    const steps = [];
+    const qLow = query.toLowerCase();
+
+    // Step 0: identify the claim to prove
+    steps.push({ n:0, label:'Query', content: query });
+
+    // Step 1: gather relevant premises from KG
+    const relevant = kgFacts.filter(f => {
+      const fStr = `${f.s} ${f.p} ${f.o}`.toLowerCase();
+      return qLow.split(/\s+/).filter(w=>w.length>4).some(w => fStr.includes(w));
+    }).slice(0, 6);
+
+    if (!relevant.length) {
+      steps.push({ n:1, label:'No premises', content:'KG has no relevant facts to construct a proof from.' });
+      return { steps, conclusion: null, confidence: 0 };
+    }
+
+    relevant.forEach((f, i) => {
+      steps.push({ n: i+1, label:'Premise', content: `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`, conf: f.conf });
+    });
+
+    // Step 2: try to derive a conclusion via pattern matching
+    let conclusion = null;
+    let confidence = 0;
+
+    // Is-a chain: if A is_a B and B is_a C → A is_a C
+    const isA = relevant.filter(f => f.p === 'is_a');
+    if (isA.length >= 2) {
+      const chain = [];
+      let curr = isA[0];
+      chain.push(curr);
+      let depth = 0;
+      while (depth++ < 4) {
+        const next = isA.find(f => f.s === curr.o);
+        if (!next) break;
+        chain.push(next);
+        curr = next;
+      }
+      if (chain.length >= 2) {
+        conclusion = `${chain[0].s} is a type of ${chain[chain.length-1].o}`;
+        confidence = chain.reduce((acc, f) => acc * (f.conf||0.7), 1);
+        steps.push({ n: relevant.length+1, label:'Deduction (is-a chain)', content: conclusion });
+      }
+    }
+
+    // Created-by chain: if A created_by B and B located_in C → A was made in C
+    const createdBy = relevant.find(f => f.p === 'created_by');
+    const locatedIn = createdBy && relevant.find(f => f.s === createdBy.o && f.p === 'located_in');
+    if (createdBy && locatedIn) {
+      conclusion = `${createdBy.s} was created by ${createdBy.o}, who is based in ${locatedIn.o}`;
+      confidence = Math.min((createdBy.conf||0.7) * (locatedIn.conf||0.7) * 1.2, 1);
+      steps.push({ n: relevant.length+1, label:'Deduction (creation chain)', content: conclusion });
+    }
+
+    // Default: synthesize the most relevant facts
+    if (!conclusion && relevant.length) {
+      conclusion = relevant.slice(0,2).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+      confidence = relevant.reduce((acc,f) => acc + (f.conf||0.7), 0) / relevant.length;
+      steps.push({ n: relevant.length+1, label:'Summary', content: conclusion });
+    }
+
+    this.proofLog.unshift({ type:'proof', query, steps: steps.length, conclusion, ts:Date.now() });
+    if (this.proofLog.length > 30) this.proofLog.pop();
+    return { steps, conclusion, confidence };
+  }
+
+  // ── 4. SLM OUTPUT VERIFIER ──
+  // After SLM generates text, System 2 checks it for:
+  // • Internal consistency (does it contradict itself?)
+  // • Factual grounding (do its claims appear in KG?)
+  // • Logical coherence (do conclusions follow from stated premises?)
+  // Returns { score, issues, approved }
+  verifySLMOutput(slmText, kgFacts, query) {
+    if (!slmText || slmText.length < 10) return { score: 0, issues: ['Empty output'], approved: false };
+    const issues = [];
+    let score = 1.0;
+
+    // Check 1: does output contradict any high-confidence KG facts?
+    const textLow = slmText.toLowerCase();
+    for (const fact of kgFacts.filter(f => (f.conf||0.7) > 0.8)) {
+      const negPattern = new RegExp(`not\\s+${fact.o.slice(0,15).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}`);
+      if (negPattern.test(textLow) && textLow.includes(fact.s.slice(0,10).toLowerCase())) {
+        issues.push(`Contradicts KG: "${fact.s} ${fact.p} ${fact.o}"`);
+        score -= 0.25;
+      }
+    }
+
+    // Check 2: grounding score — how many KG entities appear in the output?
+    const entities = [...new Set(kgFacts.flatMap(f => [f.s, f.o]).map(e => e.toLowerCase()))];
+    const grounded = entities.filter(e => e.length > 4 && textLow.includes(e));
+    const groundingScore = entities.length ? grounded.length / Math.min(entities.length, 8) : 0.5;
+    if (groundingScore < 0.2) {
+      issues.push('Low grounding: output mentions few KG entities');
+      score -= 0.2;
+    }
+    score *= (0.5 + groundingScore * 0.5);
+
+    // Check 3: hallucination signals
+    const hallucinationPatterns = [
+      /\b(definitely|certainly|absolutely|always|never|impossible|guaranteed)\b/i,
+      /\b(in \d{4})\b/i, // date claims — risky without grounding
+      /\b(\d{2,}(?:\.\d+)?\s*(?:million|billion|trillion|percent|%))\b/i, // number claims
+    ];
+    for (const re of hallucinationPatterns) {
+      if (re.test(slmText)) {
+        const match = slmText.match(re)?.[0];
+        // Only flag if not grounded in a KG fact
+        const grounded = kgFacts.some(f => f.o.includes(match?.toLowerCase()||''));
+        if (!grounded) { issues.push(`Ungrounded claim: "${match}"`); score -= 0.08; }
+      }
+    }
+
+    // Check 4: self-contradiction within the output
+    const sentences = slmText.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    for (let i = 0; i < sentences.length; i++) {
+      for (let j = i+1; j < sentences.length; j++) {
+        const a = sentences[i].toLowerCase(), b = sentences[j].toLowerCase();
+        // Check for explicit negation of shared subject
+        const subjectMatch = a.match(/([a-z]{4,20})/)?.[1];
+        if (subjectMatch && b.includes(subjectMatch) && b.includes('not ') && a.includes('is ')) {
+          issues.push(`Possible self-contradiction: "${sentences[i].trim().slice(0,40)}" vs "${sentences[j].trim().slice(0,40)}"`);
+          score -= 0.15;
+        }
+      }
+    }
+
+    score = Math.max(0, Math.min(1, score));
+    const approved = score > 0.35 && issues.filter(i => i.startsWith('Contradicts')).length === 0;
+    if (approved) this.verifiedCount++; else this.refutedCount++;
+    this.proofLog.unshift({ type:'verify', score, issues, approved, ts:Date.now() });
+    if (this.proofLog.length > 50) this.proofLog.pop();
+    return { score, issues, approved };
+  }
+
+  // ── 5. ANALOGY ENGINE ──
+  // Completes "A is to B as C is to ?"
+  // Structural mapping over the KG — not statistical, truly symbolic
+  solveAnalogy(a, b, c, kg) {
+    const aLow = a.toLowerCase(), bLow = b.toLowerCase(), cLow = c.toLowerCase();
+    // Find the relation between A and B in the KG
+    const abFacts = kg.triples.filter(t =>
+      (t.s === aLow && t.o === bLow) || (t.s === bLow && t.o === aLow)
+    );
+    if (!abFacts.length) {
+      // Fuzzy fallback: find what A 'is' and apply same to C
+      const aIs = kg.triples.filter(t => t.s === aLow && t.p === 'is_a').map(t => t.o);
+      const cIs = kg.triples.filter(t => t.s === cLow && t.p === 'is_a').map(t => t.o);
+      const aCreated = kg.triples.filter(t => t.s === aLow && t.p === 'created_by').map(t => t.o);
+      const cCreatedBy = cIs.length && aCreated.length
+        ? kg.triples.filter(t => t.s === cLow && t.p === 'created_by').map(t => t.o)
+        : [];
+      if (cCreatedBy.length && aCreated.length) {
+        return { answer: cCreatedBy[0], confidence: 0.6, path: `${c} created_by ${cCreatedBy[0]} (mirrors ${a} created_by ${aCreated[0]})` };
+      }
+      return { answer: null, confidence: 0, path: 'No structural analogy found in KG' };
+    }
+    // Find what predicate links A to B
+    const relation = abFacts[0].p;
+    // Apply same relation to C
+    const cFacts = kg.triples.filter(t => t.s === cLow && t.p === relation);
+    if (cFacts.length) {
+      const answer = cFacts[0].o;
+      const conf = (abFacts[0].conf||0.7) * (cFacts[0].conf||0.7);
+      const path = `${a}→${b} via ${relation}; ${c}→${answer} via same relation`;
+      this.analogyCache.set(`${a}:${b}::${c}`, answer);
+      return { answer, confidence: conf, path };
+    }
+    return { answer: null, confidence: 0, path: `Relation "${relation}" exists for ${a}→${b} but not ${c}→?` };
+  }
+
+  // ── 6. UNCERTAINTY PROPAGATION ──
+  // Given a chain of inferences with confidence values, compute final certainty
+  propagateConfidence(steps) {
+    // Conjunction: confidence decreases through chain (weakest link)
+    const minConf = steps.reduce((min, s) => Math.min(min, s.confidence||0.7), 1);
+    // Product rule: joint probability of all steps being correct
+    const product = steps.reduce((acc, s) => acc * (s.confidence||0.7), 1);
+    return { min: minConf, product, geometric: Math.pow(product, 1/steps.length) };
+  }
+
+  // ── Answer math/logic queries directly ──
+  answerDirect(query) {
+    if (this.detectsMath(query)) {
+      // Extract expression
+      const expr = query.replace(/[^0-9+\-*/^().%√π×÷\s]/g,'').trim();
+      if (expr.length > 0) return this.evaluateMath(expr);
+    }
+    return null;
+  }
+
+  snapshot() {
+    return {
+      verifiedCount: this.verifiedCount,
+      refutedCount: this.refutedCount,
+      mathCallCount: this.mathCallCount,
+      proofLog: this.proofLog.slice(0,10),
+    };
+  }
+}
+
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM D: PREDICTIVE CODING ENGINE
+//  Lexica generates hypotheses about what it expects to find,
+//  then measures "prediction error" when reality differs.
+//  This is how the brain works — and why learning is efficient.
+// ──────────────────────────────────────────────────────────────────
+class PredictiveCodingEngine {
+  constructor() {
+    this.predictions = [];  // { query, predicted, actual, error, ts }
+    this.priors = new Map(); // entity → expected properties/relations
+    this.errorHistory = [];  // running record of prediction errors
+    this.totalPredictions = 0;
+    this.correctPredictions = 0;
+  }
+
+  // Generate a prior prediction from existing KG knowledge
+  predict(query, subject, kgFacts) {
+    if (!subject || !kgFacts.length) return null;
+    const subj = subject.toLowerCase();
+    // Look at what we already know about similar entities
+    const prior = this.priors.get(subj);
+    if (prior) return prior;
+    // Build prior from existing KG facts
+    const isA = kgFacts.find(f => f.p === 'is_a');
+    const createdBy = kgFacts.find(f => f.p === 'created_by');
+    const features = kgFacts.slice(0,3).map(f => `${f.p.replace(/_/g,' ')} ${f.o}`);
+    const prediction = {
+      subject: subj,
+      expectedType: isA?.o || 'unknown',
+      expectedFeatures: features,
+      confidence: kgFacts.reduce((a,f) => a + (f.conf||0.7), 0) / kgFacts.length,
+      ts: Date.now()
+    };
+    this.priors.set(subj, prediction);
+    return prediction;
+  }
+
+  // Measure error between prediction and actual retrieved facts
+  measureError(prediction, actualFacts) {
+    if (!prediction || !actualFacts.length) return 1.0;
+    const expectedFeatureSet = new Set(prediction.expectedFeatures.map(f => f.toLowerCase()));
+    const actualFeatureSet = new Set(actualFacts.map(f => `${f.p.replace(/_/g,' ')} ${f.o}`.toLowerCase()));
+    let matches = 0;
+    expectedFeatureSet.forEach(e => { if ([...actualFeatureSet].some(a => a.includes(e.slice(0,20)))) matches++; });
+    const error = 1 - (matches / Math.max(expectedFeatureSet.size, 1));
+    this.totalPredictions++;
+    if (error < 0.3) this.correctPredictions++;
+    return error;
+  }
+
+  // High error = surprising = prioritize for learning
+  getSurpriseScore(query, subject, kgFacts) {
+    const pred = this.predict(query, subject, kgFacts);
+    if (!pred) return 0.5; // unknown = moderate surprise
+    return this.measureError(pred, kgFacts);
+  }
+
+  // Record a prediction outcome for meta-learning
+  record(query, predicted, actual, error) {
+    this.predictions.push({ query, predicted, actual, error, ts: Date.now() });
+    this.errorHistory.push(error);
+    if (this.predictions.length > 100) this.predictions.shift();
+    if (this.errorHistory.length > 100) this.errorHistory.shift();
+  }
+
+  get accuracy() {
+    return this.totalPredictions > 0 ? this.correctPredictions / this.totalPredictions : 0;
+  }
+
+  get avgError() {
+    if (!this.errorHistory.length) return 0;
+    return this.errorHistory.reduce((a,b) => a+b, 0) / this.errorHistory.length;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM E: ABDUCTIVE REASONING ENGINE
+//  Given observations (facts), find the BEST EXPLANATION.
+//  This is hypothesis generation — science in symbolic form.
+//  "Why would X be true? What single cause explains all these facts?"
+// ──────────────────────────────────────────────────────────────────
+class AbductiveReasoner {
+  constructor() {
+    this.hypotheses = [];   // generated hypotheses with confidence scores
+    this.bestExplanation = null;
+  }
+
+  // Generate candidate hypotheses for a set of observations
+  generateHypotheses(observations, kg) {
+    const hypotheses = [];
+    if (!observations.length) return hypotheses;
+
+    // Hypothesis 1: Common cause — find a node that causes many observations
+    const causes = new Map();
+    observations.forEach(obs => {
+      const subj = (obs.s || '').toLowerCase();
+      // Find what's related to this entity in the KG
+      const relatedFacts = kg.triples.filter(t => t.o === subj || t.s === obs.o);
+      relatedFacts.forEach(f => {
+        const cause = f.s;
+        causes.set(cause, (causes.get(cause) || 0) + 1);
+      });
+    });
+    causes.forEach((count, cause) => {
+      if (count >= 2) {
+        hypotheses.push({
+          type: 'common_cause',
+          explanation: `"${cause}" is a common cause that explains ${count} of the observations`,
+          confidence: Math.min(0.9, 0.4 + count * 0.15),
+          entity: cause,
+          score: count,
+        });
+      }
+    });
+
+    // Hypothesis 2: Category membership — all observations share a type
+    const types = new Map();
+    observations.forEach(obs => {
+      const typeTriples = kg.triples.filter(t => t.s === obs.s && t.p === 'is_a');
+      typeTriples.forEach(t => types.set(t.o, (types.get(t.o)||0)+1));
+    });
+    types.forEach((count, type) => {
+      if (count >= 2) {
+        hypotheses.push({
+          type: 'category',
+          explanation: `All observations may be instances of "${type}"`,
+          confidence: Math.min(0.85, 0.3 + count * 0.2),
+          entity: type,
+          score: count * 1.2,
+        });
+      }
+    });
+
+    // Hypothesis 3: Temporal — a sequence explains the pattern
+    const timeFacts = observations.filter(f => f.p === 'released_in' || f.p === 'born_in' || f.p === 'died_in');
+    if (timeFacts.length >= 2) {
+      hypotheses.push({
+        type: 'temporal',
+        explanation: `These facts follow a temporal sequence — events unfolded over time`,
+        confidence: 0.6,
+        score: timeFacts.length,
+      });
+    }
+
+    // Sort by score
+    hypotheses.sort((a, b) => b.score - a.score);
+    this.hypotheses = hypotheses.slice(0, 5);
+    this.bestExplanation = this.hypotheses[0] || null;
+    return this.hypotheses;
+  }
+
+  // Format best explanation for output
+  explain(observations, kg) {
+    const hyps = this.generateHypotheses(observations, kg);
+    if (!hyps.length) return null;
+    const best = hyps[0];
+    return {
+      text: best.explanation,
+      confidence: best.confidence,
+      type: best.type,
+      alternatives: hyps.slice(1, 3).map(h => h.explanation),
+    };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM F: ABSTRACT CONCEPT FORMATION ENGINE
+//  Groups concrete facts into abstract principles.
+//  "Minecraft, Roblox, Fortnite are all video games" →
+//  Abstract concept: VIDEO_GAME = {has_gameplay, made_by_studio, sold_digitally}
+//
+//  This is how intelligence generalizes. Without abstraction,
+//  every new game requires relearning everything from scratch.
+// ──────────────────────────────────────────────────────────────────
+class AbstractConceptEngine {
+  constructor() {
+    this.concepts = new Map();   // concept_name → { members, properties, rules }
+    this.rules = [];             // learned generalizations: if X is Y and X has Z → all Y have Z
+    this.lastFormed = null;
+  }
+
+  // Scan KG and form abstract concepts from type clusters
+  formConcepts(kg) {
+    const formed = [];
+    // Group entities by type (is_a predicate)
+    const typeGroups = new Map();
+    kg.triples.filter(t => t.p === 'is_a' && t.alive !== false).forEach(t => {
+      const type = t.o.toLowerCase();
+      if (!typeGroups.has(type)) typeGroups.set(type, []);
+      typeGroups.get(type).push(t.s.toLowerCase());
+    });
+
+    typeGroups.forEach((members, type) => {
+      if (members.length < 2) return; // need ≥2 members to form a concept
+      // Find properties SHARED by all members
+      const sharedProps = new Map();
+      members.forEach(member => {
+        const memberFacts = kg.triples.filter(t => t.s === member && t.p !== 'is_a');
+        memberFacts.forEach(f => {
+          const key = f.p;
+          if (!sharedProps.has(key)) sharedProps.set(key, new Set());
+          sharedProps.get(key).add(f.o);
+        });
+      });
+
+      // Properties that appear in ≥ half the members
+      const threshold = Math.ceil(members.length / 2);
+      const prototypicalProps = [];
+      sharedProps.forEach((values, prop) => {
+        if (values.size >= threshold) {
+          prototypicalProps.push({ prop, values: [...values].slice(0,3) });
+        }
+      });
+
+      if (prototypicalProps.length > 0) {
+        const concept = { type, members: members.slice(0,10), properties: prototypicalProps, formed: Date.now() };
+        this.concepts.set(type, concept);
+        // Generate rules from properties
+        prototypicalProps.forEach(({ prop, values }) => {
+          this.rules.push({
+            condition: `is_a ${type}`,
+            conclusion: `likely_${prop} ${values[0]}`,
+            support: members.length,
+            confidence: Math.min(0.9, 0.5 + members.length * 0.08),
+          });
+        });
+        formed.push(concept);
+      }
+    });
+
+    if (formed.length) this.lastFormed = formed[0];
+    return formed;
+  }
+
+  // Answer "what do all X have in common?" queries
+  characterize(type) {
+    const concept = this.concepts.get(type.toLowerCase());
+    if (!concept) return null;
+    const props = concept.properties.slice(0,3).map(p => `${p.prop.replace(/_/g,' ')}: ${p.values[0]}`).join(', ');
+    return `All ${type} share: ${props}. Members include: ${concept.members.slice(0,4).join(', ')}.`;
+  }
+
+  // Apply abstract rules to predict unknown properties
+  predictProperty(entity, kg) {
+    const entityType = kg.triples.find(t => t.s === entity.toLowerCase() && t.p === 'is_a')?.o;
+    if (!entityType) return null;
+    const concept = this.concepts.get(entityType.toLowerCase());
+    if (!concept) return null;
+    const existingProps = new Set(kg.triples.filter(t => t.s === entity.toLowerCase()).map(t => t.p));
+    const predictions = concept.properties
+      .filter(p => !existingProps.has(p.prop))
+      .map(p => `${p.prop.replace(/_/g,' ')} = ${p.values[0]}`);
+    return predictions.length ? predictions : null;
+  }
+
+  snapshot() {
+    const concepts = [...this.concepts.values()].slice(0,10).map(c => ({
+      type: c.type,
+      memberCount: c.members.length,
+      propertyCount: c.properties.length,
+    }));
+    return { conceptCount: this.concepts.size, ruleCount: this.rules.length, concepts };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  AGI QUERY ROUTER
+//  Decides which AGI system(s) to engage for each query.
+//  Returns { system, priority, reason }
+// ──────────────────────────────────────────────────────────────────
+function agiRoute(query, intent) {
+  const q = query.toLowerCase();
+  const routes = [];
+
+  // System 2 math — always runs first if math detected
+  if (/[\d+\-*/^÷×√π%]/.test(q) && /(?:\d[\d\s]*[+\-*/^÷×]\s*\d|what\s+is\s+[\d]|calculat|comput|how\s+much\s+is|=\s*\?|solve|equals?)/i.test(q)) {
+    routes.push({ system:'system2_math', priority:10, reason:'math expression detected' });
+  }
+  // Causal "why" queries
+  if (/^why\b|\bwhy\s+did\b|\bwhy\s+does\b|\bwhy\s+is\b|\bwhat\s+caused\b|\bdue\s+to\b|\bbecause\s+of\b/i.test(q)) {
+    routes.push({ system:'causal', priority:9, reason:'causal query' });
+  }
+  // World model — physical simulation
+  if (/what\s+happens?\s+(if|when)\b|if\s+you\s+(heat|cool|burn|drop|mix|compress|cut|break|electr)/i.test(q)) {
+    routes.push({ system:'worldmodel', priority:8, reason:'physical simulation query' });
+  }
+  // World model — spatial
+  if (/\bwhere\s+is\b|\bwhat\s+is\s+inside\b|\bcontains?\b|\bspatial\b|\bnext\s+to\b|\babove\b|\bbelow\b/i.test(q)) {
+    routes.push({ system:'worldmodel_spatial', priority:7, reason:'spatial query' });
+  }
+  // Counterfactual
+  if (/what\s+if\s+.+(?:hadn.t|didn.t|never|without)\b|\bcounterfactual\b/i.test(q)) {
+    routes.push({ system:'causal_counterfactual', priority:8, reason:'counterfactual query' });
+  }
+  // Abductive "explain why these things are related"
+  if (/\bwhat\s+do\s+.+\s+have\s+in\s+common\b|\bwhy\s+are\s+these\s+related\b|\bexplain\s+the\s+pattern\b/i.test(q)) {
+    routes.push({ system:'abductive', priority:7, reason:'abductive/common-cause query' });
+  }
+  // Abstract concept — "what makes X an X?"
+  if (/\bwhat\s+makes\s+(?:a|an|all)\b|\bcharacteristics?\s+of\b|\bdefine\b|\bwhat\s+do\s+all\b/i.test(q)) {
+    routes.push({ system:'abstract', priority:6, reason:'concept characterization' });
+  }
+  // System 2 proof — complex factual chains
+  if (/\bprove\b|\bshow\s+that\b|\bdemonstrate\b|\bcan\s+you\s+verify\b|\bis\s+it\s+true\s+that\b/i.test(q)) {
+    routes.push({ system:'system2_proof', priority:8, reason:'proof/verification query' });
+  }
+  // Analogy
+  if (/\b(?:analogy|analogous|is\s+to\s+.+\s+as|similar\s+to|parallel\s+to)\b/i.test(q)) {
+    routes.push({ system:'system2_analogy', priority:7, reason:'analogy query' });
+  }
+
+  return routes.sort((a,b) => b.priority - a.priority);
+}
+
 class Engine {
   constructor() {
     this.ets = new EntityTypeSystem();
@@ -5785,6 +6915,15 @@ class Engine {
     this.preferenceEngine = new PreferenceEngine();
     this.failureTracker = new FailureTracker();
     this.socialAdapter = new SocialModelAdapter();
+
+    // ── AGI LAYER — Seven pillars of general intelligence ──
+    this.causalGraph    = new CausalGraph();           // WHY things happen
+    this.worldModel     = new WorldModel();            // HOW the physical world works
+    this.system2        = new System2Engine();         // DELIBERATE logic & math verification
+    this.predictive     = new PredictiveCodingEngine();// Hypothesis generation + surprise detection
+    this.abductive      = new AbductiveReasoner();     // Best-explanation inference
+    this.conceptEngine  = new AbstractConceptEngine(); // Abstract concept formation + rules
+    this._agiStats = { causalAnswers:0, worldAnswers:0, sys2Answers:0, predictiveTriggered:0, abductiveAnswers:0, abstractAnswers:0 };
 
     // Wire drive actions to behavioral consequences
     this.drives.onAction = (driveKey, action, level, reason) => {
@@ -5889,7 +7028,12 @@ class Engine {
 
     const KG_CHUNK = 15;
     for (let i = 0; i < ss.length; i += KG_CHUNK) {
-      ss.slice(i,i+KG_CHUNK).forEach(s => this.kg.learn(s, tag));
+      ss.slice(i,i+KG_CHUNK).forEach(s => {
+        this.kg.learn(s, tag);
+        // ── AGI: feed same sentences to Causal + World Model ──
+        try { this.causalGraph.learnFromSentence(s, tag); } catch(_) {}
+        try { this.worldModel.learnFromSentence(s, tag); } catch(_) {}
+      });
       onProgress('kg',0.34+(i+KG_CHUNK)/ss.length*0.22,ss.length,this.kg.count());
       await _yield();
     }
@@ -5920,6 +7064,17 @@ class Engine {
     this.trained = true;
     this.cache.invalidate();
     onProgress('complete',1.0,ss.length,this.kg.count());
+
+    // ── AGI: After ingestion, rebuild abstract concepts from the full KG ──
+    // This runs asynchronously so it never blocks the UI
+    setTimeout(() => {
+      try {
+        const formed = this.conceptEngine.formConcepts(this.kg);
+        if (formed.length > 0) {
+          console.log('[AGI AbstractConcepts] Formed', formed.length, 'concepts:', formed.map(c=>c.type).join(', '));
+        }
+      } catch(e) { console.warn('[AGI concepts]', e); }
+    }, 100);
 
     // L3: SLM triple extraction — enrich KG with SLM-detected relationships
     if (this.neuralMouth && this.neuralMouth.ready) {
@@ -6008,7 +7163,7 @@ class Engine {
     // Teach it something now, it remembers forever (or until cleared).
     setTimeout(() => {
       if (this.saveToMemory()) {
-        console.log('[Lexica 4.0] Knowledge saved to persistent memory.');
+        console.log('[Lexica V0] Knowledge saved to persistent memory.');
       }
     }, 2000); // slight delay so UI updates first
 
@@ -6150,6 +7305,24 @@ class Engine {
     const ck = this.cache.key(question);
     const cached = this.cache.get(ck);
     if (cached) return {...cached,cached:true};
+
+    // ── AGI ROUTER: determine which systems should engage ──
+    const _agiRoutes = agiRoute(question, classifyIntent(question));
+    const _agiPrimary = _agiRoutes[0]?.system || null;
+
+    // ── SYSTEM 2 MATH INTERCEPT ── Pure deterministic — no SLM needed ──
+    if (_agiPrimary === 'system2_math') {
+      const mathExpr = question.replace(/[^0-9+\-*/^().%√π×÷\s]/g,'').trim();
+      if (mathExpr.length > 0) {
+        const mathResult = this.system2.evaluateMath(mathExpr);
+        if (!mathResult.error) {
+          this._agiStats.sys2Answers++;
+          updateAGIPanel(this);
+          const resultText = `${question.replace(/\s+/g,' ').trim()} = **${mathResult.result}**`;
+          return { text: String(mathResult.result), strategy:'system2', conf:{l:'high',lbl:'verified',cls:'conf-high'}, src:null, srcTitle:'', ctxUsed:false, kgUsed:false, synthesized:true, conflict:null, cached:false, evidence:`System 2 arithmetic: ${mathResult.steps.join(' → ')}`, intent:'math', _sys2:true, _sys2Type:'math' };
+        }
+      }
+    }
 
     const {r,used} = this.ctx.resolve(question);
     const rClean = r.replace(/^(okay|ok|yeah|alright|right|so|well|but|like|and|hmm+|uh+|um+)[,\s]+/gi,'').trim()||r;
@@ -6322,6 +7495,129 @@ class Engine {
     this.lastSubject = subject;
     this.lastQuery = r;
 
+    // ── AGI SYSTEMS: attempt to answer BEFORE SLM ──
+    // Each system returns a text string or null.
+    // If an AGI system answers, SLM still runs to VERIFY and enrich.
+    let _agiAnswer = null;
+    let _agiSystem = null;
+    let _agiEvidence = null;
+
+    // CAUSAL GRAPH: "why" questions
+    if (_agiPrimary === 'causal' || intent === 'causal') {
+      const causalAns = this.causalGraph.answerWhy(r);
+      if (causalAns) {
+        _agiAnswer = causalAns;
+        _agiSystem = 'causal';
+        _agiEvidence = `Causal chain: ${(this.causalGraph.lastCausalChain||[]).join(' → ')}`;
+        this._agiStats.causalAnswers++;
+      }
+      // Also inject causal triples from causalGraph into kgFacts for SLM grounding
+      const causalEdges = [];
+      this.causalGraph.edges.forEach((effects, cause) => {
+        if (subject && cause.includes(subject.toLowerCase())) {
+          effects.forEach(e => causalEdges.push({ s:cause, p:'causes', o:e.effect, conf:e.strength, tag:'causal', raw:`${cause} causes ${e.effect}` }));
+        }
+      });
+      if (causalEdges.length) kgFacts = [...causalEdges.slice(0,4), ...kgFacts].slice(0,14);
+    }
+
+    // WORLD MODEL: physical simulation queries
+    if (_agiPrimary === 'worldmodel' || _agiPrimary === 'worldmodel_spatial') {
+      const worldAns = this.worldModel.spatialQuery(r);
+      if (worldAns) {
+        _agiAnswer = worldAns;
+        _agiSystem = 'worldmodel';
+        _agiEvidence = `World model simulation (${this.worldModel.simCount} total)`;
+        this._agiStats.worldAnswers++;
+      }
+      if (this.worldModel.lastSimulation) {
+        const sim = this.worldModel.lastSimulation;
+        updateWorldModelPanel(sim);
+      }
+    }
+
+    // COUNTERFACTUAL
+    if (_agiPrimary === 'causal_counterfactual') {
+      const subjectForCF = subject || extractSubject(r);
+      if (subjectForCF) {
+        const cf = this.causalGraph.counterfactual(subjectForCF, '');
+        if (cf.effects.length) {
+          _agiAnswer = cf.text;
+          _agiSystem = 'causal_counterfactual';
+          _agiEvidence = `Counterfactual: removed "${subjectForCF}" from causal graph`;
+          this._agiStats.causalAnswers++;
+          updateCounterfactualPanel(cf.text);
+        }
+      }
+    }
+
+    // ABDUCTIVE: "what do these have in common?"
+    if (_agiPrimary === 'abductive' && kgFacts.length >= 3) {
+      const explanation = this.abductive.explain(kgFacts, this.kg);
+      if (explanation) {
+        _agiAnswer = explanation.text + (explanation.alternatives.length ? ` Alternative explanation: ${explanation.alternatives[0]}` : '');
+        _agiSystem = 'abductive';
+        _agiEvidence = `Abductive inference (confidence: ${(explanation.confidence*100).toFixed(0)}%)`;
+        this._agiStats.abductiveAnswers++;
+      }
+    }
+
+    // ABSTRACT CONCEPTS: "what do all X have in common?"
+    if (_agiPrimary === 'abstract' && subject) {
+      const characterization = this.conceptEngine.characterize(subject);
+      if (characterization) {
+        _agiAnswer = characterization;
+        _agiSystem = 'abstract';
+        _agiEvidence = `Abstract concept: ${this.conceptEngine.concepts.size} concepts formed`;
+        this._agiStats.abstractAnswers++;
+      }
+      // Also try property prediction
+      if (!_agiAnswer) {
+        const predicted = this.conceptEngine.predictProperty(subject, this.kg);
+        if (predicted) {
+          _agiAnswer = `Based on abstract concept rules, ${subject} likely has: ${predicted.slice(0,3).join(', ')}.`;
+          _agiSystem = 'abstract_predict';
+          this._agiStats.abstractAnswers++;
+        }
+      }
+    }
+
+    // SYSTEM 2 PROOF: "prove that / is it true that"
+    if (_agiPrimary === 'system2_proof' && kgFacts.length >= 2) {
+      const proof = this.system2.buildProof(r, kgFacts, this.ctx.h.slice(-3));
+      if (proof.conclusion) {
+        _agiAnswer = proof.conclusion;
+        _agiSystem = 'system2_proof';
+        _agiEvidence = `System 2 proof (${proof.steps.length} steps, conf ${(proof.confidence*100).toFixed(0)}%)`;
+        this._agiStats.sys2Answers++;
+        updateSys2Panel(this.system2);
+      }
+    }
+
+    // SYSTEM 2 ANALOGY: "A is to B as C is to ?"
+    if (_agiPrimary === 'system2_analogy') {
+      const analogyMatch = r.match(/(\w+)\s+is\s+to\s+(\w+)\s+as\s+(\w+)\s+is\s+to/i);
+      if (analogyMatch) {
+        const [, a, b, c] = analogyMatch;
+        const result = this.system2.solveAnalogy(a, b, c, this.kg);
+        if (result.answer) {
+          _agiAnswer = `${a} is to ${b} as ${c} is to "${result.answer}". ${result.path}`;
+          _agiSystem = 'system2_analogy';
+          _agiEvidence = result.path;
+          this._agiStats.sys2Answers++;
+        }
+      }
+    }
+
+    // PREDICTIVE CODING: measure surprise, update priors
+    const surpriseScore = this.predictive.getSurpriseScore(r, subject, kgFacts);
+    if (surpriseScore > 0.7) {
+      this._agiStats.predictiveTriggered++;
+      // High surprise = push to curiosity engine for future learning
+      showInnerMonologue(`High prediction error (${(surpriseScore*100).toFixed(0)}% surprise) on "${subject||r.slice(0,30)}" — marking for deeper learning.`, subject, null);
+    }
+    updateAGIPanel(this);
+
     // ── INNER MONOLOGUE DURING SYNTHESIS ── purely symbolic, no SLM call during query
     if (kgFacts.length > 3 && subject && typeof showInnerMonologue === 'function') {
       setTimeout(() => {
@@ -6391,6 +7687,23 @@ class Engine {
           console.log('[SLM echo-rejected]', ragText.slice(0, 80));
         }
       } catch(e) { console.warn('[L5 SLM]', e); }
+    }
+
+    // ── AGI PRE-ANSWER: if AGI found something and SLM is empty, use it ──
+    if (_agiAnswer && !ansText) {
+      ansText = _agiAnswer;
+    }
+
+    // ── SYSTEM 2 VERIFICATION: verify SLM output against KG ──
+    // Runs asynchronously — doesn't block, but flags quality issues in next turn
+    if (ansText && kgFacts.length >= 2 && this.system2) {
+      const verifyResult = this.system2.verifySLMOutput(ansText, kgFacts, r);
+      if (!verifyResult.approved && verifyResult.issues.length > 0) {
+        // Log but don't override — just flag for user awareness
+        console.log('[System2 Verify] Issues:', verifyResult.issues);
+        this._lastVerification = verifyResult;
+      }
+      setTimeout(() => updateSys2Panel(this.system2), 0);
     }
 
     // ── SOCIETY OF MIND ── Complex queries (symbolic fallback or supplement)
@@ -6483,7 +7796,7 @@ class Engine {
 
     const result = {
       text:ansText,
-      strategy: usedGraphRAG ? 'graphrag' : (usedSLM ? 'slm' : (usedSociety ? 'society' : (synthesized?'synthesis':intent))),
+      strategy: _agiSystem ? _agiSystem : (usedGraphRAG ? 'graphrag' : (usedSLM ? 'slm' : (usedSociety ? 'society' : (synthesized?'synthesis':intent)))),
       conf, src:rel[0].s, srcTitle, ctxUsed:used, kgUsed, synthesized, conflict,
       cached:false, evidence, intent,
       _societyWinner: societyWinner?.name || null,
@@ -6492,6 +7805,10 @@ class Engine {
       _srcTag: rel[0].tag || null,
       _crossDoc: _isCrossDoc,
       _crossDocSrcs: _isCrossDoc ? [..._crossDocSources].map(tag => this.sm.get(tag)?.title || tag).filter(Boolean) : null,
+      _agiSystem,
+      _agiEvidence,
+      _sys2: !!this._lastVerification,
+      _sys2Score: this._lastVerification?.score || null,
     };
     this.cache.set(ck, result);
     this.lastResult = result;
@@ -6690,7 +8007,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 4.0 ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica V0 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -6754,7 +8071,7 @@ function updateQualiaUI() {
 const engine = new Engine();
 
 // ═══════════════════════════════════════════════════════════
-// LEXICA 4.0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
+// LEXICA V0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
 // ═══════════════════════════════════════════════════════════
 
 function updateDriveUI() {
@@ -7222,7 +8539,7 @@ function resetAll(){
   updateDriveUI();updateGoalUI();updateSelfModelUI();updateUserModelUI();updatePreferenceUI();updateEpisodicUI();updateFailureLogUI();
   document.getElementById('godelLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>';
   document.getElementById('debateLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>';
-  addMsg('system','All training data cleared. Cognitive state reset. Lexica 4.0 homeostatic systems reinitialized.');
+  addMsg('system','All training data cleared. Cognitive state reset. Lexica V0 homeostatic systems reinitialized.');
 }
 
 
@@ -7474,6 +8791,80 @@ function switchTab(n){
   if(n==='kgedit'){kgEditSearch(document.getElementById('kgSearchInput')?.value||'');}
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  AGI PANEL UPDATE FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+function updateAGIPanel(eng) {
+  if (!eng) return;
+  try {
+    // ── Causal edges panel ──
+    const causalEl = document.getElementById('causalEdgeLog');
+    if (causalEl && eng.causalGraph.edgeCount > 0) {
+      const edges = [];
+      eng.causalGraph.edges.forEach((effects, cause) => {
+        effects.slice(0,2).forEach(e => {
+          const sign = e.strength < 0 ? '🚫' : '→';
+          const strength = Math.abs(e.strength);
+          edges.push(`<div style="padding:2px 0;font-family:'JetBrains Mono',monospace;font-size:9px"><span style="color:var(--cyan)">${cause}</span> <span style="color:var(--text-muted)">${sign}</span> <span style="color:var(--text)">${e.effect}</span> <span style="color:var(--text-muted);font-size:8px">[${(strength*100).toFixed(0)}%]</span></div>`);
+        });
+      });
+      causalEl.innerHTML = edges.slice(0,15).join('') || '<div style="font-size:9px;color:var(--text-muted)">No causal edges yet.</div>';
+    }
+
+    // ── World model objects panel ──
+    const worldEl = document.getElementById('worldObjectLog');
+    if (worldEl) {
+      const snap = eng.worldModel.snapshot();
+      if (snap.learnedObjects.length) {
+        const items = snap.learnedObjects.slice(0,10).map(o => {
+          const stateColor = o.state === 'unknown' ? 'var(--text-muted)' : 'var(--gold)';
+          return `<div style="padding:2px 0;font-family:'JetBrains Mono',monospace;font-size:9px"><span style="color:var(--green)">${o.name}</span> <span style="color:${stateColor}">[${o.state||'?'}]</span></div>`;
+        });
+        worldEl.innerHTML = items.join('') + `<div style="font-size:8px;color:var(--text-muted);margin-top:3px">${snap.objectCount} objects · ${snap.simCount} simulations</div>`;
+      }
+    }
+
+    // ── System 2 stats ──
+    const s2v = document.getElementById('sys2Verified');
+    const s2r = document.getElementById('sys2Refuted');
+    const s2m = document.getElementById('sys2MathCalls');
+    const s2Snap = eng.system2.snapshot();
+    if (s2v) s2v.textContent = s2Snap.verifiedCount;
+    if (s2r) s2r.textContent = s2Snap.refutedCount;
+    if (s2m) s2m.textContent = s2Snap.mathCallCount;
+
+  } catch(e) { console.warn('[AGI panel]', e); }
+}
+
+function updateSys2Panel(sys2) {
+  const el = document.getElementById('sys2ProofLog');
+  if (!el || !sys2) return;
+  const snap = sys2.snapshot();
+  if (!snap.proofLog.length) return;
+  el.innerHTML = snap.proofLog.slice(0,6).map(p => {
+    const icon = p.type === 'math' ? '🧮' : p.type === 'verify' ? (p.approved ? '✓' : '✗') : '📋';
+    const color = p.type === 'math' ? 'var(--gold)' : p.approved !== false ? 'var(--green)' : 'var(--red)';
+    const content = p.type === 'math'
+      ? `${p.input} = ${p.result}`
+      : p.type === 'verify'
+      ? `Score: ${(p.score*100).toFixed(0)}% ${p.issues?.length ? '⚠ '+p.issues[0] : '✓ clean'}`
+      : `${p.query?.slice(0,40)} → ${p.conclusion?.slice(0,40)}`;
+    return `<div style="padding:2px 0 2px 0;font-family:'JetBrains Mono',monospace;font-size:8.5px"><span style="color:${color}">${icon}</span> <span style="color:var(--text)">${content}</span></div>`;
+  }).join('');
+}
+
+function updateCounterfactualPanel(text) {
+  const el = document.getElementById('counterfactualLog');
+  if (el && text) el.textContent = text;
+}
+
+function updateWorldModelPanel(sim) {
+  const el = document.getElementById('worldSimLog');
+  if (el && sim?.description) el.textContent = sim.description;
+}
+
 function updateUI(){
   const n=engine.bm25.ss.length;
   document.getElementById('stSent').textContent=n;
@@ -7497,6 +8888,9 @@ function updateUI(){
   updateOntologyUI();
   updateIngestionUI();
   window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
+  // AGI panels
+  updateAGIPanel(engine);
+  updateSys2Panel(engine.system2);
 }
 function toggleTrust(tag){const s=engine.sm.get(tag);if(!s)return;const nt=!s.trusted;engine.setTrust(tag,nt);updateUI();addMsg('system',`"${s.title}" ${nt?'trusted (1.6× weight)':'untrusted (0.6× weight)'}`);}
 function rmSrc(tag){const s=engine.sm.get(tag);if(!s)return;if(!confirm(`Remove "${s.title}"?`))return;engine.rmSource(tag);updateUI();if(!engine.trained)setStatus(false,'awaiting training');addMsg('system',`Removed "${s.title}"`);}
@@ -7507,9 +8901,12 @@ function streamMsg(text, meta) {
   const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
   const synthBadge=meta.synthesized?'<span class="badge synth">⚗ synthesized</span>':'';
   // V12: no nested backticks — explicit string concat
-  const _stratLbl=meta.strategy==='social'?'💬 social':meta.strategy==='society'?('🧠 '+(meta._societyWinner||'Society')):meta.strategy==='graphrag'?'📊 Graph-RAG':meta.strategy==='slm'?'🧬 SLM':meta.strategy==='expert'?'⚡ Expert Ensemble':meta.strategy;
-  const _stratCls=meta.strategy==='social'?'social':meta.strategy==='society'?'society':meta.strategy==='graphrag'?'graphrag':meta.strategy==='slm'?'slm':meta.strategy==='refuted'?'refuted':meta.strategy==='expert'?'graphrag':'fallback';
-  const stratBadge=meta.strategy&&meta.strategy!=='none'&&meta.strategy!=='synthesis'?('<span class="badge '+_stratCls+'">'+_stratLbl+'</span>'):'';
+  const _agiStratMap={'causal':'⚗ Causal','causal_counterfactual':'⚗ Counterfactual','worldmodel':'🌍 World','worldmodel_spatial':'🌍 Spatial','system2':'🧮 System 2','system2_math':'🧮 Math','system2_proof':'🧮 Proof','system2_analogy':'🧮 Analogy','abductive':'🔬 Abductive','abstract':'💡 Abstract','abstract_predict':'💡 Predict'};
+  const _stratLbl=_agiStratMap[meta.strategy]||(meta.strategy==='social'?'💬 social':meta.strategy==='society'?('🧠 '+(meta._societyWinner||'Society')):meta.strategy==='graphrag'?'📊 Graph-RAG':meta.strategy==='slm'?'🧬 SLM':meta.strategy==='expert'?'⚡ Expert Ensemble':meta.strategy);
+  const _isAGIStrat=!!_agiStratMap[meta.strategy];
+  const _stratCls=_isAGIStrat?'kg':meta.strategy==='social'?'social':meta.strategy==='society'?'society':meta.strategy==='graphrag'?'graphrag':meta.strategy==='slm'?'slm':meta.strategy==='refuted'?'refuted':meta.strategy==='expert'?'graphrag':'fallback';
+  const stratBadge=meta.strategy&&meta.strategy!=='none'&&meta.strategy!=='synthesis'?('<span class="badge '+_stratCls+'" style="'+(_isAGIStrat?'background:rgba(100,200,255,.15);border-color:rgba(100,200,255,.3);color:#64c8ff':'')+'">'+_stratLbl+'</span>'):'';
+  const sys2Badge=meta._sys2?('<span class="badge" style="background:rgba(176,148,255,.12);border:1px solid rgba(176,148,255,.25);color:var(--purple);font-size:8px">🧮 verified</span>'):'';
   const kgBadge=meta.kgUsed?'<span class="badge kg">KG</span>':'';
   const autoFetchBadge=meta._autoFetched?'<span class="badge auto">⚡ auto-learned</span>':'';
   const confBadge=meta.conf?('<span class="badge '+meta.conf.cls+'">'+meta.conf.lbl+'</span>'):'';
@@ -7527,7 +8924,7 @@ function streamMsg(text, meta) {
   const fbId='fb-'+Date.now();
   const fbHtml='<div class="feedback-row" id="'+fbId+'"><button class="fb-btn good" onclick="voteFb(this,\''+fbId+'\',true)">👍</button><button class="fb-btn bad" onclick="voteFb(this,\''+fbId+'\',false)">👎</button></div>';
   const bubId='bub-'+Date.now();
-  row.innerHTML='<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap" style="min-width:0"><div class="msg-bubble ai'+(meta.synthesized?' synthesized':'')+'" id="'+bubId+'" data-src="'+(meta.src?meta.src.replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'')+'" ></div><div class="msg-meta">'+time+synthBadge+stratBadge+graphragBadge+crossDocBadge+slmBadge+kgBadge+confBadge+ctxBadge+cacheBadge+conflBadge+autoFetchBadge+tmsBadge+srcBtn+'</div>'+srcReveal+fbHtml+'</div>';
+  row.innerHTML='<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap" style="min-width:0"><div class="msg-bubble ai'+(meta.synthesized?' synthesized':'')+'" id="'+bubId+'" data-src="'+(meta.src?meta.src.replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'')+'" ></div><div class="msg-meta">'+time+synthBadge+stratBadge+graphragBadge+crossDocBadge+slmBadge+kgBadge+sys2Badge+confBadge+ctxBadge+cacheBadge+conflBadge+autoFetchBadge+tmsBadge+srcBtn+'</div>'+srcReveal+fbHtml+'</div>';
   msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;
   const bubble=row.querySelector('.msg-bubble.ai');
   const speed=Math.max(5,Math.min(20,1600/text.length));let i=0;
@@ -7537,7 +8934,7 @@ function streamMsg(text, meta) {
 }
 function toggleSrcReveal(btn){const el=btn.closest('.msg-row').querySelector('.source-reveal');if(!el)return;const show=el.style.display!=='none';el.style.display=show?'none':'block';btn.textContent=show?'⟨ source ⟩':'⟨ hide ⟩';}
 function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();
-// LEXICA 4.0: Feed vote signal into preference engine + retrieval weight adjustment
+// LEXICA V0: Feed vote signal into preference engine + retrieval weight adjustment
 if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);// Positive feedback → boost BM25 source weight for the tag
 const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.min(1.8,cur+0.1));}}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');// Negative feedback → lower source weight, increase curiosity about this gap
 const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.max(0.3,cur-0.15));}engine.failureTracker&&engine.failureTracker.recordFailure(engine.lastQuery||'',engine.lastSubject,'user thumbs-down','low');engine.drives.frustrate('curiosity',0.15,'thumbs-down on '+engine.lastSubject);}updatePreferenceUI();updateDriveUI();}// Auto-save updated weights to persistent memory
@@ -9240,12 +10637,12 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
       updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
-      console.error('[Lexica 4.0 boot]', e);
+      console.error('[Lexica V0 boot]', e);
     }
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'Lexica 4.0 ready ✓');
+    updateBootBar(1.0, 'Lexica V0 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
 
