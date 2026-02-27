@@ -966,6 +966,106 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
 .hg-node-count{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-left:auto}
 
 </style>
+<!-- SLM Worker source — read as text, instantiated as a Blob module worker so ALL inference runs off the main thread -->
+<script type="text/plain" id="slmWorkerSrc">
+const TRANSFORMERS_URLS=[
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0',
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0',
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.0',
+];
+const MODEL_CASCADE=[
+  {id:'HuggingFaceTB/SmolLM2-360M-Instruct',type:'text-generation',isDecoder:true},
+  {id:'HuggingFaceTB/SmolLM2-135M-Instruct',type:'text-generation',isDecoder:true},
+  {id:'Xenova/flan-t5-base',type:'text2text-generation',isDecoder:false},
+  {id:'Xenova/flan-t5-small',type:'text2text-generation',isDecoder:false},
+];
+let _pipe=null,_isDecoder=false,_ready=false;
+
+function clean(raw){
+  return(raw||'')
+    .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi,'')
+    .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi,'')
+    .replace(/^(Sure[,!]\s*[^.!?]*[.!?]\s*)/i,'')
+    .replace(/^Lexica:\s*/i,'')
+    .split('\n').filter(l=>!/^\s*[\*\-•]|^\s*\d+\./.test(l)).join(' ')
+    .replace(/\s{2,}/g,' ').split(/\n\n/)[0].slice(0,500).trim();
+}
+
+async function initModel(){
+  let pipelineFn=null;
+  for(const url of TRANSFORMERS_URLS){
+    try{
+      const mod=await import(url);
+      pipelineFn=mod.pipeline??mod.default?.pipeline??null;
+      const env=mod.env??mod.default?.env??null;
+      if(env){try{env.allowLocalModels=false;env.useBrowserCache=true;}catch(_){}}
+      if(typeof pipelineFn==='function'){self.postMessage({type:'progress',status:'transformers_ok',url});break;}
+    }catch(e){self.postMessage({type:'progress',status:'cdn_fail',url,error:e.message});}
+  }
+  if(!pipelineFn){self.postMessage({type:'progress',status:'failed',error:'Transformers.js unavailable'});return;}
+  for(const{id,type,isDecoder}of MODEL_CASCADE){
+    try{
+      self.postMessage({type:'progress',status:'loading',model:id});
+      _pipe=await pipelineFn(type,id,{
+        progress_callback(info){
+          if(info.status==='downloading'||info.status==='progress')
+            self.postMessage({type:'progress',status:'download',model:id,loaded:info.loaded||0,total:info.total||1});
+        }
+      });
+      _isDecoder=isDecoder;_ready=true;
+      self.postMessage({type:'ready',model:id,isDecoder});
+      return;
+    }catch(e){self.postMessage({type:'progress',status:'model_fail',model:id,error:e.message});}
+  }
+  self.postMessage({type:'progress',status:'failed',error:'All models failed'});
+}
+
+async function generate(taskPrefix,contentPrompt,maxTokens,history){
+  if(!_ready)throw new Error('not ready');
+  let raw='';
+  if(_isDecoder){
+    const sys='You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct and specific. No lists, no markdown, no disclaimers.';
+    const hist=(history||[]).slice(-4).flatMap(t=>[
+      {role:'user',content:t.q.slice(0,120)},
+      {role:'assistant',content:t.a.slice(0,150)},
+    ]);
+    const userMsg=(taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+    const msgs=[{role:'system',content:sys},...hist,{role:'user',content:userMsg.slice(0,600)}];
+    const res=await _pipe(msgs,{max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+    const g=res?.[0]?.generated_text;
+    if(Array.isArray(g))raw=(g[g.length-1]?.content??'').trim();
+    else{raw=(g??'').trim();const ai=raw.lastIndexOf('<|im_start|>assistant');if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim();}
+  }else{
+    const input=(taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+    const res=await _pipe(input.slice(0,480),{max_new_tokens:Math.min(maxTokens,120),do_sample:false,num_beams:1,repetition_penalty:1.3});
+    raw=(res?.[0]?.generated_text??'').trim();
+  }
+  return clean(raw);
+}
+
+async function generateMessages(messages,maxTokens){
+  if(!_ready||!_isDecoder)throw new Error('decoder not ready');
+  const res=await _pipe(messages,{max_new_tokens:Math.min(maxTokens||120,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+  const g=res?.[0]?.generated_text;
+  let raw='';
+  if(Array.isArray(g))raw=(g[g.length-1]?.content??'').trim();
+  else{raw=(g??'').trim();const ai=raw.lastIndexOf('<|im_start|>assistant');if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim();}
+  return clean(raw);
+}
+
+self.onmessage=async function(e){
+  const{type,id}=e.data;
+  if(type==='init'){await initModel();return;}
+  try{
+    let result='';
+    if(type==='generate') result=await generate(e.data.taskPrefix,e.data.contentPrompt,e.data.maxTokens||80,e.data.conversationHistory);
+    else if(type==='messages') result=await generateMessages(e.data.messages,e.data.maxTokens||120);
+    self.postMessage({type:'result',id,text:result});
+  }catch(err){
+    self.postMessage({type:'error',id,error:err.message||String(err)});
+  }
+};
+</script>
 </head>
 <body>
 
@@ -1479,7 +1579,30 @@ const ABBREVS=new Set(['mr','mrs','ms','dr','prof','sr','jr','vs','etc','inc','c
 
 function cleanText(t){return t.replace(/\r\n|\r/g,'\n').replace(/\[[\w\s,]+\]/g,'').replace(/={2,}[^=]+=+/g,' ').replace(/\{\{[\s\S]*?\}\}/g,'').replace(/https?:\S+/g,'').replace(/(?:^|\n)\s*(?:\*|\-|•|·|\d+[.)])\s+/gm,' ').replace(/\(\s*(?:born|died|fl\.?)\s+[\d–\-]+[^)]{0,30}\)/gi,'').replace(/\n{2,}/g,' ').replace(/\s{2,}/g,' ').trim();}
 
-function splitSentences(text){const c=cleanText(text),toks=c.match(/\S+/g)||[],res=[];let buf=[];for(let i=0;i<toks.length;i++){const tok=toks[i];buf.push(tok);if(/[.!?]["']?\s*$/.test(tok)){const cl=tok.toLowerCase().replace(/[.!?'"]+$/,'').replace(/[^a-z.]/g,'');const isAbbr=ABBREVS.has(cl)||(cl.length===1&&/[a-z]/.test(cl))||/[A-Z]\./.test(tok);if(!isAbbr&&!/^[a-z]/.test(toks[i+1]||'')){const s=buf.join(' ').trim();if(s.split(/\s+/).length>=5&&s.length>=24&&(s.match(/[a-zA-Z]/g)||[]).length>=14)res.push(s);buf=[];}}}if(buf.length>=4){const s=buf.join(' ').trim();if(s.length>=24)res.push(s);}const seen=new Set();return res.filter(s=>{const fp=s.slice(0,55).toLowerCase().replace(/\s+/g,'');if(seen.has(fp))return false;seen.add(fp);return true;});}
+// ── SENTENCE QUALITY GATE ──
+// Every sentence passes this before entering BM25 or KG.
+// This is the primary fix for garbage like "Millions user erik games".
+function _isSentenceClean(s) {
+  if (!s || s.length < 30) return false;
+  const words = s.split(/\s+/);
+  if (words.length < 5) return false;
+  // Needs real alphabetic content
+  const alphaCount = (s.match(/[a-zA-Z]/g)||[]).length;
+  if (alphaCount < 20) return false;
+  // Reject if mostly numbers/symbols (table rows, reference lists)
+  const nonAlpha = words.filter(w => /^[\d\W]+$/.test(w));
+  if (nonAlpha.length > words.length * 0.5) return false;
+  // Reject Wikipedia markup / category artifacts
+  if (/^\s*(\[\[|\{\{|\||\*|#REDIRECT|Category:|File:|See also|References|External links)/i.test(s)) return false;
+  // Reject fragment pattern: sentence starts with 4+ lowercase words (not a proper sentence)
+  // catches "millions user erik games" and similar KG-poisoning fragments
+  const startsLower = s.match(/^([a-z][a-z]+ ){4}/);
+  if (startsLower) return false;
+  // Must have at least one verb
+  if (!/\b(is|are|was|were|has|have|had|can|will|would|does|did|been|makes|made|created|developed|allows|includes|features|provides|uses|contains|represents|consists|enables|produces|serves|became|remains|known|called|found|located|named|started|won|lost|built|designed|wrote|published|released|launched|established|founded|acquired|sold|bought|operates|refers|derives|consists|occurs|appears|became|played|fought|occurred)\b/i.test(s)) return false;
+  return true;
+}
+function splitSentences(text){const c=cleanText(text),toks=c.match(/\S+/g)||[],res=[];let buf=[];for(let i=0;i<toks.length;i++){const tok=toks[i];buf.push(tok);if(/[.!?]["']?\s*$/.test(tok)){const cl=tok.toLowerCase().replace(/[.!?'"]+$/,'').replace(/[^a-z.]/g,'');const isAbbr=ABBREVS.has(cl)||(cl.length===1&&/[a-z]/.test(cl))||/[A-Z]\./.test(tok);if(!isAbbr&&!/^[a-z]/.test(toks[i+1]||'')){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);buf=[];}}}if(buf.length>=5){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);}const seen=new Set();return res.filter(s=>{const fp=s.slice(0,55).toLowerCase().replace(/\s+/g,'');if(seen.has(fp))return false;seen.add(fp);return true;});}
 function _yield(){return new Promise(r=>setTimeout(r,0));}
 
 // ─────────────────────────────────────────────────────
@@ -2440,6 +2563,19 @@ class KnowledgeGraph {
     const sn = s.trim().toLowerCase().replace(/\s+/g,' ');
     let on = o.trim().toLowerCase().replace(/\s+/g,' ');
     if (sn.length < 2 || on.length < 2) return;
+    // ── TRIPLE QUALITY GATE ──
+    // Reject fragment nodes — the root cause of "Millions user erik games" in answers
+    const isFragment = str => {
+      if (!str || str.length > 110) return true;
+      if (!/[a-zA-Z]/.test(str)) return true; // pure numbers/symbols
+      const ws = str.split(/\s+/);
+      // >4 all-lowercase words = sentence fragment, not an entity
+      if (ws.length > 4 && ws.every(w => /^[a-z]/.test(w))) return true;
+      // Wikipedia markup artifacts
+      if (/\[\[|\]\]|\{\{/.test(str)) return true;
+      return false;
+    };
+    if (isFragment(sn) || isFragment(on)) return;
     // V11: Stop-word filter — never create useless topological clutter
     if (STOP_WORDS.has(sn) || STOP_WORDS.has(on)) return;
     // V11: Synonym resolution
@@ -5153,16 +5289,17 @@ class NanoCortex {
 // ─────────────────────────────────────────────────────
 class NeuralMouth {
   constructor() {
-    this.pipeline = null;   // Transformers.js text2text-generation pipeline
+    this.pipeline = null;   // null when using Worker mode (preferred)
     this.ready = false;
     this.loading = false;
     this.error = null;
-    this.modelId = 'Xenova/flan-t5-base';
-    this._pipelineType = 'text2text-generation';
-    // NOTE: WebLLM was replaced with Transformers.js (text2text-generation).
-    // WebLLM requires crossOriginIsolated=true which is impossible in a single
-    // HTML file on static hosting. Transformers.js needs only WebAssembly — works
-    // everywhere NanoCortex works, no server headers required.
+    this.modelId = 'loading...';
+    this._pipelineType = 'text-generation';
+    this._isDecoder = false;
+    // Web Worker — all inference runs off the main thread (no UI freeze)
+    this._worker = null;
+    this._pendingRequests = new Map(); // id → { resolve, reject, timeout }
+    this._nextId = 1;
   }
 
   async init(onProgress) {
@@ -5170,157 +5307,135 @@ class NeuralMouth {
     if (this.loading) return false;
     this.loading = true;
 
-    // ── Load Transformers.js (same CDN + version as NanoCortex) ──
-    let pipelineFn = null;
-    let env = null;
-    const TRANSFORMERS_URLS = [
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0',
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0',
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.0',
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@2.17.2',
-    ];
-    for (const url of TRANSFORMERS_URLS) {
-      try {
-        onProgress('NeuralMouth: Loading Transformers.js...');
-        const mod = await import(url);
-        pipelineFn = mod.pipeline ?? mod.default?.pipeline ?? null;
-        env        = mod.env     ?? mod.default?.env     ?? null;
-        if (typeof pipelineFn === 'function') {
-          console.log('[NeuralMouth] Transformers.js loaded from:', url);
-          break;
-        }
-      } catch(e) {
-        console.warn('[NeuralMouth] Transformers CDN failed:', url, e.message);
-      }
-    }
-    if (!pipelineFn) {
-      this.error = 'Transformers.js failed to load';
+    // ── Spin up Web Worker from inline <script type="text/plain" id="slmWorkerSrc"> ──
+    // All model loading + inference runs in the worker. Zero main-thread blocking.
+    let workerBlobUrl = null;
+    try {
+      const src = document.getElementById('slmWorkerSrc')?.textContent || '';
+      if (!src.trim()) throw new Error('Worker source element not found');
+      const blob = new Blob([src], { type: 'text/javascript' });
+      workerBlobUrl = URL.createObjectURL(blob);
+    } catch(e) {
+      this.error = 'Blob URL failed: ' + e.message;
       this.loading = false;
-      onProgress('NeuralMouth: Transformers.js unavailable — symbolic fallback active');
+      onProgress('NeuralMouth: ' + this.error);
       return false;
     }
-    // Configure env
-    if (env) {
-      try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_) {}
-    }
 
-    // ── Model cascade: best → fallback ──
-    // SmolLM2-360M-Instruct: causal decoder, instruction-tuned on HuggingFace Smol Corpus.
-    // Dramatically better than Flan-T5 for multi-turn reasoning, comparison, speculation.
-    // Uses chat_template format: <|im_start|>system...user...assistant<|im_end|>
-    // Flan-T5 kept as fallback for low-memory environments.
-    const MODEL_CASCADE = [
-      { id: 'HuggingFaceTB/SmolLM2-360M-Instruct', type: 'text-generation',      isDecoder: true  },
-      { id: 'HuggingFaceTB/SmolLM2-135M-Instruct', type: 'text-generation',      isDecoder: true  },
-      { id: 'Xenova/flan-t5-base',                  type: 'text2text-generation', isDecoder: false },
-      { id: 'Xenova/flan-t5-small',                 type: 'text2text-generation', isDecoder: false },
-    ];
-    const progressCb = (info) => {
-      if (info.status === 'downloading' || info.status === 'progress') {
-        const pct = (info.loaded && info.total) ? Math.round(info.loaded / info.total * 100) : '?';
-        onProgress(`NeuralMouth: Downloading model (${pct}%)`);
-        try { updateBootBar(0.5 + ((info.loaded||0)/(info.total||1)) * 0.45, 'NeuralMouth: Downloading...'); } catch(_) {}
-      }
-    };
-
-    let lastErr = null;
-    for (const { id, type, isDecoder } of MODEL_CASCADE) {
+    return new Promise((resolve) => {
       try {
-        onProgress(`NeuralMouth: Loading ${id}...`);
-        console.log('[NeuralMouth] Attempting model:', id);
-        this.pipeline = await pipelineFn(type, id, { progress_callback: progressCb });
-        this.modelId = id;
-        this._pipelineType = type;
-        this._isDecoder = isDecoder;
-        this.ready = true;
-        this.loading = false;
-        window._webllmReady = true;
-        onProgress('NeuralMouth: SLM ready ✓ (' + id + ')');
-        console.log('[NeuralMouth] Loaded:', id, '| decoder:', isDecoder);
-        return true;
-      } catch(modelErr) {
-        lastErr = modelErr;
-        console.warn('[NeuralMouth] Model failed:', id, modelErr.message || modelErr);
-        this.pipeline = null;
-      }
-    }
-
-    this.error = lastErr?.message || 'All models failed';
-    this.loading = false;
-    onProgress('NeuralMouth: All models failed — ' + this.error.slice(0, 80));
-    console.error('[NeuralMouth] All models failed. Last:', lastErr);
-    return false;
-  }
-
-  // Internal generate — dual-mode: SmolLM2 chat template OR Flan-T5 task-prefix.
-  // SmolLM2 uses ChatML format: <|im_start|>system / user / assistant<|im_end|>
-  // Flan-T5 uses task-prefix: "Answer the question:\n\nFacts: ...\nAnswer:"
-  // _isDecoder is set during model cascade loading.
-  async _generate(taskPrefix, contentPrompt, maxTokens=80) {
-    if (!this.ready || !this.pipeline) throw new Error('NeuralMouth not ready');
-
-    let raw = '';
-    if (this._isDecoder) {
-      // ── SmolLM2 / causal decoder path ──
-      // Use proper ChatML messages format for best quality
-      const systemMsg = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct and brief — no lists, no markdown, no disclaimers.';
-      const userMsg = taskPrefix ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 600) : contentPrompt.slice(0, 600);
-      const messages = [
-        { role: 'system', content: systemMsg },
-        { role: 'user',   content: userMsg },
-      ];
-      try {
-        const result = await this.pipeline(messages, {
-          max_new_tokens: Math.min(maxTokens, 150),
-          do_sample: false,
-          temperature: 1.0,
-          repetition_penalty: 1.2,
-          return_full_text: false, // only new tokens — prevents prompt echo
-        });
-        // SmolLM2 returns the full generated text including the prompt
-        const genText = result?.[0]?.generated_text;
-        if (Array.isArray(genText)) {
-          // Messages format: last element is the assistant response
-          raw = (genText[genText.length - 1]?.content ?? '').trim();
-        } else {
-          raw = (genText ?? '').trim();
-          // Strip everything before <|im_start|>assistant if present
-          const assistantIdx = raw.lastIndexOf('<|im_start|>assistant');
-          if (assistantIdx !== -1) raw = raw.slice(assistantIdx + 21).replace(/<\|im_end\|>.*$/s, '').trim();
-        }
+        this._worker = new Worker(workerBlobUrl, { type: 'module' });
       } catch(e) {
-        console.warn('[NeuralMouth decoder] generate failed:', e);
-        throw e;
+        this.error = 'Worker.new failed: ' + e.message;
+        this.loading = false;
+        onProgress('NeuralMouth: ' + this.error);
+        resolve(false);
+        return;
       }
-    } else {
-      // ── Flan-T5 / seq2seq path (fallback) ──
-      const input = taskPrefix
-        ? `${taskPrefix}\n\n${contentPrompt}`.slice(0, 480)
-        : contentPrompt.slice(0, 480);
-      const result = await this.pipeline(input, {
-        max_new_tokens: Math.min(maxTokens, 120),
-        do_sample: false,
-        num_beams: 1,
-        repetition_penalty: 1.3,
-      });
-      raw = (result?.[0]?.generated_text ?? '').trim();
-    }
 
-    return raw
-      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi, '')
-      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi, '')
-      .replace(/^(Sure[,!]\s*[^.!?]*[.!?]\s*)/i, '')
-      .replace(/^Lexica:\s*/i, '')
-      .split('\n')
-      .filter(line => !/^\s*[\*\-•]|^\s*\d+\./.test(line))
-      .join(' ')
-      .replace(/\s{2,}/g, ' ')
-      .split(/\n\n/)[0]
-      .slice(0, 400)
-      .trim();
+      this._worker.onmessage = (ev) => {
+        const msg = ev.data;
+
+        // ── Progress / status messages ──
+        if (msg.type === 'progress') {
+          if (msg.status === 'loading') {
+            onProgress(`NeuralMouth: Loading ${msg.model.split('/').pop()}...`);
+            try { updateBootBar(0.55, 'NeuralMouth: Loading ' + msg.model.split('/').pop() + '...'); } catch(_) {}
+          } else if (msg.status === 'download') {
+            const pct = msg.total ? Math.round(msg.loaded/msg.total*100) : '?';
+            onProgress(`NeuralMouth: Downloading (${pct}%)`);
+            try { updateBootBar(0.55 + (msg.loaded||0)/(msg.total||1)*0.40, 'Downloading...'); } catch(_) {}
+          } else if (msg.status === 'failed') {
+            this.error = msg.error || 'All models failed';
+            this.loading = false;
+            onProgress('NeuralMouth: ' + this.error.slice(0,80));
+            resolve(false);
+          }
+          return;
+        }
+
+        // ── Model ready ──
+        if (msg.type === 'ready') {
+          this.modelId = msg.model;
+          this._isDecoder = msg.isDecoder;
+          this._pipelineType = msg.isDecoder ? 'text-generation' : 'text2text-generation';
+          this.ready = true;
+          this.loading = false;
+          window._webllmReady = true;
+          onProgress('NeuralMouth: SLM ready ✓ (' + msg.model.split('/').pop() + ') [Web Worker]');
+          console.log('[NeuralMouth] Worker ready:', msg.model, 'decoder:', msg.isDecoder);
+          // Update cognition tab UI
+          try {
+            const dot = document.getElementById('slmDot'); if (dot) dot.className = 'slm-dot ready';
+            const lbl = document.getElementById('slmLabel'); if (lbl) lbl.textContent = 'NeuralMouth ready (Web Worker 🔀)';
+            const mn = document.getElementById('slmModelName'); if (mn) mn.textContent = msg.model;
+          } catch(_) {}
+          resolve(true);
+          return;
+        }
+
+        // ── RPC responses (result / error) ──
+        if (msg.type === 'result' || msg.type === 'error') {
+          const pending = this._pendingRequests.get(msg.id);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this._pendingRequests.delete(msg.id);
+            if (msg.type === 'result') pending.resolve(msg.text || '');
+            else pending.reject(new Error(msg.error || 'worker error'));
+          }
+        }
+      };
+
+      this._worker.onerror = (ev) => {
+        console.error('[NeuralMouth Worker] Error:', ev);
+        // Route to pending requests if any
+        if (this._pendingRequests.size > 0) {
+          this._pendingRequests.forEach(p => { clearTimeout(p.timeout); p.reject(new Error('Worker crashed')); });
+          this._pendingRequests.clear();
+        }
+        if (!this.ready) {
+          this.error = ev.message || 'Worker error';
+          this.loading = false;
+          onProgress('NeuralMouth: Worker error — ' + this.error.slice(0,60));
+          resolve(false);
+        }
+      };
+
+      this._worker.postMessage({ type: 'init' });
+      onProgress('NeuralMouth: Worker launched, loading model...');
+    });
   }
 
-  // ── ENSEMBLE SYNTHESIS ──
+  // ── Worker RPC — send to worker, return promise resolved by onmessage ──
+  _workerCall(payload, timeoutMs=16000) {
+    if (!this._worker || !this.ready) return Promise.reject(new Error('Worker not ready'));
+    const id = this._nextId++;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._pendingRequests.delete(id);
+        reject(new Error('Worker RPC timeout after ' + timeoutMs + 'ms'));
+      }, timeoutMs);
+      this._pendingRequests.set(id, { resolve, reject, timeout });
+      this._worker.postMessage({ ...payload, id });
+    });
+  }
+
+  // ── _generate: routes ALL inference through Web Worker — main thread never blocked ──
+  async _generate(taskPrefix, contentPrompt, maxTokens=80, conversationHistory=[]) {
+    if (!this.ready) throw new Error('NeuralMouth not ready');
+    return this._workerCall({ type:'generate', taskPrefix, contentPrompt, maxTokens, conversationHistory }, 18000);
+  }
+
+  // ── _generateMessages: decoder chat-format inference via worker ──
+  async _generateMessages(messages, maxTokens=120) {
+    if (!this.ready) throw new Error('NeuralMouth not ready');
+    if (!this._isDecoder) {
+      const uMsg = messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
+      const sMsg = messages.find(m=>m.role==='system')?.content || '';
+      return this._generate(sMsg.slice(0,80), uMsg.slice(0,380), maxTokens);
+    }
+    return this._workerCall({ type:'messages', messages, maxTokens }, 18000);
+  }
   // Runs 3 specialized role prompts in parallel, selects best by grounding score.
   // Thinker: systematic reasoning, links facts. Narrator: fluid prose output. Critic: challenges and refines.
   // Only fires when SmolLM2 decoder is loaded (fast enough for parallel calls).
@@ -5379,13 +5494,8 @@ class NeuralMouth {
         ...historyMsgs,
         { role: 'user', content: `Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}\n\nKey insight:` },
       ];
-      const r1 = await this.pipeline(thinkerMsgs, {
-        max_new_tokens: 70,
-        do_sample: false,
-        repetition_penalty: 1.2,
-        return_full_text: false,
-      });
-      trace = extractText(r1);
+      const traceRaw = await this._generateMessages(thinkerMsgs, 70);
+      trace = traceRaw || '';
     } catch(e) { trace = ''; }
 
     // ── PASS 2: SPEAKER ── Uses the trace to produce a polished final answer
@@ -5397,13 +5507,7 @@ class NeuralMouth {
         ...historyMsgs,
         { role: 'user', content: `${traceHint}Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}` },
       ];
-      const r2 = await this.pipeline(speakerMsgs, {
-        max_new_tokens: 120,
-        do_sample: false,
-        repetition_penalty: 1.15,
-        return_full_text: false,
-      });
-      answer = extractText(r2);
+      answer = await this._generateMessages(speakerMsgs, 120) || '';
     } catch(e) { return null; }
 
     if (!answer || answer.length < 8) return null;
@@ -5428,20 +5532,7 @@ class NeuralMouth {
           { role: 'system', content: 'You are Lexica, a curious AI knowledge engine running in a browser. You learn from Wikipedia articles loaded by the user and reason over a knowledge graph. Be brief (1-2 sentences), direct, and a bit thoughtful. Never make up facts. If you don\'t know, say so.' },
           { role: 'user', content: `${userInput.slice(0, 140)}\n\n[My knowledge state: ${state}]` },
         ];
-        const result = await this.pipeline(messages, {
-          max_new_tokens: 90,
-          do_sample: false,
-          repetition_penalty: 1.2,
-          return_full_text: false,
-        });
-        const genText = result?.[0]?.generated_text;
-        if (Array.isArray(genText)) {
-          raw = (genText[genText.length - 1]?.content ?? '').trim();
-        } else {
-          raw = (genText ?? '').trim();
-          const ai = raw.lastIndexOf('<|im_start|>assistant');
-          if (ai !== -1) raw = raw.slice(ai + 21).replace(/<\|im_end\|>.*$/s, '').trim();
-        }
+        raw = await this._generateMessages(messages, 90);
       } else {
         // Flan-T5 fallback
         const task = `Write a short reply (1-2 sentences) as Lexica, an AI knowledge assistant.`;
@@ -5498,22 +5589,7 @@ class NeuralMouth {
         { role: 'user',   content: userMsg },
       ];
       try {
-        const result = await this.pipeline(messages, {
-          max_new_tokens: 120,
-          do_sample: false,
-          temperature: 1.0,
-          repetition_penalty: 1.2,
-          return_full_text: false, // only new tokens, no prompt echo
-        });
-        const genText = result?.[0]?.generated_text;
-        let raw = '';
-        if (Array.isArray(genText)) {
-          raw = (genText[genText.length - 1]?.content ?? '').trim();
-        } else {
-          raw = (genText ?? '').trim();
-          const ai = raw.lastIndexOf('<|im_start|>assistant');
-          if (ai !== -1) raw = raw.slice(ai + 21).replace(/<\|im_end\|>.*$/s, '').trim();
-        }
+        const raw = await this._generateMessages(messages, 120);
         if (raw && raw.length > 10)
           return raw.replace(/^(Answer:|Facts:|Question:|Sure[,!]\s*)/i, '').replace(/\n/g,' ').trim();
       } catch(e) { /* fall through to task-prefix path */ }
@@ -5578,10 +5654,8 @@ class NeuralMouth {
           { role: 'system', content: 'Extract subject-predicate-object triples from text. Output only valid JSON array. Example: [{"s":"London","p":"is_capital_of","o":"England"}]. Use short noun phrases for s and o. Use snake_case for p.' },
           { role: 'user',   content: `Text: ${text}\n\nExtract 3 triples as JSON array:` },
         ];
-        const result = await this.pipeline(messages, { max_new_tokens: 120, do_sample: false, return_full_text: false });
-        const genText = result?.[0]?.generated_text;
-        if (Array.isArray(genText)) raw = (genText[genText.length-1]?.content ?? '').trim();
-        else { raw = (genText ?? '').trim(); const ai = raw.lastIndexOf('<|im_start|>assistant'); if (ai !== -1) raw = raw.slice(ai+21).replace(/<\|im_end\|>.*$/s,'').trim(); }
+        const raw2 = await this._generateMessages(messages, 120);
+        raw = raw2 || '';
       } else {
         const task = `Extract 3 subject-predicate-object triples from the text. Output only JSON: [{"s":"subject","p":"predicate","o":"object"}]`;
         raw = await this._generate(task, `Text: ${text}\nJSON:`, 100);
@@ -7595,111 +7669,119 @@ function _expertSetSynthesis(text) {
 // Runs four sequential SLM calls with agent-specific prompts.
 // Each agent receives the previous agent's output as context.
 // Returns the Synthesizer's final answer string.
+// ═══════════════════════════════════════════════════════
+//  EXPERT ENSEMBLE — Real collaborative debate
+//  Each agent reads the previous and explicitly challenges, builds on,
+//  or contradicts them. The panel shows genuine disagreement.
+// ═══════════════════════════════════════════════════════
 async function expertEnsembleQuery(question, kgFacts, evidenceSentences, conversationHistory) {
   const nm = engine.neuralMouth;
-  if (!nm?.ready) {
-    _expertReset('SLM not ready');
-    return null;
-  }
+  if (!nm?.ready) { _expertReset('SLM not ready'); return null; }
 
+  // Build high-quality context — filter garbage triples first
   const goodFacts = kgFacts.filter(f => NeuralMouth._tripleQuality(f)).slice(0, 8);
   const factsStr = goodFacts.map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
   const evStr = evidenceSentences
-    .filter(s => s && s.length > 20 && s.length < 200 && /[.!?]$/.test(s.trim()))
-    .slice(0, 3).join(' | ');
-  const context = [factsStr, evStr].filter(Boolean).join(' || ').slice(0, 400);
+    .filter(s => s && s.length > 25 && s.length < 200 && /[.!?]$/.test(s.trim()))
+    .slice(0, 3).join(' ');
+  const context = [factsStr, evStr].filter(Boolean).join(' | ').slice(0, 380);
   if (!context.trim()) { _expertReset('no KG data'); return null; }
 
+  const timeout = ms => new Promise(r => setTimeout(() => r(null), ms));
+  const safe = async (promise, fallback='') => { try { return await promise || fallback; } catch(e) { return fallback; } };
   await yieldToMain();
 
-  // ── AGENT 1: Analyst ──
-  // Reads raw KG facts, identifies what's actually known vs inferred.
+  // ── ANALYST ── Reads raw facts, states only what the KG actually knows
   _expertSetThinking('Analyst');
   await yieldToMain();
-  let analystOut = '';
-  try {
-    const task = 'You are the Analyst. List the key facts relevant to the question. Be brief and factual.';
-    const content = `KG facts: ${context}\nQuestion: ${question.slice(0, 100)}\nKey facts:`;
-    analystOut = await Promise.race([
-      nm._generate(task, content, 80),
-      new Promise(r => setTimeout(() => r('(timeout)'), 6000))
-    ]) || '';
-  } catch(e) { analystOut = '(error)'; }
-  _expertSetDone('Analyst', analystOut);
+  const analystOut = await safe(Promise.race([
+    nm._generate(
+      'State the key facts from the given data that directly answer the question. Only mention what is explicitly in the facts. Do not infer.',
+      `Facts: ${context}\nQuestion: ${question.slice(0,100)}\nKnown facts:`,
+      85
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Analyst', analystOut || '(no output)');
   await yieldToMain();
 
-  // ── AGENT 2: Reasoner ──
-  // Reads Analyst output, builds multi-hop logic chains.
+  // ── REASONER ── Reads Analyst, builds on it OR challenges if Analyst missed something
   _expertSetThinking('Reasoner');
   await yieldToMain();
-  let reasonerOut = '';
-  try {
-    const task = "You are the Reasoner. Given the Analyst's facts, explain the logical chain that answers the question.";
-    const content = `Analyst found: ${analystOut.slice(0, 150)}\nQuestion: ${question.slice(0, 100)}\nReasoning chain:`;
-    reasonerOut = await Promise.race([
-      nm._generate(task, content, 90),
-      new Promise(r => setTimeout(() => r('(timeout)'), 6000))
-    ]) || '';
-  } catch(e) { reasonerOut = '(error)'; }
-  _expertSetDone('Reasoner', reasonerOut);
+  const reasonerPrompt = analystOut && analystOut.length > 10
+    ? `Analyst stated: "${analystOut.slice(0,140)}"\n\nDo you agree? Build on this or correct it. Trace the logical chain. What does it imply about the question?`
+    : `No analyst output. Use the facts directly to reason about the question.`;
+  const reasonerOut = await safe(Promise.race([
+    nm._generate(
+      'You are the Reasoner. Engage with the Analyst. Build on correct points or challenge wrong ones. Show your reasoning chain.',
+      `${reasonerPrompt}\nFacts: ${context.slice(0,200)}\nQuestion: ${question.slice(0,80)}\nReasoning:`,
+      100
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Reasoner', reasonerOut || '(no output)');
   await yieldToMain();
 
-  // ── AGENT 3: Critic ──
-  // Reads both, challenges weak inferences, flags what's unsupported.
+  // ── CRITIC ── Reads both, explicitly contradicts or approves, flags gaps
   _expertSetThinking('Critic');
   await yieldToMain();
-  let criticOut = '';
-  try {
-    const task = 'You are the Critic. Identify any unsupported claims or gaps in the reasoning. Be concise.';
-    const content = `Facts: ${analystOut.slice(0, 100)}\nReasoning: ${reasonerOut.slice(0, 150)}\nQuestion: ${question.slice(0, 80)}\nCritique:`;
-    criticOut = await Promise.race([
-      nm._generate(task, content, 70),
-      new Promise(r => setTimeout(() => r('(timeout)'), 5000))
-    ]) || '';
-  } catch(e) { criticOut = '(error)'; }
-  _expertSetDone('Critic', criticOut);
+  const criticContent = [
+    analystOut ? `Analyst: "${analystOut.slice(0,110)}"` : '',
+    reasonerOut ? `Reasoner: "${reasonerOut.slice(0,110)}"` : '',
+    `Question: ${question.slice(0,80)}`,
+    `Available facts: ${context.slice(0,150)}`,
+    'Do you see any unsupported claims above? What is missing or wrong? Be specific.',
+  ].filter(Boolean).join('\n');
+  const criticOut = await safe(Promise.race([
+    nm._generate(
+      'You are the Critic. Point out what the other agents got wrong or unsupported. Mention which agent specifically. Be direct.',
+      criticContent,
+      80
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Critic', criticOut || '(no objections)');
   await yieldToMain();
 
-  // ── AGENT 4: Synthesizer ──
-  // Integrates all three into a single clean answer.
+  // ── SYNTHESIZER ── Arbitrates the debate into a final grounded answer
   const lbl = document.getElementById('expertStatusLbl');
-  if (lbl) lbl.textContent = 'Synthesizer composing...';
+  if (lbl) lbl.textContent = 'Synthesizer arbitrating...';
   await yieldToMain();
+
+  const debateSummary = [
+    analystOut ? `Analyst found: ${analystOut.slice(0,100)}` : '',
+    reasonerOut ? `Reasoner argued: ${reasonerOut.slice(0,100)}` : '',
+    criticOut ? `Critic flagged: ${criticOut.slice(0,80)}` : '',
+  ].filter(Boolean).join(' | ');
+
   let finalAnswer = '';
   try {
     if (nm._isDecoder) {
-      // SmolLM2: full chat with all agents as context
-      const sysMsg = 'You are Lexica. Given debate notes from three agents, write a single clear answer. Be direct and grounded. No disclaimers.';
-      const histMsgs = (conversationHistory||[]).slice(-3).flatMap(t => [
-        { role: 'user', content: t.q.slice(0,100) },
-        { role: 'assistant', content: t.a.slice(0,120) },
-      ]);
-      const userMsg = `Analyst: ${analystOut.slice(0,120)}\nReasoner: ${reasonerOut.slice(0,120)}\nCritic: ${criticOut.slice(0,100)}\n\nQuestion: ${question.slice(0,100)}\nFinal answer:`;
-      const msgs = [{ role:'system', content:sysMsg }, ...histMsgs, { role:'user', content:userMsg }];
-      const result = await Promise.race([
-        nm.pipeline(msgs, { max_new_tokens:130, do_sample:false, temperature:1.0, repetition_penalty:1.2, return_full_text:false }),
-        new Promise(r => setTimeout(() => r(null), 8000))
-      ]);
-      if (result) {
-        const g = result?.[0]?.generated_text;
-        if (Array.isArray(g)) finalAnswer = (g[g.length-1]?.content||'').trim();
-        else { const ai=(g||'').lastIndexOf('<|im_start|>assistant'); finalAnswer = ai!==-1 ? g.slice(ai+21).replace(/<\|im_end\|>.*$/s,'').trim() : (g||'').trim(); }
-      }
+      const msgs = [
+        { role:'system', content:'You are Lexica. After reading a three-agent debate, write one clear, grounded answer. Incorporate valid points, dismiss unsupported ones. No disclaimers. No lists.' },
+        ...(conversationHistory||[]).slice(-2).flatMap(t => [
+          { role:'user', content:t.q.slice(0,80) },
+          { role:'assistant', content:t.a.slice(0,100) },
+        ]),
+        { role:'user', content:`Debate: ${debateSummary}\n\nQuestion: ${question.slice(0,100)}\n\nFinal answer:` },
+      ];
+      finalAnswer = await safe(Promise.race([nm._generateMessages(msgs, 140), timeout(12000)]));
     } else {
-      // Flan-T5 fallback
-      const task = 'Write a single clear answer using the three agents\' notes.';
-      const content = `Notes: Analyst: ${analystOut.slice(0,100)} | Reasoner: ${reasonerOut.slice(0,100)} | Critic: ${criticOut.slice(0,80)}\nQuestion: ${question.slice(0,80)}\nAnswer:`;
-      finalAnswer = await Promise.race([
-        nm._generate(task, content, 110),
-        new Promise(r => setTimeout(() => r(null), 8000))
-      ]) || '';
+      finalAnswer = await safe(Promise.race([
+        nm._generate(
+          'Write one clear answer. Incorporate the best points from the debate. Dismiss unsupported claims.',
+          `Debate: ${debateSummary}\nQuestion: ${question.slice(0,80)}\nAnswer:`,
+          110
+        ),
+        timeout(10000)
+      ]));
     }
-    finalAnswer = finalAnswer
-      .replace(/^(Answer:|Final answer:|Sure[,!]\s*|Lexica:\s*)/i, '')
+    finalAnswer = (finalAnswer||'')
+      .replace(/^(Answer:|Final answer:|Sure[,!]\s*|Lexica:\s*)/i,'')
       .replace(/\n/g,' ').trim();
   } catch(e) { finalAnswer = ''; }
 
-  _expertSetSynthesis(finalAnswer || '(synthesis failed)');
+  _expertSetSynthesis(finalAnswer || '(synthesis failed — check console)');
   return finalAnswer || null;
 }
 async function sendQ(){
