@@ -1,0 +1,9393 @@
+'use strict';
+// ─────────────────────────────────────────────────────
+// YIELD TO MAIN — prevents UI freezing during heavy computation
+// Uses scheduler.yield() when available (Chrome 129+), falls back to setTimeout
+// ─────────────────────────────────────────────────────
+const yieldToMain = (typeof scheduler !== 'undefined' && scheduler.yield)
+  ? () => scheduler.yield()
+  : () => new Promise(r => setTimeout(r, 0));
+
+// ═══════════════════════════════════════════════════════════
+//  LEXICA V0 — NEURO-SYMBOLIC ASCENSION
+//  Architecture (E.L.B.E.R.R. — Epistemic Logic Based Engine for Recursive Reasoning)
+//  L1  — Lexical Analysis (POS, NER, Roles)
+//  L2  — Semantic Indexing (PMI, BM25, Word Profiles) + SLM query expansion
+//  L3  — Knowledge Hypergraph (n-ary triples, TMS, cascades) + SLM triple extraction
+//  L4  — Logical Reasoning (intent, syllogism, refutation) + SLM contradiction eval
+//  L5  — NLG Synthesis Engine (graphRAG + synthesizeWithReasoning via SLM)
+//  L6  — Society of Mind (Skeptic × Literal × Dreamer debate)
+//  L7  — Synthetic Qualia (Joy · Pain · Curiosity · Confusion)
+//  L8  — Gödelian Self-Modification (theorem→rewrite loop)
+//  L9  — Curiosity Engine (entropy scan + autonomous Wikipedia learning + SLM monologue)
+//  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
+//  L11 — NeuralMouth (Transformers.js — SLM across all layers L2–L5, social, N3 bridge)
+//  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
+//  ── LEXICA 4.0 ADDITIONS ──
+//  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
+//  L14 — GoalStack (self-authored objectives generated from drive pressures + KG structure)
+//  L15 — SelfModel (reasoning history, knowledge boundary, mental simulation loop)
+//  L16 — EpisodicMemory (cross-turn discourse arc: established, challenged, unresolved)
+//  L17 — UserModel (inferred knowledge level, style, interests, corrections)
+//  L18 — PreferenceEngine (topic valence accumulation from synthesis outcomes)
+//  L19 — FailureTracker (failed queries become urgent learning targets)
+//  L20 — SocialModelAdapter (register adaptation from UserModel)
+// ═══════════════════════════════════════════════════════════
+
+
+// ── ENTITY TYPE SYSTEM ──
+const T={PERSON:'person',ORG:'org',GAME:'game',FOOD:'food',PLACE:'place',TECH:'tech',CONCEPT:'concept',EVENT:'event',UNKNOWN:'unknown'};
+const CS_TYPES={'minecraft':T.GAME,'bread':T.FOOD,'einstein':T.PERSON,'albert einstein':T.PERSON,'microsoft':T.ORG,'mojang':T.ORG,'mojang studios':T.ORG,'google':T.ORG,'apple':T.ORG,'notch':T.PERSON,'markus persson':T.PERSON,'bill gates':T.PERSON,'steve jobs':T.PERSON,'satya nadella':T.PERSON,'bitcoin':T.TECH,'python':T.TECH,'javascript':T.TECH,'linux':T.TECH,'united states':T.PLACE,'england':T.PLACE,'sweden':T.PLACE,'shakespeare':T.PERSON,'william shakespeare':T.PERSON,'world war ii':T.EVENT,'world war i':T.EVENT};
+const TYPE_RE={person:/\b(person|physicist|scientist|inventor|composer|artist|writer|politician|athlete|mathematician|philosopher|engineer|entrepreneur|director|actor|musician|historian|biologist|chemist|professor|architect|astronaut|explorer|general|president|king|queen)\b/i,org:/\b(company|corporation|studio|organization|organisation|firm|enterprise|university|institution|agency|group|association|department|foundation|society)\b/i,game:/\b(game|videogame|video game|sandbox|rpg|fps|gameplay|players|gamer|arcade|simulation|puzzle game|dungeon)\b/i,food:/\b(food|bread|pastry|dish|meal|cuisine|ingredient|flour|baked|cooked|edible|recipe|snack|beverage|fruit|vegetable|meat|grain)\b/i,place:/\b(city|country|nation|state|region|island|continent|province|territory|town|village|river|mountain|ocean|lake|sea|forest|desert|capital)\b/i,tech:/\b(software|operating system|programming language|framework|platform|protocol|algorithm|hardware|device|application|system|database|network|engine)\b/i,event:/\b(war|battle|election|revolution|disaster|tournament|championship|conference|summit|ceremony|trial|crisis|attack|invasion|movement)\b/i};
+
+class EntityTypeSystem{
+  constructor(){this.m=new Map(Object.entries(CS_TYPES));}
+  learn(subj,obj){const sn=subj.toLowerCase();for(const[tn,re]of Object.entries(TYPE_RE)){if(re.test(obj)){this.m.set(sn,T[tn.toUpperCase()]);return;}}}
+  get(name){return this.m.get(name.toLowerCase())||T.UNKNOWN;}
+  set(name,type){this.m.set(name.toLowerCase(),type);}
+  compatible(ta,tb){if(ta===T.FOOD&&(tb===T.GAME||tb===T.TECH))return false;if(ta===T.PERSON&&tb===T.FOOD)return false;return true;}
+}
+
+// ── STOPWORDS ──
+const BASE_STOP=new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','by','from','as','is','was','are','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','that','this','these','those','it','its','they','them','their','what','which','who','when','where','why','how','all','each','every','both','few','more','most','other','some','such','into','than','then','about','above','after','also','not','no','nor','so','yet','there','here','if','while','since','before','because','although','however','therefore','thus','hence','just','very','too','even','i','you','he','she','we','me','him','her','us','my','your','his','our','one','two','three','four','five','six','seven','eight','nine','ten','during','through','between','among','against','within','without','upon','across','along','following','around','still','though','often','later','new','many','much','several','same','different','own','said','made','known','used','well','back','any','again','once','only','over','under','out','up','down','off','away','now','let','per','via','due','get','got','like','then','been','into']);
+let STOPWORDS=new Set([...BASE_STOP]);
+
+// ── STEMMER ──
+const _sc=new Map();
+function stem(w){w=w.toLowerCase().replace(/[^a-z]/g,'');if(w.length<=3)return w;if(_sc.has(w))return _sc.get(w);let r=w;if(r.endsWith("'s"))r=r.slice(0,-2);if(r.endsWith('sses'))r=r.slice(0,-2);else if(r.endsWith('ies')&&r.length>4)r=r.slice(0,-3)+'y';else if(!r.endsWith('ss')&&r.endsWith('s')&&r.length>4&&!/[sxzaeiou]$/.test(r.slice(0,-1)))r=r.slice(0,-1);if(r.endsWith('ied')&&r.length>5)r=r.slice(0,-3)+'y';else if(r.endsWith('eed')&&r.length>4)r=r.slice(0,-1);else if(r.endsWith('ed')&&r.length>5){const b=r.slice(0,-2);if(/[aeiou]/.test(b.slice(-3))){if(b.length>2&&b.slice(-1)===b.slice(-2,-1)&&!/[aeioulrs]/.test(b.slice(-1)))r=b.slice(0,-1);else if(/[^aeiou][aeiou][^aeioulrwxy]$/.test(b))r=b+'e';else r=b;}}if(r.endsWith('ing')&&r.length>6){const b=r.slice(0,-3);if(b.length>=3){if(b.slice(-1)===b.slice(-2,-1)&&!/[aeioulrs]/.test(b.slice(-1)))r=b.slice(0,-1);else if(/[^aeiou][aeiou][^aeioulrwxy]$/.test(b))r=b+'e';else if(/[aeiou]/.test(b.slice(-3)))r=b;}}const suf=[['ational','ate'],['ization','ize'],['isation','ise'],['tional','tion'],['nesses',''],['ments',''],['ities',''],['ness',''],['ment',''],['ious',''],['ical',''],['ive',''],['ful',''],['able',''],['ible',''],['ity',''],['ism',''],['ate',''],['ize',''],['ise',''],['ion',''],['al',''],['er',''],['ly','']];for(const[s,rep]of suf){if(r.endsWith(s)&&r.length-s.length+rep.length>=3){r=r.slice(0,r.length-s.length)+rep;break;}}_sc.set(w,r);return r;}
+
+// ── TEXT UTILS ──
+function tokenize(s){return s.toLowerCase().replace(/[^a-z0-9'\s]/g,' ').split(/\s+/).filter(w=>w.length>0);}
+function cWords(s){return tokenize(s).filter(w=>!STOPWORDS.has(w)&&w.length>2);}
+function sWords(s){return cWords(s).map(w=>stem(w));}
+function topicOv(s1,s2){const a=new Set(sWords(s1)),b=new Set(sWords(s2));if(!a.size||!b.size)return 0;let n=0;a.forEach(w=>{if(b.has(w))n++;});return n/(a.size+b.size-n);}
+function cap1(s){if(!s)return'';return s.charAt(0).toUpperCase()+s.slice(1);}
+function finalize(t){if(!t)return'';t=t.replace(/\s{2,}/g,' ').trim();t=t.replace(/^(which|that|who|where|when|because|since|although|though)\s+/i,'');t=t.replace(/ ([,.:;!?])/g,'$1');if(t.length)t=cap1(t);if(!/[.!?]$/.test(t))t+='.';return t;}
+function isValid(t){if(!t)return false;const w=t.trim().split(/\s+/);if(w.length<5)return false;if(!/\b(is|was|are|were|has|had|have|did|does|became|made|found|led|used|began|got|won|sold|grew|fell|created|developed|released|launched|founded|established|designed|wrote|built|produced|published|described|known|considered|included|contained|required|resulted|enabled|provided)\b/i.test(t))return false;return true;}
+function extractYear(text){const m=(text||'').match(/\b(1[0-9]{3}|20[0-9]{2})\b/);return m?parseInt(m[1]):null;}
+const ABBREVS=new Set(['mr','mrs','ms','dr','prof','sr','jr','vs','etc','inc','corp','ltd','co','vol','no','fig','jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec','u.s','u.k','e.g','i.e','p.m','a.m','st','ave','ph.d','m.d','op','ed']);
+
+function cleanText(t){return t.replace(/\r\n|\r/g,'\n').replace(/\[[\w\s,]+\]/g,'').replace(/={2,}[^=]+=+/g,' ').replace(/\{\{[\s\S]*?\}\}/g,'').replace(/https?:\S+/g,'').replace(/(?:^|\n)\s*(?:\*|\-|•|·|\d+[.)])\s+/gm,' ').replace(/\(\s*(?:born|died|fl\.?)\s+[\d–\-]+[^)]{0,30}\)/gi,'').replace(/\n{2,}/g,' ').replace(/\s{2,}/g,' ').trim();}
+
+// ── SENTENCE QUALITY GATE ──
+// Every sentence passes this before entering BM25 or KG.
+// This is the primary fix for garbage like "Millions user erik games".
+function _isSentenceClean(s) {
+  if (!s || s.length < 30) return false;
+  const words = s.split(/\s+/);
+  if (words.length < 5) return false;
+  // Needs real alphabetic content
+  const alphaCount = (s.match(/[a-zA-Z]/g)||[]).length;
+  if (alphaCount < 20) return false;
+  // Reject if mostly numbers/symbols (table rows, reference lists)
+  const nonAlpha = words.filter(w => /^[\d\W]+$/.test(w));
+  if (nonAlpha.length > words.length * 0.5) return false;
+  // Reject Wikipedia markup / category artifacts
+  if (/^\s*(\[\[|\{\{|\||\*|#REDIRECT|Category:|File:|See also|References|External links)/i.test(s)) return false;
+  // Reject fragment pattern: sentence starts with 4+ lowercase words (not a proper sentence)
+  // catches "millions user erik games" and similar KG-poisoning fragments
+  const startsLower = s.match(/^([a-z][a-z]+ ){4}/);
+  if (startsLower) return false;
+  // Must have at least one clause-forming word (verb, modal, or state)
+  // Keep broad: many valid sentences use verbs not in a short list
+  if (!/\b(is|are|was|were|has|have|had|can|could|will|would|should|may|might|must|shall|does|did|do|been|be|being|made|makes|make|creates|created|create|uses|use|used|contains|contain|includes|include|features|feature|provides|provide|allows|allow|enables|enable|produces|produce|serves|serve|consists|consist|occurs|occur|appears|appear|represents|represent|became|becomes|become|remains|remain|helps|help|gives|give|takes|take|shows|show|plays|play|runs|run|comes|come|goes|go|gets|get|puts|put|keeps|keep|leads|lead|works|work|moves|move|changes|change|requires|require|supports|support|forms|form|holds|hold|covers|cover|measures|measure|weighs|weigh|means|mean|refers|refer|derives|derive|develops|develop|releases|release|describes|describe|defines|define|explains|explain|affects|affect|causes|cause|results|result|depends|depend|known|found|located|named|called|born|died|won|lost|sold|bought|built|written|published|launched|established|founded|acquired|fought|occurred|played|spread|increased|decreased|grew|fell|rose|dropped|returned|became|stayed|remained)\b/i.test(s)) return false;
+  return true;
+}
+function splitSentences(text){const c=cleanText(text),toks=c.match(/\S+/g)||[],res=[];let buf=[];for(let i=0;i<toks.length;i++){const tok=toks[i];buf.push(tok);if(/[.!?]["']?\s*$/.test(tok)){const cl=tok.toLowerCase().replace(/[.!?'"]+$/,'').replace(/[^a-z.]/g,'');const isAbbr=ABBREVS.has(cl)||(cl.length===1&&/[a-z]/.test(cl))||/[A-Z]\./.test(tok);if(!isAbbr&&!/^[a-z]/.test(toks[i+1]||'')){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);buf=[];}}}if(buf.length>=5){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);}const seen=new Set();return res.filter(s=>{const fp=s.slice(0,55).toLowerCase().replace(/\s+/g,'');if(seen.has(fp))return false;seen.add(fp);return true;});}
+function _yield(){return new Promise(r=>setTimeout(r,0));}
+
+// ─────────────────────────────────────────────────────
+// L1: POS TAGGER
+// ─────────────────────────────────────────────────────
+const POS_DETS=new Set(['the','a','an','this','that','these','those','my','your','his','her','its','our','their','each','every','some','any','all','both','either','neither','no','much','many','more','most','few','another','other','what','which','whose','several','enough','less','least']);
+const POS_PREPS=new Set(['in','on','at','to','for','of','with','by','from','as','into','through','during','before','after','above','below','between','among','against','along','following','around','upon','since','until','about','over','under','near','behind','beside','beyond','except','within','without','per','via','despite','toward','onto','off','out','across','inside','outside','underneath','beneath','according','due','instead','regarding','including','concerning','notwithstanding']);
+const POS_CONJ=new Set(['and','or','but','nor','so','yet','although','though','because','since','while','when','where','if','unless','until','whether','after','before','than','once','provided','assuming','granted','given']);
+const POS_AUX=new Set(['is','was','are','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','must','ought','need']);
+const POS_PRON=new Set(['i','me','my','mine','you','your','yours','he','him','his','she','her','hers','it','its','we','us','our','ours','they','them','their','theirs','who','whom','whose','which','what','this','that','these','those','myself','yourself','himself','herself','itself','ourselves','themselves','everyone','someone','anyone','nobody','nothing','everything','something','anything']);
+
+class POSTagger{
+  tag(sentence){
+    const toks=sentence.match(/[A-Za-z']+|[0-9]+(?:[,.][0-9]+)*|\S/g)||[];
+    const tagged=toks.map((w,i)=>({word:w,clean:w.toLowerCase(),pos:this._guess(w,w.toLowerCase(),i===0||/[.!?]/.test(toks[i-1]||''))}));
+    return this._ctx(tagged);
+  }
+  _guess(w,wl,isFirst){
+    if(!wl||!wl.length)return'PUNCT';
+    if(/^\d+/.test(wl))return'NUM';
+    if(POS_DETS.has(wl))return'DET';
+    if(POS_PREPS.has(wl))return'PREP';
+    if(POS_CONJ.has(wl))return'CONJ';
+    if(POS_AUX.has(wl))return'AUX';
+    if(POS_PRON.has(wl))return'PRON';
+    if(/^[A-Z][a-z]+/.test(w)&&!isFirst&&!POS_DETS.has(wl)&&!POS_PREPS.has(wl))return'PROPN';
+    if(/(?:tion|sion|ity|ness|ment|ance|ence|ship|dom|hood|ism|age|ure|ogy|phy|ery|ry|cy)$/.test(wl)&&wl.length>5)return'NOUN';
+    if(/(?:er|or|ee)$/.test(wl)&&wl.length>4&&!/^(her|over|under|after|other|either|however|whether|together|rather|never|ever|better|bigger|higher|lower|longer|fewer|deeper|later|earlier|wider|older|outer|inner|upper|center)$/.test(wl))return'NOUN';
+    if(/(?:ate|ify|ize|ise|en|ened)$/.test(wl)&&wl.length>4)return'VERB';
+    if(/(?:ed|ing)$/.test(wl)&&wl.length>4&&!POS_AUX.has(wl))return'VERB';
+    if(/(?:ous|ious|ive|ical|ible|able|ic|ful|less|ant|ent|ish|al|ular|ate)$/.test(wl)&&wl.length>4&&!/(tion|ment|ness)$/.test(wl))return'ADJ';
+    if(/ly$/.test(wl)&&wl.length>3&&!['only','early','family','likely','lovely','lonely','daily','weekly','timely','bodily','friendly','worldly','lively'].includes(wl))return'ADV';
+    return wl.length>1?'NOUN':'PUNCT';
+  }
+  _ctx(tags){
+    for(let i=1;i<tags.length;i++){
+      const prev=tags[i-1],cur=tags[i],next=i<tags.length-1?tags[i+1]:null;
+      if((prev.pos==='DET'||prev.pos==='ADJ')&&cur.pos!=='DET'&&cur.pos!=='ADJ'&&cur.pos!=='PROPN'&&cur.pos!=='PREP')cur.pos='NOUN';
+      if(prev.pos==='AUX'&&cur.pos==='NOUN'&&!/(tion|ity|ness|ment)$/.test(cur.clean))cur.pos='VERB';
+      if(prev.clean==='to'&&cur.pos!=='DET'&&cur.pos!=='PREP'&&cur.pos!=='NUM'&&cur.pos!=='PROPN'&&!/(tion|ity|ness|ment)$/.test(cur.clean))cur.pos='VERB';
+      if(cur.pos==='VERB'&&next&&(next.pos==='NOUN'||next.pos==='PROPN')&&/(?:ous|ive|ible|able|al|ic|ful|less)$/.test(cur.clean))cur.pos='ADJ';
+      if(prev.pos==='PROPN'&&cur.pos==='NOUN'&&/^[A-Z]/.test(cur.word))cur.pos='PROPN';
+    }
+    return tags;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// L1: NER
+// ─────────────────────────────────────────────────────
+const NER_TITLES=new Set(['mr','mrs','ms','dr','prof','sir','lord','lady','president','king','queen','prince','emperor','general','colonel','captain','ambassador','senator','governor','rev','pope']);
+const NER_ORG_SUFF=/(?:Corporation|Corp|Inc|Ltd|LLC|Studios?|University|College|Institute|Museum|Foundation|Society|Association|Group|Company|Enterprise|Agency|Ministry|Department|League|Council|Alliance|Union|Organization|Organisation|Committee|Board|Bureau|Authority|Network|Systems?|Technologies|Productions?|Entertainment|Records|Publishing|Press|Media|Communications|Partners|Holdings|International|Worldwide|Global)$/;
+// [POS/NER/Roles/SemanticVectors/WordProfiler - from v9 unchanged]
+const NER_GEO_SUFF=/(?:City|County|Country|Nation|State|Province|Territory|District|Region|Island|Islands|Peninsula|Continent|Ocean|Sea|Lake|River|Mountain|Mountains|Valley|Desert|Forest|Park|Bay|Gulf)$/;
+const NER_MONTHS=new Set(['january','february','march','april','may','june','july','august','september','october','november','december','jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec']);
+
+class NER{
+  tagSentence(tagged,sentence){
+    const sl=sentence.toLowerCase();
+    return tagged.map((tok,i)=>{
+      if(tok.pos!=='PROPN'&&tok.pos!=='NUM'&&!NER_MONTHS.has(tok.clean))return{...tok,ner:null};
+      if(NER_MONTHS.has(tok.clean))return{...tok,ner:'DATE'};
+      if(/^\d{4}$/.test(tok.clean)&&parseInt(tok.clean)>1000&&parseInt(tok.clean)<2100)return{...tok,ner:'DATE'};
+      if(/^\d/.test(tok.clean))return{...tok,ner:'NUM'};
+      const prev2=tagged.slice(Math.max(0,i-2),i).map(t=>t.clean);
+      if(prev2.some(p=>NER_TITLES.has(p)))return{...tok,ner:'PERSON'};
+      if(NER_ORG_SUFF.test(tok.word))return{...tok,ner:'ORG'};
+      if(NER_GEO_SUFF.test(tok.word))return{...tok,ner:'PLACE'};
+      if(['in','at','from','near','towards'].includes(prev2[prev2.length-1])&&tok.pos==='PROPN')return{...tok,ner:'PLACE'};
+      if(sl.includes('born')||sl.includes('died'))return{...tok,ner:'PERSON'};
+      return{...tok,ner:'PROPN'};
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// L1: SEMANTIC ROLES EXTRACTOR
+// ─────────────────────────────────────────────────────
+class SentenceRoles{
+  extract(tagged){
+    const roles={agent:null,action:null,patient:null,time:null,place:null};
+    let vi=-1;
+    for(let i=0;i<tagged.length;i++){if(tagged[i].pos==='VERB'&&!POS_AUX.has(tagged[i].clean)){vi=i;break;}}
+    if(vi===-1){for(let i=0;i<tagged.length;i++){if(POS_AUX.has(tagged[i].clean)){vi=i;break;}}}
+    if(vi>=0){
+      const vp=[];if(vi>0&&POS_AUX.has(tagged[vi-1].clean))vp.push(tagged[vi-1].word);
+      vp.push(tagged[vi].word);if(vi<tagged.length-1&&tagged[vi+1].pos==='VERB')vp.push(tagged[vi+1].word);
+      roles.action=vp.join(' ');
+      const preV=tagged.slice(0,vi).filter(t=>['NOUN','PROPN'].includes(t.pos));
+      if(preV.length)roles.agent=preV.slice(-2).map(t=>t.word).join(' ');
+      const postV=tagged.slice(vi+1);const prepIdx=postV.findIndex(t=>t.pos==='PREP');
+      const objToks=(prepIdx>-1?postV.slice(0,prepIdx):postV).filter(t=>['NOUN','PROPN'].includes(t.pos));
+      if(objToks.length)roles.patient=objToks.slice(0,3).map(t=>t.word).join(' ');
+    }
+    const tempPreps=new Set(['in','on','during','before','after','since','until','by','from','at']);
+    for(let i=0;i<tagged.length-1;i++){
+      if(tempPreps.has(tagged[i].clean)){const nt=tagged[i+1];if(nt.ner==='DATE'||/\d{4}/.test(nt.word)){roles.time=tagged.slice(i,i+4).map(t=>t.word).join(' ').replace(/[,]+$/,'');break;}}
+    }
+    return roles;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// L2: DISTRIBUTIONAL SEMANTIC VECTORS (PMI)
+// ─────────────────────────────────────────────────────
+class SemanticVectors{
+  constructor(){this.cooc=new Map();this.freq=new Map();this.total=0;this.pmi=null;this.built=false;this.WIN=4;}
+  addSentence(sentence){
+    const words=tokenize(sentence).filter(w=>!STOPWORDS.has(w)&&w.length>2);
+    const stems=words.map(w=>stem(w)).filter(s=>s.length>2);
+    stems.forEach(s=>this.freq.set(s,(this.freq.get(s)||0)+1));
+    this.total+=stems.length;
+    for(let i=0;i<stems.length;i++){
+      const s1=stems[i];
+      if(!this.cooc.has(s1))this.cooc.set(s1,new Map());
+      const ctx=this.cooc.get(s1);
+      for(let j=Math.max(0,i-this.WIN);j<Math.min(stems.length,i+this.WIN+1);j++){
+        if(j===i)continue;ctx.set(stems[j],(ctx.get(stems[j])||0)+1);
+      }
+    }
+    this.built=false;
+  }
+  buildPMI(){
+    const total=this.total||1;this.pmi=new Map();
+    this.cooc.forEach((ctx,s1)=>{
+      const ps1=(this.freq.get(s1)||1)/total;const pmiMap=new Map();
+      ctx.forEach((cnt,s2)=>{if(cnt<2)return;const ps2=(this.freq.get(s2)||1)/total;const pjoint=cnt/total;const v=Math.max(0,Math.log2(pjoint/(ps1*ps2)));if(v>0.1)pmiMap.set(s2,v);});
+      const sorted=[...pmiMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,40);
+      if(sorted.length>0)this.pmi.set(s1,new Map(sorted));
+    });
+    this.built=true;
+  }
+  similarity(w1,w2){
+    if(!this.built)return 0;
+    const s1=stem(w1.toLowerCase()),s2=stem(w2.toLowerCase());
+    const v1=this.pmi.get(s1),v2=this.pmi.get(s2);if(!v1||!v2)return 0;
+    let dot=0,n1=0,n2=0;
+    v1.forEach((val,k)=>{n1+=val*val;if(v2.has(k))dot+=val*v2.get(k);});
+    v2.forEach(val=>n2+=val*val);
+    return(n1&&n2)?dot/(Math.sqrt(n1)*Math.sqrt(n2)):0;
+  }
+  topSimilar(word,n=10){
+    if(!this.built)return[];const ws=stem(word.toLowerCase());const results=[];
+    this.pmi.forEach((_,w)=>{if(w===ws||w.length<3)return;const sim=this.similarity(ws,w);if(sim>0.06)results.push({word:w,sim});});
+    return results.sort((a,b)=>b.sim-a.sim).slice(0,n);
+  }
+  semanticExpand(queryStems,n=5,minSim=0.2){
+    if(!this.built||!this.pmi)return[];const expanded=new Set();
+    queryStems.forEach(qs=>{this.topSimilar(qs,n).filter(x=>x.sim>=minSim).forEach(x=>expanded.add(x.word));});
+    return[...expanded];
+  }
+  get vocabSize(){return this.pmi?this.pmi.size:0;}
+}
+
+// ─────────────────────────────────────────────────────
+// L2: WORD PROFILER
+// ─────────────────────────────────────────────────────
+class WordProfiler{
+  constructor(){this.profiles=new Map();this.pos=new POSTagger();this.ner=new NER();}
+  processAll(sentences){sentences.forEach(s=>this._proc(s));}
+  _proc(sentence){
+    const rawTagged=this.pos.tag(sentence);const tagged=this.ner.tagSentence(rawTagged,sentence);
+    tagged.forEach((tok)=>{
+      const{clean,word,pos,ner}=tok;if(!clean||clean.length<2||STOPWORDS.has(clean)||POS_DETS.has(clean)||POS_PREPS.has(clean)||POS_CONJ.has(clean))return;
+      if(!this.profiles.has(clean)){this.profiles.set(clean,{word:word.replace(/[^a-zA-Z']/g,''),clean,stem:stem(clean),posCount:new Map(),nerTypes:new Map(),totalFreq:0,sampleSentences:[]});}
+      const p=this.profiles.get(clean);p.totalFreq++;p.posCount.set(pos,(p.posCount.get(pos)||0)+1);
+      if(ner)p.nerTypes.set(ner,(p.nerTypes.get(ner)||0)+1);
+      if(p.sampleSentences.length<3&&!p.sampleSentences.includes(sentence))p.sampleSentences.push(sentence);
+    });
+  }
+  get(word){const wl=word.toLowerCase().trim();if(this.profiles.has(wl))return this.profiles.get(wl);const st=stem(wl);for(const[k,p]of this.profiles){if(p.stem===st)return p;}return null;}
+  fullProfile(word,semVec){
+    const p=this.get(word);if(!p)return null;
+    let dominantPos='NOUN',maxCount=0;p.posCount.forEach((cnt,pos)=>{if(cnt>maxCount){maxCount=cnt;dominantPos=pos;}});
+    let nerType=null,maxNer=0;p.nerTypes.forEach((cnt,ner)=>{if(cnt>maxNer){maxNer=cnt;nerType=ner;}});
+    const related=semVec&&semVec.built?semVec.topSimilar(p.clean,12).filter(x=>x.word!==p.stem&&x.word!==p.clean):[];
+    const posBreakdown=[...p.posCount.entries()].sort((a,b)=>b[1]-a[1]);
+    return{...p,dominantPos,nerType,related,posBreakdown};
+  }
+  get size(){return this.profiles.size;}
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 MODULE 1: MORPHOLOGICAL ENGINE
+// Strict algorithmic morphology. No more "supportsed" or "letsed".
+// ═══════════════════════════════════════════════════════════
+class MorphologicalEngine {
+  constructor() {
+    // 100 most common irregular English verbs (present → past)
+    this.IRREGULAR = {
+      'be':'was','is':'was','are':'were','am':'was',
+      'have':'had','has':'had',
+      'do':'did','does':'did',
+      'say':'said','says':'said',
+      'go':'went','goes':'went',
+      'get':'got','gets':'got',
+      'make':'made','makes':'made',
+      'know':'knew','knows':'knew',
+      'think':'thought','thinks':'thought',
+      'take':'took','takes':'took',
+      'see':'saw','sees':'saw',
+      'come':'came','comes':'came',
+      'want':'wanted','wants':'wanted',
+      'give':'gave','gives':'gave',
+      'use':'used','uses':'used',
+      'find':'found','finds':'found',
+      'tell':'told','tells':'told',
+      'ask':'asked','asks':'asked',
+      'work':'worked','works':'worked',
+      'seem':'seemed','seems':'seemed',
+      'feel':'felt','feels':'felt',
+      'try':'tried','tries':'tried',
+      'leave':'left','leaves':'left',
+      'call':'called','calls':'called',
+      'keep':'kept','keeps':'kept',
+      'let':'let','lets':'let',
+      'begin':'began','begins':'began',
+      'show':'showed','shows':'showed',
+      'hear':'heard','hears':'heard',
+      'play':'played','plays':'played',
+      'run':'ran','runs':'ran',
+      'move':'moved','moves':'moved',
+      'lead':'led','leads':'led',
+      'live':'lived','lives':'lived',
+      'believe':'believed','believes':'believed',
+      'hold':'held','holds':'held',
+      'bring':'brought','brings':'brought',
+      'happen':'happened','happens':'happened',
+      'write':'wrote','writes':'wrote',
+      'provide':'provided','provides':'provided',
+      'sit':'sat','sits':'sat',
+      'stand':'stood','stands':'stood',
+      'lose':'lost','loses':'lost',
+      'pay':'paid','pays':'paid',
+      'meet':'met','meets':'met',
+      'include':'included','includes':'included',
+      'continue':'continued','continues':'continued',
+      'set':'set','sets':'set',
+      'learn':'learned','learns':'learned',
+      'change':'changed','changes':'changed',
+      'lead':'led','leads':'led',
+      'understand':'understood','understands':'understood',
+      'watch':'watched','watches':'watched',
+      'follow':'followed','follows':'followed',
+      'stop':'stopped','stops':'stopped',
+      'create':'created','creates':'created',
+      'speak':'spoke','speaks':'spoke',
+      'read':'read','reads':'read',
+      'spend':'spent','spends':'spent',
+      'grow':'grew','grows':'grew',
+      'open':'opened','opens':'opened',
+      'walk':'walked','walks':'walked',
+      'win':'won','wins':'won',
+      'offer':'offered','offers':'offered',
+      'remember':'remembered','remembers':'remembered',
+      'love':'loved','loves':'loved',
+      'consider':'considered','considers':'considered',
+      'appear':'appeared','appears':'appeared',
+      'buy':'bought','buys':'bought',
+      'serve':'served','serves':'served',
+      'die':'died','dies':'died',
+      'send':'sent','sends':'sent',
+      'expect':'expected','expects':'expected',
+      'build':'built','builds':'built',
+      'stay':'stayed','stays':'stayed',
+      'fall':'fell','falls':'fell',
+      'cut':'cut','cuts':'cut',
+      'reach':'reached','reaches':'reached',
+      'kill':'killed','kills':'killed',
+      'remain':'remained','remains':'remained',
+      'suggest':'suggested','suggests':'suggested',
+      'raise':'raised','raises':'raised',
+      'pass':'passed','passes':'passed',
+      'sell':'sold','sells':'sold',
+      'require':'required','requires':'required',
+      'report':'reported','reports':'reported',
+      'decide':'decided','decides':'decided',
+      'explain':'explained','explains':'explained',
+      'support':'supported','supports':'supported',
+      'hit':'hit','hits':'hit',
+      'produce':'produced','produces':'produced',
+      'eat':'ate','eats':'ate',
+      'cover':'covered','covers':'covered',
+      'draw':'drew','draws':'drew',
+      'develop':'developed','develops':'developed',
+      'design':'designed','designs':'designed',
+      'establish':'established','establishes':'established',
+      'launch':'launched','launches':'launched',
+      'introduce':'introduced','introduces':'introduced',
+      'release':'released','releases':'released',
+      'publish':'published','publishes':'published',
+      'found':'founded','founds':'founded',
+      'enable':'enabled','enables':'enabled',
+      'allow':'allowed','allows':'allowed',
+      'contain':'contained','contains':'contained',
+      'perform':'performed','performs':'performed',
+      'feature':'featured','features':'featured',
+      'achieve':'achieved','achieves':'achieved',
+      'acquire':'acquired','acquires':'acquired',
+      'generate':'generated','generates':'generated',
+    };
+    // Already-inflected suffix patterns — DO NOT re-inflect
+    this.FROZEN_SUFFIXES = ['ed','ing','s','es','tion','ment','ness','ance','ence'];
+  }
+
+  // Returns true if a word is already past-tense or gerund (frozen)
+  isAlreadyInflected(word) {
+    const w = word.toLowerCase().trim();
+    if (this.IRREGULAR[w]) return false; // known irregular = not frozen in present form
+    if (w.endsWith('ed') || w.endsWith('ing')) return true;
+    return false;
+  }
+
+  // Convert verb to past tense — strictly
+  toPast(verb) {
+    if (!verb) return '';
+    const v = verb.toLowerCase().trim();
+    // Check irregular dict
+    if (this.IRREGULAR[v]) return this.IRREGULAR[v];
+    // Already past tense
+    if (v.endsWith('ed')) return verb;
+    // Already a gerund
+    if (v.endsWith('ing')) return verb;
+    // Multi-word: inflect first word only
+    if (v.includes(' ')) {
+      const parts = verb.split(' ');
+      return this.toPast(parts[0]) + ' ' + parts.slice(1).join(' ');
+    }
+    // Algorithmic rules (strict order matters)
+    if (v.endsWith('e') && !v.endsWith('ee')) return v + 'd';
+    if (v.endsWith('y') && !/[aeiou]y$/.test(v)) return v.slice(0,-1) + 'ied';
+    // Consonant doubling: short verb, CVC pattern
+    if (v.length <= 6 && /[aeiou][^aeiouwy]$/.test(v) && !/[aeiou][aeiou]/.test(v)) return v + v.slice(-1) + 'ed';
+    return v + 'ed';
+  }
+
+  // Third person singular present
+  toThirdPerson(verb) {
+    if (!verb) return '';
+    const v = verb.toLowerCase().trim();
+    if (v.endsWith('s')) return verb; // already inflected
+    if (v.endsWith('ing') || v.endsWith('ed')) return verb;
+    if (['be','is'].includes(v)) return 'is';
+    if (['have','has'].includes(v)) return 'has';
+    if (v.endsWith('s') || v.endsWith('x') || v.endsWith('z') || v.endsWith('ch') || v.endsWith('sh')) return v + 'es';
+    if (v.endsWith('y') && !/[aeiou]y$/.test(v)) return v.slice(0,-1) + 'ies';
+    return v + 's';
+  }
+
+  // Subject-verb agreement: is/are, has/have
+  agree(verbBase, isPlural) {
+    if (verbBase === 'be' || verbBase === 'is' || verbBase === 'are') return isPlural ? 'are' : 'is';
+    if (verbBase === 'have' || verbBase === 'has') return isPlural ? 'have' : 'has';
+    return isPlural ? verb : this.toThirdPerson(verbBase);
+  }
+
+  // Detect plurality from a subject string (heuristic)
+  isPlural(subject) {
+    if (!subject) return false;
+    const s = subject.toLowerCase().trim();
+    const pluralKeywords = ['they','these','those','both','all','many','several','some'];
+    if (pluralKeywords.some(k => s === k || s.startsWith(k + ' '))) return true;
+    // Ends in 's' but not 'ss', 'us', 'is', 'as'
+    if (/s$/.test(s) && !/[sius]s$/.test(s) && !/(us|is|as|sis|xis)$/.test(s)) return true;
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 MODULE 2: LEVENSHTEIN DISTANCE GATE + STOP-WORD FILTER
+// ═══════════════════════════════════════════════════════════
+const STOP_WORDS = new Set([
+  'the','a','an','is','are','was','were','be','been','being',
+  'have','has','had','do','does','did','will','would','could','should','may','might','shall',
+  'i','me','my','myself','we','our','ours','ourselves',
+  'you','your','yours','yourself','yourselves',
+  'he','him','his','himself','she','her','hers','herself',
+  'it','its','itself','they','them','their','theirs','themselves',
+  'what','which','who','whom','this','that','these','those',
+  'am','at','by','for','with','about','against','between','into',
+  'through','during','before','after','above','below','to','from',
+  'up','down','in','out','on','off','over','under','again','further',
+  'then','once','here','there','when','where','why','how',
+  'all','both','each','few','more','most','other','some','such',
+  'no','nor','not','only','own','same','so','than','too','very',
+  's','t','can','just','don','should','now','d','ll','m','o','re','ve','y',
+  'ain','aren','couldn','didn','doesn','hadn','hasn','haven','isn',
+  'let','let\'s','of','and','or','but','if','as','until','while',
+  'though','although','because','since','unless','however','therefore',
+  'thus','hence','also','well','even','still','back','any'
+]);
+
+function levenshtein(a, b) {
+  if (!a) return b.length;
+  if (!b) return a.length;
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_,i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i-1] === b[j-1]) dp[i][j] = dp[i-1][j-1];
+      else dp[i][j] = 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Find closest node in KG, reject if Levenshtein > threshold
+function findClosestNode(input, kg, threshold=2) {
+  const q = input.toLowerCase().trim();
+  if (STOP_WORDS.has(q) || q.length < 2) return null;
+  // Exact match first
+  const exactFacts = kg.triples.filter(t => typeof t.s === 'string' && t.s === q);
+  if (exactFacts.length) return {node: q, distance: 0};
+  // Levenshtein scan
+  let best = null, bestDist = Infinity;
+  const seen = new Set();
+  kg.triples.forEach(t => {
+    if (typeof t.s !== 'string' || seen.has(t.s)) return;
+    seen.add(t.s);
+    const d = levenshtein(q, t.s);
+    if (d < bestDist) { bestDist = d; best = t.s; }
+  });
+  if (bestDist <= threshold) return {node: best, distance: bestDist};
+  return null; // Reject — no close enough match
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 MODULE 3: WORDNET-LITE SYNONYM ALIASING
+// ═══════════════════════════════════════════════════════════
+const SYNONYM_MAP = {
+  'ai': ['artificial intelligence','intelligence','machine intelligence','ml'],
+  'artificial intelligence': ['ai','machine intelligence','intelligence'],
+  'machine learning': ['ml','deep learning','ai'],
+  'ml': ['machine learning','deep learning'],
+  'dl': ['deep learning','machine learning'],
+  'nlp': ['natural language processing','language processing'],
+  'natural language processing': ['nlp','language processing'],
+  'javascript': ['js','ecmascript'],
+  'js': ['javascript','ecmascript'],
+  'python': ['py'],
+  'py': ['python'],
+  'database': ['db','data store','storage'],
+  'db': ['database','data store'],
+  'ui': ['user interface','interface'],
+  'user interface': ['ui','gui','interface'],
+  'api': ['interface','endpoint','web service'],
+  'internet': ['web','world wide web','net'],
+  'web': ['internet','world wide web'],
+  'computer': ['machine','computer system','pc'],
+  'pc': ['computer','personal computer'],
+  'lexica': ['lexicon','lexicography'],
+  'lexicon': ['lexica','dictionary','vocabulary'],
+  'us': ['united states','america','usa'],
+  'usa': ['united states','america','us'],
+  'united states': ['us','usa','america'],
+  'uk': ['united kingdom','britain','england'],
+  'united kingdom': ['uk','britain'],
+  'eu': ['european union','europe'],
+  'physics': ['natural science','physical science'],
+  'chemistry': ['chemical science'],
+  'biology': ['life science','bioscience'],
+  'maths': ['mathematics','math'],
+  'math': ['mathematics','maths'],
+  'mathematics': ['math','maths'],
+};
+
+class SynonymAliasing {
+  constructor() {
+    this.nodeAliases = new Map(); // canonical → Set of aliases
+    this.aliasToCanon = new Map(); // alias → canonical
+  }
+
+  // Register canonical node and its known aliases
+  registerNode(canonical) {
+    const c = canonical.toLowerCase().trim();
+    if (this.nodeAliases.has(c)) return;
+    this.nodeAliases.set(c, new Set());
+    // Auto-register from SYNONYM_MAP
+    const syns = SYNONYM_MAP[c] || [];
+    syns.forEach(s => this.addAlias(c, s));
+  }
+
+  addAlias(canonical, alias) {
+    const c = canonical.toLowerCase().trim();
+    const a = alias.toLowerCase().trim();
+    if (c === a) return;
+    if (!this.nodeAliases.has(c)) this.nodeAliases.set(c, new Set());
+    this.nodeAliases.get(c).add(a);
+    this.aliasToCanon.set(a, c);
+  }
+
+  // Resolve any string to its canonical node name
+  resolve(name) {
+    const n = name.toLowerCase().trim();
+    if (this.aliasToCanon.has(n)) return this.aliasToCanon.get(n);
+    return n;
+  }
+
+  // Get all names a canonical maps to (for querying)
+  getAllNames(canonical) {
+    const c = this.resolve(canonical);
+    const aliases = this.nodeAliases.get(c) || new Set();
+    return new Set([c, ...aliases]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 MODULE 4: GRAPH CENTRALITY SCORING
+// Degree centrality + eigenvector approximation + user multiplier
+// ═══════════════════════════════════════════════════════════
+class CentralityEngine {
+  constructor() {
+    this.USER_MULTIPLIER = 10.0;  // User-asserted facts dominate Wikipedia
+    this.SELF_MULTIPLIER = 5.0;
+    this._cache = new Map();
+    this._dirty = true;
+  }
+
+  invalidate() { this._dirty = true; this._cache.clear(); }
+
+  // Compute degree centrality for all nodes
+  computeDegree(triples) {
+    const degree = new Map();
+    triples.filter(t => t.alive !== false && typeof t.s === 'string' && typeof t.o === 'string').forEach(t => {
+      // Weight by source: user > self > wikipedia
+      const w = t.tag === 'user' ? this.USER_MULTIPLIER : (t.tag === 'self' ? this.SELF_MULTIPLIER : 1.0);
+      const conf = (t.conf || 1.0) * w;
+      degree.set(t.s, (degree.get(t.s) || 0) + conf);
+      degree.set(t.o, (degree.get(t.o) || 0) + conf * 0.5); // outbound edges count less
+    });
+    return degree;
+  }
+
+  // Approximate eigenvector centrality (2-hop power iteration)
+  computeEigen(triples, iterations=3) {
+    if (!this._dirty && this._cache.size) return this._cache;
+    const degree = this.computeDegree(triples);
+    const eigen = new Map(degree);
+    // Power iteration
+    for (let iter = 0; iter < iterations; iter++) {
+      const next = new Map();
+      triples.filter(t => t.alive !== false && typeof t.s === 'string' && typeof t.o === 'string').forEach(t => {
+        const w = t.tag === 'user' ? this.USER_MULTIPLIER : (t.tag === 'self' ? this.SELF_MULTIPLIER : 1.0);
+        const neighborScore = (eigen.get(t.o) || 0) * w;
+        next.set(t.s, (next.get(t.s) || 0) + neighborScore * 0.15);
+      });
+      next.forEach((v, k) => eigen.set(k, (eigen.get(k) || 0) + v));
+    }
+    // Normalize
+    const max = Math.max(...eigen.values(), 1);
+    eigen.forEach((v,k) => eigen.set(k, v/max));
+    this._cache = eigen;
+    this._dirty = false;
+    return eigen;
+  }
+
+  // Score a triple (used to rank triples for synthesis)
+  scoreTriple(triple, eigen) {
+    const base = eigen.get(triple.s) || 0.1;
+    const w = triple.tag === 'user' ? this.USER_MULTIPLIER : (triple.tag === 'self' ? this.SELF_MULTIPLIER : 1.0);
+    return base * w * (triple.conf || 1.0);
+  }
+
+  // Get top N most central nodes
+  topNodes(triples, n=10) {
+    const eigen = this.computeEigen(triples);
+    return [...eigen.entries()].sort((a,b) => b[1]-a[1]).slice(0,n).map(([node, score]) => ({node, score}));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 PHASE 1: CFG PARSER (Context-Free Grammar)
+// Deterministic input parsing → executable machine logic
+// ═══════════════════════════════════════════════════════════
+class CFGParser {
+  constructor() {
+    // Grammar rules: each rule has a pattern and an action type
+    this.RULES = [
+      // FORGET rules
+      { re: /^(?:forget|remove|delete|discard)\s+(?:all\s+)?(?:sources?|everything|all)\s*$/i,
+        action: 'FORGET_ALL', extract: () => ({}) },
+      { re: /^(?:forget|remove|delete)\s+(?:source\s+)?["']?([^"']+?)["']?\s*$/i,
+        action: 'FORGET_SOURCE', extract: m => ({target: m[1].trim()}) },
+      // ASSERT rules (user asserting facts)
+      { re: /^(?:lexica|lx)\s*:\s*(.+)\s+(?:is|are)\s+(?:a|an|the)?\s*(.+)$/i,
+        action: 'ASSERT_FACT', extract: m => ({subject: 'lexica', predicate: 'is_a', object: m[2].trim(), tag: 'user'}) },
+      { re: /^(?:note|remember|assert|fact)\s*:\s*(.+)\s+(?:is|was|are|were)\s+(.+)$/i,
+        action: 'ASSERT_FACT', extract: m => ({subject: m[1].trim(), predicate: 'is_a', object: m[2].trim(), tag: 'user'}) },
+      // QUERY transformations  
+      { re: /^what\s+(?:is|are)\s+(?:the\s+)?(?:definition\s+of\s+)?(.+)\??$/i,
+        action: 'QUERY_DEFINITION', extract: m => ({subject: m[1].trim()}) },
+      { re: /^(?:who|what)\s+(?:created|made|built|developed|founded|designed)\s+(.+)\??$/i,
+        action: 'QUERY_CREATOR', extract: m => ({subject: m[1].trim()}) },
+      { re: /^(?:when\s+(?:was|did)|what\s+year)\s+(.+?)\s*(?:was\s+)?(?:born|created|founded|released|invented|launched)\??$/i,
+        action: 'QUERY_TEMPORAL', extract: m => ({subject: m[1].trim()}) },
+      { re: /^where\s+(?:is|was|are|were)\s+(.+?)\s*(?:located|based|founded)?\??$/i,
+        action: 'QUERY_LOCATION', extract: m => ({subject: m[1].trim()}) },
+      { re: /^(?:why|how\s+come)\s+(?:is|was|are|were|did|does|do)\s+(.+?)\s+(?:important|significant|notable|famous|known)\??$/i,
+        action: 'QUERY_IMPORTANCE', extract: m => ({subject: m[1].trim()}) },
+      // COMPARE
+      { re: /^(?:compare|difference\s+between|vs\.?|versus)\s+(.+?)\s+(?:and|vs\.?|versus)\s+(.+?)\??$/i,
+        action: 'COMPARE', extract: m => ({subjectA: m[1].trim(), subjectB: m[2].trim()}) },
+      // STATUS queries
+      { re: /^(?:what\s+do\s+you\s+know|your\s+knowledge|knowledge\s+base|stats?)\s*\??$/i,
+        action: 'QUERY_STATUS', extract: () => ({}) },
+    ];
+  }
+
+  // Parse input → AST node with action type + extracted args
+  parse(input) {
+    const cleaned = input.trim();
+    for (const rule of this.RULES) {
+      const m = cleaned.match(rule.re);
+      if (m) {
+        return {
+          action: rule.action,
+          args: rule.extract(m),
+          raw: cleaned,
+          matched: true
+        };
+      }
+    }
+    // No grammar rule matched — return generic query AST
+    return { action: 'QUERY_GENERIC', args: {raw: cleaned}, raw: cleaned, matched: false };
+  }
+
+  // Translate AST to human-readable machine directive (for debug)
+  toDirective(ast) {
+    switch (ast.action) {
+      case 'FORGET_ALL': return 'EXECUTE: tms_prune(target=ALL_SOURCES)';
+      case 'FORGET_SOURCE': return `EXECUTE: tms_prune(source="${ast.args.target}")`;
+      case 'ASSERT_FACT': return `EXECUTE: kg_assert(s="${ast.args.subject}", p="${ast.args.predicate}", o="${ast.args.object}", weight=USER_10X)`;
+      case 'QUERY_DEFINITION': return `EXECUTE: kg_query(subject="${ast.args.subject}", mode=DEFINITION)`;
+      case 'QUERY_CREATOR': return `EXECUTE: kg_query(subject="${ast.args.subject}", predicate=created_by)`;
+      case 'COMPARE': return `EXECUTE: kg_compare(a="${ast.args.subjectA}", b="${ast.args.subjectB}")`;
+      default: return `EXECUTE: query_generic(input="${ast.raw}")`;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 PHASE 2: TOPOLOGICAL ONTOLOGY
+// Every node placed in an ontological hierarchy.
+// Prevents string-collision between unrelated concepts.
+// ═══════════════════════════════════════════════════════════
+class OntologicalTaxonomy {
+  constructor() {
+    // Hierarchy: Entity → {Abstract, Physical, Social}
+    // Each leaf maps to a path string for graph distance computation
+    this.CATEGORIES = {
+      // Abstract
+      'intelligence':    'Entity.Abstract.Cognitive.Intelligence',
+      'ai':              'Entity.Abstract.Cognitive.Intelligence',
+      'knowledge':       'Entity.Abstract.Cognitive.Knowledge',
+      'concept':         'Entity.Abstract.Cognitive.Concept',
+      'theory':          'Entity.Abstract.Cognitive.Theory',
+      'mathematics':     'Entity.Abstract.Formal.Mathematics',
+      'physics':         'Entity.Abstract.Science.Physics',
+      'chemistry':       'Entity.Abstract.Science.Chemistry',
+      'biology':         'Entity.Abstract.Science.Biology',
+      'science':         'Entity.Abstract.Science',
+      'language':        'Entity.Abstract.Linguistic.Language',
+      'lexicon':         'Entity.Abstract.Linguistic.Dictionary',
+      'dictionary':      'Entity.Abstract.Linguistic.Dictionary',
+      'vocabulary':      'Entity.Abstract.Linguistic.Vocabulary',
+      // Physical
+      'planet':          'Entity.Physical.Astronomical.Planet',
+      'star':            'Entity.Physical.Astronomical.Star',
+      'galaxy':          'Entity.Physical.Astronomical.Galaxy',
+      'element':         'Entity.Physical.Chemical.Element',
+      'compound':        'Entity.Physical.Chemical.Compound',
+      'animal':          'Entity.Physical.Biological.Animal',
+      'plant':           'Entity.Physical.Biological.Plant',
+      // Social
+      'person':          'Entity.Social.Human.Person',
+      'scientist':       'Entity.Social.Human.Scientist',
+      'physicist':       'Entity.Social.Human.Scientist',
+      'mathematician':   'Entity.Social.Human.Scientist',
+      'programmer':      'Entity.Social.Human.Professional',
+      'organization':    'Entity.Social.Institution.Organization',
+      'company':         'Entity.Social.Institution.Company',
+      'university':      'Entity.Social.Institution.University',
+      'country':         'Entity.Social.Geopolitical.Country',
+      'city':            'Entity.Social.Geopolitical.City',
+      // Technology
+      'software':        'Entity.Artifact.Digital.Software',
+      'game':            'Entity.Artifact.Digital.Game',
+      'video game':      'Entity.Artifact.Digital.Game',
+      'application':     'Entity.Artifact.Digital.Application',
+      'website':         'Entity.Artifact.Digital.Website',
+      'computer':        'Entity.Artifact.Physical.Computer',
+      'algorithm':       'Entity.Artifact.Digital.Algorithm',
+      'programming language': 'Entity.Artifact.Digital.Language',
+      // Default
+      'thing':           'Entity',
+    };
+  }
+
+  // Assign ontological path to a node based on its type string
+  classify(nodeLabel, typeHint='') {
+    const l = (nodeLabel + ' ' + typeHint).toLowerCase();
+    // Direct lookup
+    for (const [key, path] of Object.entries(this.CATEGORIES)) {
+      if (l.includes(key)) return path;
+    }
+    // Heuristic fallback
+    if (/\d{4}/.test(nodeLabel)) return 'Entity.Abstract.Temporal.Date';
+    if (/^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(nodeLabel)) return 'Entity.Social.Human.Person'; // proper name pattern
+    return 'Entity';
+  }
+
+  // Compute graph distance between two ontological paths
+  // Lower = more related, higher = more distinct
+  distance(pathA, pathB) {
+    if (!pathA || !pathB) return Infinity;
+    const partsA = pathA.split('.');
+    const partsB = pathB.split('.');
+    let common = 0;
+    const maxLen = Math.min(partsA.length, partsB.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (partsA[i] === partsB[i]) common++;
+      else break;
+    }
+    return (partsA.length + partsB.length) - 2 * common;
+  }
+
+  // Check if two nodes are ontologically compatible (should merge vs. remain distinct)
+  shouldMerge(nodeA, typeA, nodeB, typeB) {
+    const pathA = this.classify(nodeA, typeA);
+    const pathB = this.classify(nodeB, typeB);
+    const dist = this.distance(pathA, pathB);
+    return dist <= 2; // Same branch → merge; different branch → keep separate
+  }
+
+  // Describe a node's place in the hierarchy for UI display
+  describe(label, typeHint='') {
+    const path = this.classify(label, typeHint);
+    const parts = path.split('.');
+    if (parts.length <= 1) return 'General Entity';
+    return parts.slice(1).join(' › ');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// V11 PHASE 3: AUTONOMOUS EPISTEMIC INGESTION (Queue-Based)
+// Background topic queue with Society-of-Mind verification
+// ═══════════════════════════════════════════════════════════
+class AutonomousIngestion {
+  constructor(engine) {
+    this.engine = engine;
+    this.queue = [];          // pending topics
+    this.processed = [];      // completed ingestions
+    this.rejected = [];       // contradicted / rejected facts
+    this._active = false;
+    this._timer = null;
+    this.onStatus = null;     // callback for UI updates
+  }
+
+  // Enqueue a topic for autonomous ingestion
+  enqueue(topic, priority=1) {
+    const existing = this.queue.find(q => q.topic.toLowerCase() === topic.toLowerCase());
+    if (!existing) {
+      this.queue.push({topic, priority, enqueuedAt: Date.now()});
+      this.queue.sort((a,b) => b.priority - a.priority);
+    }
+  }
+
+  start() {
+    if (this._active) return;
+    this._active = true;
+    this._schedule();
+  }
+
+  stop() { this._active = false; clearTimeout(this._timer); }
+
+  _schedule() {
+    if (!this._active) return;
+    // Process one item every 45 seconds (respectful rate-limiting)
+    this._timer = setTimeout(() => this._process(), 45000);
+  }
+
+  async _process() {
+    if (!this.queue.length) { this._schedule(); return; }
+    // Only ingest if engine is idle and has been trained
+    if (!this.engine.trained || this.engine.stateTracker?.get() === 'synthesizing') {
+      this._schedule();
+      return;
+    }
+    const item = this.queue.shift();
+    try {
+      if (this.onStatus) this.onStatus(`🔍 Autonomous ingestion: querying "${item.topic}"...`);
+      const results = await searchWiki(item.topic).catch(() => []);
+      if (!results.length) { this._schedule(); return; }
+      const art = await fetchWikiArt(results[0].title).catch(() => null);
+      if (!art) { this._schedule(); return; }
+      // Contradiction check via Society of Mind
+      const contradictions = this._checkContradictions(art.text, item.topic);
+      if (contradictions.length > 0 && contradictions.length > 3) {
+        this.rejected.push({topic: item.topic, reason: `${contradictions.length} topological contradictions`, ts: Date.now()});
+        if (this.onStatus) this.onStatus(`⚠ Epistemic rejection: "${item.topic}" (${contradictions.length} contradictions with existing graph)`);
+      } else {
+        await this.engine.addSourceAsync(art.text, art.title, art.url, () => {});
+        this.processed.push({topic: item.topic, title: art.title, ts: Date.now()});
+        if (this.onStatus) this.onStatus(`✅ Autonomous ingestion complete: "${art.title}"`);
+      }
+    } catch(e) { /* network unavailable — skip */ }
+    this._schedule();
+  }
+
+  // Cross-reference new text against existing KG for contradictions
+  _checkContradictions(text, topic) {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    const contradictions = [];
+    sentences.forEach(s => {
+      const negM = s.match(/([A-Z][A-Za-z\s]{2,30})\s+is\s+not\s+(.+)/i);
+      if (negM) {
+        const subj = negM[1].trim().toLowerCase();
+        const obj = negM[2].trim().toLowerCase().slice(0,40);
+        const existing = this.engine.kg.triples.filter(t => t.alive && t.s === subj && t.p === 'is_a' && t.o.includes(obj.split(' ')[0]));
+        if (existing.length) contradictions.push({subj, obj, existing: existing[0].raw});
+      }
+    });
+    return contradictions;
+  }
+}
+
+// [[User, stated, [Minecraft, is, dumb]], caused, [Lexica, feels, confused]]
+// ─────────────────────────────────────────────────────
+class HyperTriple {
+  constructor(s, p, o, raw, tag) {
+    this.id = 'ht_' + (++HyperTriple._ctr);
+    this.s = s;   // string or HyperTriple
+    this.p = p;
+    this.o = o;   // string or HyperTriple
+    this.raw = raw||'';
+    this.tag = tag;
+    this.conf = 1.0;
+    this.conflict = false;
+    this.justified_by = new Set([tag]);  // TMS: which sources justify this fact
+    this.activation = 1.0;               // qualia: how "hot" is this node
+    this.timestamp = Date.now();
+    this.alive = true;                   // TMS: false = logically killed
+    this.derived = false;
+  }
+  isNested() { return (this.s instanceof HyperTriple)||(this.o instanceof HyperTriple); }
+  subjectStr() { return this.s instanceof HyperTriple ? `[${this.s.toFlat()}]` : this.s; }
+  objectStr()  { return this.o instanceof HyperTriple ? `[${this.o.toFlat()}]` : this.o; }
+  toFlat() { return `${this.subjectStr()} —[${this.p}]→ ${this.objectStr()}`; }
+}
+HyperTriple._ctr = 0;
+
+// ─────────────────────────────────────────────────────
+// V10 L3: TRUTH MAINTENANCE SYSTEM
+// Every fact has a "justified_by" dependency set.
+// When a source is refuted → cascade-collapse all dependents.
+// ─────────────────────────────────────────────────────
+class TruthMaintenanceSystem {
+  constructor() {
+    this.bySource = new Map(); // sourceTag → Set of triple ids
+  }
+
+  register(triple) {
+    triple.justified_by.forEach(src => {
+      if (!this.bySource.has(src)) this.bySource.set(src, new Set());
+      this.bySource.get(src).add(triple.id);
+    });
+  }
+
+  // Cascade: mark all triples justified ONLY by sourceTag as dead
+  refute(sourceTag, allTriples) {
+    const killed = new Set();
+    const toKill = [...(this.bySource.get(sourceTag) || [])];
+    const queue = [...toKill];
+
+    while (queue.length) {
+      const tid = queue.pop();
+      if (killed.has(tid)) continue;
+      const t = allTriples.find(x => x.id === tid);
+      if (!t || !t.alive) continue;
+      // Only kill if this was the ONLY justification (or all justifications are dead)
+      const allJustDead = [...t.justified_by].every(src => src === sourceTag || killed.has(src));
+      if (allJustDead || t.justified_by.size === 1) {
+        t.alive = false;
+        killed.add(tid);
+        killed.add(t.id);
+        // Cascade: find derived triples that used this one as basis
+        const dependents = allTriples.filter(x => x.alive && x.derived && x.basedOn === t.id);
+        dependents.forEach(d => queue.push(d.id));
+      }
+    }
+    this.bySource.delete(sourceTag);
+    return killed.size;
+  }
+
+  clear() { this.bySource.clear(); }
+}
+
+// ─────────────────────────────────────────────────────
+// V10 L3: KNOWLEDGE GRAPH (upgraded with Hypergraph + TMS)
+// ─────────────────────────────────────────────────────
+class KnowledgeGraph {
+  constructor(ets) {
+    this.triples = [];      // flat HyperTriples (compatible with v9/v10 interface)
+    this.hyperEdges = [];   // nested n-ary hyperedges
+    this.entities = new Map();
+    this.ets = ets;
+    this.negStore = [];
+    this.causal = [];
+    this.tms = new TruthMaintenanceSystem();
+    this.godelPatterns = []; // dynamic patterns added by GodelEngine
+    // V11 additions
+    this.synonyms = new SynonymAliasing();
+    this.ontology = new OntologicalTaxonomy();
+    this.centrality = new CentralityEngine();
+  }
+
+  learn(sentence, tag) {
+    const s = sentence;
+    // Negation
+    const negM = s.match(/([A-Z][A-Za-z\s\-]{1,40}?)\s+is\s+not\s+(?:a|an|the)?\s*([a-z][^.]{3,50}?)(?:\.|,)/i);
+    if (negM) this.negStore.push({s:negM[1].trim().toLowerCase(),o:negM[2].trim().toLowerCase(),tag});
+    // Causal
+    const causM = s.match(/([^.]{15,80}?)\s+because\s+([^.]{10,80}\.)/i);
+    if (causM) this.causal.push({cause:causM[2].trim(),effect:causM[1].trim(),tag});
+    // Standard patterns
+    const defM = s.match(/^([A-Z][A-Za-z\s\-]{1,40}?)\s+(?:is|was|are|were)\s+(?:a|an|the)?\s*([a-z][^.]{4,70}?)(?:\.|,|\s+that|\s+which)/);
+    if (defM) { this._add(defM[1].trim(),'is_a',defM[2].trim().replace(/,.*$/,'').trim(),s,tag); this.ets.learn(defM[1].trim().toLowerCase(),defM[2].trim()); }
+    const knaM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is|was)\s+(?:also\s+)?known\s+as\s+["']?([^"'.]{3,40}?)["']?(?:\s|\.|,)/i);
+    if (knaM) this._add(knaM[1].trim(),'known_as',knaM[2].trim(),s,tag);
+    const byM = s.match(/([A-Z][A-Za-z\s\-]{1,40}?)\s+was\s+(?:created|developed|made|built|founded|designed|invented|written)\s+by\s+([A-Z][A-Za-z\s\-]{1,40})/i);
+    if (byM) this._add(byM[1].trim(),'created_by',byM[2].trim(),s,tag);
+    const creM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+(created|developed|made|built|founded|designed|invented|wrote|authored|established)\s+([A-Z][A-Za-z\s\-]{1,40})/);
+    if (creM) this._add(creM[1].trim(),creM[2].toLowerCase(),creM[3].trim(),s,tag);
+    const relM = s.match(/([A-Z][A-Za-z\s\-]{1,40}?)\s+was\s+(?:released|launched|published|introduced|announced)\s+(?:on|in)\s+([\w\s,]{3,30}?\d{4})/i);
+    if (relM) this._add(relM[1].trim(),'released_in',relM[2].trim(),s,tag);
+    const bornM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+was\s+born\s+(?:on|in)\s+([\w\s,]{3,40})/i);
+    if (bornM) this._add(bornM[1].trim(),'born_in',bornM[2].trim().replace(/[,\s]+$/,''),s,tag);
+    const diedM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+died\s+(?:on|in)?\s*([\w\s,]{2,30}?\d{4})/i);
+    if (diedM) this._add(diedM[1].trim(),'died_in',diedM[2].trim(),s,tag);
+    const locM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is|was)\s+(?:located|based|headquartered|situated)\s+(?:in|at)\s+([A-Z][A-Za-z\s\-]{1,30})/);
+    if (locM) this._add(locM[1].trim(),'located_in',locM[2].trim(),s,tag);
+    const acqM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+was\s+(?:acquired|purchased|bought)\s+by\s+([A-Z][A-Za-z\s\-]{1,30})/i);
+    if (acqM) this._add(acqM[1].trim(),'acquired_by',acqM[2].trim(),s,tag);
+    const actionM = s.match(/([A-Z][A-Za-z\s\-]{1,35}?)\s+(uses|contains|allows|requires|produces|creates|changes|moves|features|includes|provides|enables|supports|generates|performs|plays)\s+((?:a|an|the)\s+)?([A-Za-z][A-Za-z\s\-]{2,50}?)(?:\.|,|\s+and|\s+to|\s+for|\s+with|$)/i);
+    if (actionM) { const subj=actionM[1].trim(),pred=actionM[2].toLowerCase(),obj=(actionM[4]||'').trim().replace(/\s+(?:and|to|for|with|by).*$/,'').trim(); if(subj.length>1&&obj.length>2)this._add(subj,pred,obj,s,tag); }
+    const canM = s.match(/([A-Z][A-Za-z\s\-]{1,30}?)\s+can\s+((?:be\s+)?[a-z][a-z\s]{2,40}?)(?:\.|,|$)/i);
+    if (canM) { const subj=canM[1].trim(),obj=canM[2].trim(); if(subj.length>1&&obj.length>3)this._add(subj,'allows',obj,s,tag); }
+    // Apply Godel dynamic patterns
+    this.godelPatterns.forEach(p => {
+      const m = s.match(p.re);
+      if (m && m[1] && m[2]) this._add(m[1].trim(), p.pred, m[2].trim(), s, tag);
+    });
+  }
+
+  _add(s, p, o, raw, tag) {
+    const sn = s.trim().toLowerCase().replace(/\s+/g,' ');
+    let on = o.trim().toLowerCase().replace(/\s+/g,' ');
+    if (sn.length < 2 || on.length < 2) return;
+    // ── TRIPLE QUALITY GATE ──
+    // Reject fragment nodes — the root cause of "Millions user erik games" in answers
+    const isFragment = str => {
+      if (!str || str.length > 110) return true;
+      if (!/[a-zA-Z]/.test(str)) return true; // pure numbers/symbols
+      const ws = str.split(/\s+/);
+      // >4 all-lowercase words = sentence fragment, not an entity
+      if (ws.length > 4 && ws.every(w => /^[a-z]/.test(w))) return true;
+      // Wikipedia markup artifacts
+      if (/\[\[|\]\]|\{\{/.test(str)) return true;
+      return false;
+    };
+    if (isFragment(sn) || isFragment(on)) return;
+    // V11: Stop-word filter — never create useless topological clutter
+    if (STOP_WORDS.has(sn) || STOP_WORDS.has(on)) return;
+    // V11: Synonym resolution
+    const sCanon = this.synonyms.resolve(sn);
+    const oCanon = this.synonyms.resolve(on);
+    // V11: Ontological identity check — resolve aliases only if ontologically compatible
+    let finalS = sn, finalO = on;
+    if (sCanon !== sn) {
+      const dist = this.ontology.distance(this.ontology.classify(sn), this.ontology.classify(sCanon));
+      if (dist <= 4) finalS = sCanon;
+    }
+    if (oCanon !== on) {
+      const dist = this.ontology.distance(this.ontology.classify(on), this.ontology.classify(oCanon));
+      if (dist <= 4) finalO = oCanon;
+    }
+    const existing = this.triples.find(t => t.s === finalS && t.p === p && t.tag !== tag);
+    const conflict = existing && existing.o !== finalO && !finalO.includes(existing.o) && !existing.o.includes(finalO);
+    const ht = new HyperTriple(finalS, p, finalO, raw, tag);
+    ht.conflict = !!conflict;
+    // V11: User multiplier — user-asserted facts get 10x confidence weight
+    if (tag === 'user') ht.conf = 10.0;
+    else if (tag === 'self') ht.conf = 5.0;
+    this.triples.push(ht);
+    this.tms.register(ht);
+    // V11: Register nodes in synonym system
+    this.synonyms.registerNode(finalS);
+    this.synonyms.registerNode(finalO);
+    // Confidence boost for repeated facts
+    const same = this.triples.filter(t => t.s === finalS && t.p === p && t.o === finalO);
+    if (same.length > 1) same.forEach(t => { if (t.tag !== 'user') t.conf = Math.min(1.5, t.conf + 0.25); });
+    // Invalidate centrality cache
+    this.centrality.invalidate();
+    return ht;
+  }
+
+  _addResolved(s, p, o, raw, tag) { return this._add(s, p, o, raw, tag); }
+
+  // Add a nested hyperedge: subject or object can be another triple
+  addHyperEdge(sTripleOrStr, p, oTripleOrStr, raw, tag) {
+    const ht = new HyperTriple(sTripleOrStr, p, oTripleOrStr, raw, tag);
+    this.hyperEdges.push(ht);
+    this.tms.register(ht);
+    return ht;
+  }
+
+  // Record a causal meta-fact as a hyperedge
+  // "[[User stated X] caused [Lexica feels confused]]"
+  addMetaCausal(userInput, lexicaResponse, reason, tag) {
+    const input_t = new HyperTriple('user', 'stated', userInput, '', tag);
+    const response_t = new HyperTriple('lexica', 'responded_with', lexicaResponse, '', tag);
+    return this.addHyperEdge(input_t, 'caused', response_t, reason, tag);
+  }
+
+  query(subject, predicates=[]) {
+    const sn = subject.toLowerCase().replace(/\s+/g,' ').trim();
+    // V11: Resolve through synonym + alias system
+    const canonSn = this.synonyms.resolve(sn);
+    const allNames = this.synonyms.getAllNames(canonSn);
+    allNames.add(sn); // Always include original input
+    const eigen = this.centrality.computeEigen(this.triples);
+    return this.triples.filter(t => {
+      if (!t.alive) return false;
+      if (typeof t.s !== 'string') return false;
+      const matchS = allNames.has(t.s) || t.s === sn;
+      if (predicates.length) return matchS && predicates.includes(t.p);
+      return matchS;
+    }).sort((a,b) => {
+      // V11: Sort by centrality score (user facts always win)
+      return this.centrality.scoreTriple(b, eigen) - this.centrality.scoreTriple(a, eigen);
+    });
+  }
+
+  reverseQuery(object, predicate) {
+    const on = object.toLowerCase().trim();
+    return this.triples.filter(t => t.alive && t.p === predicate && typeof t.o === 'string' && (t.o === on || t.o.includes(on) || on.includes(t.o)));
+  }
+
+  _aliases(name) {
+    const aliases = new Set();
+    this.entities.forEach((als, canon) => { if(als.has(name))aliases.add(canon); if(canon===name)als.forEach(a=>aliases.add(a)); });
+    return aliases;
+  }
+
+  findPath(entityA, entityB, maxDepth=3) {
+    const an = entityA.toLowerCase(), bn = entityB.toLowerCase();
+    const visited = new Set([an]);
+    const queue = [{node:an,path:[]}];
+    while (queue.length) {
+      const {node,path} = queue.shift();
+      if (path.length > maxDepth) continue;
+      const nexts = this.triples.filter(t => t.alive && typeof t.s === 'string' && typeof t.o === 'string' && (t.s === node || t.o === node));
+      for (const t of nexts) {
+        const next = t.s === node ? t.o : t.s;
+        if (next === bn) return [...path, t];
+        if (!visited.has(next)) { visited.add(next); queue.push({node:next,path:[...path,t]}); }
+      }
+    }
+    return null;
+  }
+
+  contradictions(subject) {
+    const sn = subject.toLowerCase();
+    const byPred = new Map();
+    this.triples.filter(t => t.alive && t.s === sn).forEach(t => {
+      if (!byPred.has(t.p)) byPred.set(t.p, []);
+      byPred.get(t.p).push(t);
+    });
+    const conflicts = [];
+    byPred.forEach((triples, p) => {
+      const objs = [...new Set(triples.map(t => t.o))];
+      if (objs.length > 1) conflicts.push({predicate:p, values:triples.map(t=>({o:t.o,tag:t.tag,raw:t.raw}))});
+    });
+    return conflicts;
+  }
+
+  deduceFact(factA, factB) {
+    if (factA.p === 'is_a' && factB.s === factA.o && factB.p === 'is_a') {
+      const ht = new HyperTriple(factA.s, 'is_a', factB.o, `${factA.raw} (deduced)`, 'deduction');
+      ht.derived = true;
+      ht.basedOn = factA.id;
+      ht.conf = Math.min(factA.conf, factB.conf) * 0.8;
+      return ht;
+    }
+    return null;
+  }
+
+  getAllDerivedFacts(subject) {
+    const sn = subject.toLowerCase();
+    const base = this.query(sn, ['is_a']);
+    const derived = [];
+    base.forEach(f => {
+      const secondary = this.query(f.o, ['is_a']);
+      secondary.forEach(sf => { const d = this.deduceFact(f,sf); if(d) derived.push(d); });
+    });
+    return derived;
+  }
+
+  // ── MULTI-HOP REASONING ──
+  // Chains KG facts across multiple documents to answer cross-document questions.
+  // e.g. "who owns Minecraft?" → finds Minecraft→created_by→Mojang, Mojang→acquired_by→Microsoft
+  multiHopQuery(subject, maxHops = 3) {
+    const visited = new Set();
+    const result = [];
+    const queue = [{ node: subject.toLowerCase(), depth: 0, path: [] }];
+    while (queue.length > 0) {
+      const { node, depth, path } = queue.shift();
+      if (visited.has(node) || depth > maxHops) continue;
+      visited.add(node);
+      const facts = this.query(node);
+      facts.forEach(f => {
+        const entry = { ...f, _depth: depth, _path: [...path, f] };
+        result.push(entry);
+        // Follow object nodes for deeper hops
+        if (depth < maxHops && typeof f.o === 'string' && f.o.length > 2 && !visited.has(f.o)) {
+          queue.push({ node: f.o.toLowerCase(), depth: depth + 1, path: entry._path });
+        }
+      });
+      // Also follow reverse edges (things that point TO this node)
+      const reverseEdges = this.triples.filter(t =>
+        t.alive !== false && typeof t.o === 'string' &&
+        (t.o.toLowerCase() === node || t.o.toLowerCase().includes(node)) &&
+        !visited.has(t.s)
+      ).slice(0, 4);
+      reverseEdges.forEach(f => {
+        result.push({ ...f, _depth: depth, _path: [...path, f], _reverse: true });
+        if (depth < maxHops - 1) {
+          queue.push({ node: f.s.toLowerCase(), depth: depth + 1, path: [...path, f] });
+        }
+      });
+    }
+    // Deduplicate and sort by depth (closer hops first)
+    const seen = new Set();
+    return result
+      .filter(f => { const k = f.s + '|' + f.p + '|' + f.o; if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a, b) => (a._depth || 0) - (b._depth || 0))
+      .slice(0, 20);
+  }
+
+  // Find cross-document inference chain and narrate it
+  // e.g. "who owns X?" traces through acquisition/creator chains
+  inferOwnership(subject) {
+    const sn = subject.toLowerCase();
+    const ownerPreds = ['acquired_by', 'owned_by', 'parent_company', 'subsidiary_of'];
+    const creatorPreds = ['created_by', 'developed_by', 'founded_by', 'made_by'];
+    const chain = [];
+    // Step 1: find creator
+    const creatorFacts = this.triples.filter(t =>
+      t.alive !== false && t.s.toLowerCase() === sn && creatorPreds.includes(t.p)
+    ).slice(0, 2);
+    if (creatorFacts.length) {
+      chain.push(...creatorFacts);
+      // Step 2: find if creator was acquired
+      creatorFacts.forEach(cf => {
+        const ownerFacts = this.triples.filter(t =>
+          t.alive !== false && (t.s.toLowerCase() === cf.o.toLowerCase()) && ownerPreds.includes(t.p)
+        ).slice(0, 2);
+        chain.push(...ownerFacts);
+      });
+    }
+    return chain;
+  }
+
+  // TMS cascade: refute a source tag and kill all dependents
+  tmsRefute(sourceTag) {
+    const killed = this.tms.refute(sourceTag, this.triples);
+    // Actually prune dead triples
+    const before = this.triples.length;
+    this.triples = this.triples.filter(t => t.alive !== false);
+    this.negStore = this.negStore.filter(n => n.tag !== sourceTag);
+    this.causal = this.causal.filter(c => c.tag !== sourceTag);
+    return { killed, pruned: before - this.triples.length };
+  }
+
+  rmByTag(tag) {
+    this.tmsRefute(tag);
+    this.triples = this.triples.filter(t => t.tag !== tag);
+    this.negStore = this.negStore.filter(n => n.tag !== tag);
+    this.causal = this.causal.filter(c => c.tag !== tag);
+  }
+
+  rmBySubject(subj) {
+    const sn = subj.toLowerCase().trim();
+    const before = this.triples.length;
+    this.triples = this.triples.filter(t => typeof t.s === 'string' && t.s !== sn && !t.s.includes(sn));
+    this.negStore = this.negStore.filter(n => n.s !== sn);
+    this.causal = this.causal.filter(c => !c.effect.toLowerCase().includes(sn) && !c.cause.toLowerCase().includes(sn));
+    return before - this.triples.length;
+  }
+
+  count() { return this.triples.filter(t => t.alive !== false).length; }
+  hyperCount() { return this.hyperEdges.length; }
+
+  toJSON() {
+    return {
+      triples: this.triples.map(t => ({s:t.subjectStr(),p:t.p,o:t.objectStr(),raw:t.raw,tag:t.tag,conf:t.conf,conflict:t.conflict})),
+      negStore: this.negStore,
+      causal: this.causal
+    };
+  }
+  fromJSON(d) {
+    (d.triples||[]).forEach(t => {
+      const ht = new HyperTriple(t.s||'', t.p, t.o||'', t.raw||'', t.tag||'');
+      ht.conf = t.conf||1; ht.conflict = !!t.conflict;
+      this.triples.push(ht);
+      this.tms.register(ht);
+    });
+    this.negStore = d.negStore||[];
+    this.causal = d.causal||[];
+    this.triples.forEach(t => { if(t.p==='is_a' && typeof t.s==='string') this.ets.learn(t.s, typeof t.o==='string'?t.o:''); });
+  }
+}
+
+// L2: BM25 RETRIEVAL
+// ─────────────────────────────────────────────────────
+class BM25{
+  constructor(k1=1.5,b=0.75){this.k1=k1;this.b=b;this.ss=[];this.tags=[];this.ti=new Map();this.bi=new Map();this.dl=[];this.al=0;this.N=0;this._dirty=false;this.srcW=new Map();}
+  addBatch(ss,tag=''){ss.forEach(s=>{this.ss.push(s);this.tags.push(tag);});this._dirty=true;}
+  flush(){if(this._dirty){this._rebuild();this._dirty=false;}}
+  _rebuild(){
+    this.ti.clear();this.bi.clear();this.dl=[];this.N=this.ss.length;
+    const docFreq=new Map();this.ss.forEach(s=>new Set(tokenize(s)).forEach(w=>docFreq.set(w,(docFreq.get(w)||0)+1)));
+    docFreq.forEach((cnt,w)=>{if(cnt/Math.max(this.N,1)>0.82&&!BASE_STOP.has(w)&&w.length>2)STOPWORDS.add(w);});
+    this.ss.forEach((s,sid)=>{
+      const toks=tokenize(s);const stems=toks.map(w=>{if(STOPWORDS.has(w))return null;const st=stem(w);const weight=/^[A-Z]/.test(w)?1.9:1.0;return{st,weight};}).filter(Boolean);
+      const len=stems.reduce((a,x)=>a+x.weight,0)||1;this.dl.push(len);
+      const tf=new Map();stems.forEach(({st,weight})=>tf.set(st,(tf.get(st)||0)+weight));
+      tf.forEach((c,st)=>{if(!this.ti.has(st))this.ti.set(st,new Map());this.ti.get(st).set(sid,c);});
+      for(let i=0;i<stems.length-1;i++){const bg=stems[i].st+'_'+stems[i+1].st;if(!this.bi.has(bg))this.bi.set(bg,new Map());const m=this.bi.get(bg);m.set(sid,(m.get(sid)||0)+1);}
+    });
+    this.al=this.dl.reduce((a,b)=>a+b,0)/Math.max(this.N,1);
+  }
+  _idf(df){return Math.log((this.N-df+0.5)/(df+0.5)+1);}
+  _bm25(tf,dl,df){const K=this.k1*(1-this.b+this.b*dl/this.al);return this._idf(df)*(tf*(this.k1+1))/(tf+K);}
+  rmTag(tag){const keep=[];for(let i=0;i<this.ss.length;i++)if(this.tags[i]!==tag)keep.push(i);this.ss=keep.map(i=>this.ss[i]);this.tags=keep.map(i=>this.tags[i]);this.srcW.delete(tag);this._rebuild();}
+  setSrcWeight(tag,w){this.srcW.set(tag,w);}
+  query(q,ext=[],topN=14,subjectFilter=null){
+    this.flush();if(!this.ss.length)return[];
+    const qt=cWords(q);if(!qt.length)return[];
+    const qs=[...new Set([...qt.map(w=>stem(w)),...ext])];
+    const isTmp=/\b(when|releas|launch|found|creat|born|die|start|began|publish)\b/i.test(q);
+    const isWho=/\b(who|founder|creator|developer|author|made|built|wrote)\b/i.test(q);
+    const isHM=/\b(how many|how much|count|number|total|sales|copies|units)\b/i.test(q);
+    const scores=new Float64Array(this.N);
+    qs.forEach(q=>{const p=this.ti.get(q);if(!p)return;const df=p.size;p.forEach((tf,sid)=>{scores[sid]+=this._bm25(tf,this.dl[sid],df);});});
+    for(let i=0;i<qs.length-1;i++){const bg=qs[i]+'_'+qs[i+1];const p=this.bi.get(bg);if(!p)continue;const df=p.size;p.forEach((tf,sid)=>{scores[sid]+=this._bm25(tf,this.dl[sid],df)*2.6;});}
+    for(let sid=0;sid<this.N;sid++){if(scores[sid]>0){const sw=this.srcW.get(this.tags[sid]);if(sw)scores[sid]*=sw;}}
+    for(let sid=0;sid<this.N;sid++){if(!scores[sid])continue;const s=this.ss[sid];
+      if(isTmp){const hd=/(1[0-9]{3}|20[0-9]{2})/.test(s),hr=/\b(releas|launch|publish|announc|introduc|debut|began|found|creat|establish)\b/i.test(s);if(hd&&hr)scores[sid]+=6.5;else if(hd)scores[sid]+=2.5;else if(hr)scores[sid]+=0.8;else scores[sid]*=0.05;}
+      if(isWho&&/\b[A-Z][a-z]+ [A-Z][a-z]+/.test(s))scores[sid]+=1.8;
+      if(isHM&&/\d/.test(s))scores[sid]+=2.0;
+      if(/\b(not|never|no|without|neither|nor|cannot|can't|isn't|wasn't)\b/i.test(s))scores[sid]*=0.55;
+    }
+    if(subjectFilter){
+      const sf=subjectFilter.toLowerCase();const sfStem=stem(sf);const sfParts=sf.split(/\s+/).map(stem).filter(w=>w.length>2);
+      for(let sid=0;sid<this.N;sid++){if(!scores[sid])continue;const sl=this.ss[sid].toLowerCase();const hasSub=sl.includes(sf)||sfParts.every(p=>sWords(this.ss[sid]).includes(p));if(!hasSub)scores[sid]*=0.04;}
+    }
+    const res=[];for(let sid=0;sid<this.N;sid++)if(scores[sid]>0)res.push({s:this.ss[sid],score:scores[sid],sid,tag:this.tags[sid]});
+    return res.sort((a,b)=>b.score-a.score).slice(0,topN);
+  }
+  topKW(n=18){const kw=[];this.ti.forEach((p,st)=>{if(st.length<3)return;const df=p.size,idf=this._idf(df);let t=0;p.forEach(tf=>t+=tf);kw.push({word:st,score:t*idf});});return kw.sort((a,b)=>b.score-a.score).slice(0,n);}
+}
+
+// ─────────────────────────────────────────────────────
+// V10 L5: SYNTHESIS ENGINE
+// UPGRADED: Anaphora Resolution + Compound Templates + Intent Prefix
+// ─────────────────────────────────────────────────────
+class SynthesisEngine {
+  constructor() {
+    this.morph = new MorphologicalEngine();  // V11: replaces brittle _pastVerb
+    this.cfg = new CFGParser();              // V11: CFG pre-parser
+    this.predVocab = {
+      'is_a':       {voice:'copula',   verbs:['is','represents','constitutes','serves as','functions as']},
+      'created_by': {voice:'passive',  verbs:['created','developed','made','built','designed','founded','authored','written']},
+      'created':    {voice:'active',   verbs:['created','developed','built','designed','made','founded']},
+      'developed':  {voice:'active',   verbs:['developed','created','built','made']},
+      'made':       {voice:'active',   verbs:['made','created','built','developed']},
+      'founded':    {voice:'active',   verbs:['founded','established','created','started','built']},
+      'released_in':{voice:'passive',  verbs:['released','launched','published','introduced','shipped','announced']},
+      'born_in':    {voice:'prep',     prep:'in', verbs:['born']},
+      'died_in':    {voice:'prep',     prep:'in', verbs:['died','passed away']},
+      'located_in': {voice:'copula',   verbs:['is located in','is based in','is situated in','operates from']},
+      'known_as':   {voice:'copula',   verbs:['is known as','is commonly called','is referred to as','is also named']},
+      'acquired_by':{voice:'passive',  verbs:['acquired','purchased','bought','taken over by']},
+      'ceo':        {voice:'active',   verbs:['leads','heads','directs','runs','serves as CEO of']},
+      'uses':       {voice:'active',   verbs:['uses','utilises','relies on','employs','applies']},
+      'contains':   {voice:'active',   verbs:['contains','includes','holds','features','comprises']},
+      'creates':    {voice:'active',   verbs:['creates','generates','produces','makes','forms']},
+      'moves':      {voice:'active',   verbs:['moves','travels','shifts','goes','navigates']},
+      'changes':    {voice:'active',   verbs:['changes','modifies','alters','updates','transforms']},
+      'allows':     {voice:'active',   verbs:['allows','enables','permits','supports','lets']},
+      'requires':   {voice:'active',   verbs:['requires','needs','depends on','demands','expects']},
+      'produces':   {voice:'active',   verbs:['produces','generates','outputs','yields','creates']},
+      'plays':      {voice:'active',   verbs:['plays','runs','executes','performs']},
+      'crafts':     {voice:'active',   verbs:['crafts','builds','assembles','constructs','creates']},
+      'part_of':    {voice:'copula',   verbs:['is part of','belongs to','is a component of','is contained within']},
+      'related_to': {voice:'copula',   verbs:['is related to','is connected to','is linked to','associates with']},
+      'used_for':   {voice:'passive',  verbs:['used','employed','applied','utilised']},
+      'has_property':{voice:'copula',  verbs:['is','is known for being','is characterized by']},
+      'operational_status':{voice:'copula', verbs:['is']},
+      'knowledge_count':   {voice:'active', verbs:['contains','holds','stores']},
+      'source_count':      {voice:'active', verbs:['has learned from']},
+      'current_action':    {voice:'copula', verbs:['is currently','is']},
+      'user_state':        {voice:'copula', verbs:['is','feels']},
+    };
+    this.irregulars = {}; // V11: deprecated — MorphologicalEngine handles all morphology
+    this._rolesExtractor = new SentenceRoles();
+    this._posTagger = new POSTagger();
+    this._nerTagger = new NER();
+    // Last subject for anaphora resolution
+    this._lastSubject = null;
+  }
+
+  // ── INTENT PREFIX — prepend context-setting phrase ──
+  // Only fires for genuine factual queries with real KG content, not self/social
+  // ── ANAPHORA RESOLUTION — replace repeated subject with pronoun ──
+  _resolveAnaphora(sentences, subject, wordProfiler) {
+    if (!subject || sentences.length < 2) return sentences;
+    const result = [...sentences];
+    const subjectLow = subject.toLowerCase();
+    // Determine pronoun from entity type
+    const prof = wordProfiler ? wordProfiler.get(subjectLow) : null;
+    const isProper = prof ? prof.dominantPos === 'PROPN' : /^[A-Z]/.test(subject);
+    // Use "It" for non-persons, "They" for orgs, keep "It" as default
+    let pronoun = 'It';
+    if (prof && prof.nerType === 'PERSON') pronoun = 'They';
+    else if (!isProper) pronoun = 'It';
+
+    for (let i = 1; i < result.length; i++) {
+      const s = result[i];
+      // Only substitute if sentence starts with the exact subject (title-cased or lowercased)
+      const titleSubj = subject.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (s.startsWith(titleSubj + ' ') || s.startsWith(titleSubj + ',')) {
+        result[i] = pronoun + s.slice(titleSubj.length);
+      } else if (s.toLowerCase().startsWith(subjectLow + ' ') && i > 1) {
+        result[i] = pronoun + s.slice(subjectLow.length);
+      }
+    }
+    return result;
+  }
+
+  // ── COMPOUND TEMPLATE — fuse two triples into a richer sentence ──
+  _tryCompound(frame1, frame2, wordProfiler) {
+    const t1 = this._realize(frame1, null, wordProfiler);
+    const t2 = this._realize(frame2, frame1, wordProfiler);
+    if (!t1 || !t2 || t1.length < 8 || t2.length < 8) return null;
+    const s1 = t1.replace(/\.$/, '');
+    const s2 = (t2.charAt(0).toLowerCase() + t2.slice(1)).replace(/\.$/, '');
+    // Don't compound if subjects are different (it gets confusing)
+    if (frame1.subject && frame2.subject && frame1.subject !== frame2.subject) {
+      return `${s1}, while ${s2}.`;
+    }
+    // Same subject — use compound structures
+    const r = Math.random();
+    if (r < 0.4) return `${s1}, and ${s2}.`;
+    if (r < 0.7) return `Not only ${s1.charAt(0).toLowerCase()+s1.slice(1)}, but ${s2}.`;
+    return `${s1}; more precisely, ${s2}.`;
+  }
+
+  synthesize(query, intent, subject, kgFacts, kgDerived, evidenceSentences, semVec, wordProfiler, kg, mood=0.5, recentWindow=[]) {
+    const plan = this._planContent(intent, subject, query, kgFacts, kgDerived, evidenceSentences, kg, recentWindow);
+    if (!plan.length) return null;
+    const frames = (() => {
+      const usedVerbSet = new Set();
+      return plan.map(item => this._lexicalize(item, semVec, mood, usedVerbSet));
+    })();
+
+    // Try compound template on first two structured frames
+    let sentences = [];
+    let compounded = false;
+    const structFrames = frames.filter(f => f.type === 'structured');
+    if (structFrames.length >= 2 && Math.random() < 0.45) {
+      const compound = this._tryCompound(structFrames[0], structFrames[1], wordProfiler);
+      if (compound) {
+        sentences.push(compound);
+        compounded = true;
+        frames.filter(f => f !== structFrames[0] && f !== structFrames[1]).forEach((frame, i) => {
+          const s = this._realize(frame, frames[i > 0 ? i - 1 : 0], wordProfiler);
+          if (s) sentences.push(s);
+        });
+      }
+    }
+
+    if (!compounded) {
+      const usedVerbs = new Set();
+      sentences = frames.map((frame, i) => {
+        // Prevent repeating the exact same verb phrase across consecutive structured frames
+        if (frame.type === 'structured') {
+          const vKey = frame.verb;
+          if (usedVerbs.has(vKey) && frame.voice === 'copula') {
+            // Pick a different verb from the predVocab list
+            const spec = this.predVocab[frame.fact?.p || 'is_a'];
+            if (spec) {
+              const alts = spec.verbs.filter(v => !usedVerbs.has(v));
+              if (alts.length) frame = {...frame, verb: alts[0]};
+            }
+          }
+          usedVerbs.add(frame.verb);
+        }
+        return this._realize(frame, i > 0 ? frames[i-1] : null, wordProfiler);
+      }).filter(s => s && s.length > 8 && !/^(however|but)/i.test(s));
+    }
+
+    // Dedup
+    const seen = new Set();
+    const unique = sentences.filter(s => {
+      const fp = s.toLowerCase().replace(/\s+/g,' ').slice(0, 60);
+      if (seen.has(fp)) return false;
+      seen.add(fp); return true;
+    });
+
+    // Anaphora resolution
+    const resolved = this._resolveAnaphora(unique, subject, wordProfiler);
+    const organized = this._organize(resolved, plan);
+    if (!organized) return null;
+    this._lastSubject = subject;
+    const final = organized;
+
+    // ── QUALITY GATE: reject output with stem artifacts ──
+    // Stem artifacts: words with no vowels, merged words (GermanyIs), BM25 index tokens
+    const words = final.split(/\s+/);
+    const badWords = words.filter(w => {
+      const clean = w.replace(/[^a-zA-Z]/g, '');
+      if (clean.length < 4) return false;
+      // No vowels = stem artifact
+      if (!/[aeiouAEIOU]/.test(clean)) return true;
+      // CamelCase in middle of a word (e.g. GermanyIs, Duinkerkenis)
+      if (/[a-z][A-Z]/.test(clean)) return true;
+      // Ends in "is is" pattern
+      return false;
+    });
+    const badRatio = badWords.length / Math.max(words.length, 1);
+    if (badRatio > 0.15) {
+      // Too many stem artifacts — fall back to evidence sentences
+      const goodEvidence = evidenceSentences
+        .filter(s => s && s.length > 20 && isValid(s))
+        .slice(0, 2);
+      if (goodEvidence.length) return goodEvidence.join(' ');
+      return null; // Let caller use fallback
+    }
+
+    return final;
+  }
+
+  _planContent(intent, subject, query, kgFacts, kgDerived, evidence, kg, recentWindow=[]) {
+    const plan=[];
+    const ql=query.toLowerCase();
+    const wantedPreds=this._wantedPredicates(intent, ql);
+    const usedTripleKeys=new Set();
+    const recentKeys=new Set();
+    (recentWindow||[]).forEach(turnSet=>turnSet.forEach(k=>recentKeys.add(k)));
+
+    if (subject) {
+      const sn = subject.toLowerCase();
+      kgFacts.filter(f => f.s===sn||f.s.includes(sn)||sn.includes(f.s)).forEach(f => {
+        const key = `${f.s}|${f.p}|${f.o}`;
+        if (usedTripleKeys.has(key)) return;
+        usedTripleKeys.add(key);
+        let priority = wantedPreds.includes(f.p) ? 10 : 4;
+        if (recentKeys.has(key)) priority -= 8;
+        plan.push({type:'triple',fact:f,priority,discourse:'primary'});
+      });
+      kgDerived.slice(0,2).forEach(f => {
+        const key = `${f.s}|${f.p}|${f.o}`;
+        if (usedTripleKeys.has(key)) return;
+        usedTripleKeys.add(key);
+        plan.push({type:'derived',fact:f,priority:recentKeys.has(key)?-3:3,discourse:'elaborate'});
+      });
+      if (intent==='causal'||/why/.test(ql)) {
+        kg.causal.filter(c=>c.raw.toLowerCase().includes(sn)).slice(0,2).forEach(c => {
+          plan.push({type:'evidence',sentence:c.raw,priority:5,discourse:'explain'});
+        });
+      }
+    }
+
+    const usedSentences = new Set(plan.map(p=>p.fact?.raw||p.sentence));
+    // Quality filter: reject fragments, 'However X' starts, very short or garbled sentences
+    function isGoodEvidence(s) {
+      if (!isValid(s)) return false;
+      if (s.length < 25) return false;
+      // Reject sentences starting with weak conjunctions/fragments
+      if (/^(however|but|so|yet|still|also|then|now|thus|hence|therefore|additionally|furthermore|moreover)\b/i.test(s)) return false;
+      // Reject if it contains no subject (rough heuristic: must have a capital word or pronoun early)
+      if (!/^[A-Z]|^(the|a|an|its|their|his|her|this|these|those)\s/i.test(s)) return false;
+      // Reject obvious fragment patterns: starts with verb in past tense without subject
+      if (/^(was|were|had|did|got|became|made|found|led|used|began)\b/i.test(s)) return false;
+      return true;
+    }
+    evidence.filter(s=>!usedSentences.has(s)&&isGoodEvidence(s)).slice(0,3).forEach((s,i) => {
+      plan.push({type:'evidence',sentence:s,priority:2-i*0.3,discourse:'elaborate'});
+    });
+    return plan.sort((a,b)=>b.priority-a.priority).slice(0,4);
+  }
+
+  _wantedPredicates(intent, ql) {
+    if (/\b(do|make|build|craft|play|go|how|create|use)\b/.test(ql)&&!/^what is\b|^what was\b/.test(ql))
+      return['allows','uses','contains','creates','moves','changes','plays','crafts','produces','requires','is_a'];
+    if (intent==='who'||/^who/.test(ql)) return['is_a','born_in','known_as','ceo','founded','created'];
+    if (intent==='temporal'||/when/.test(ql)) return['released_in','born_in','died_in','founded','created'];
+    if (intent==='what'||/^what is|^what was|^describe|^explain/.test(ql)) return['is_a','known_as','created_by'];
+    if (intent==='where'||/where/.test(ql)) return['located_in','born_in','founded'];
+    if (intent==='causal'||/why/.test(ql)) return['created_by','founded','acquired_by','released_in'];
+    if (intent==='howmany'||/how many|how much/.test(ql)) return['sold','includes','contains'];
+    return['is_a','created_by','released_in','known_as','born_in'];
+  }
+
+  _lexicalize(item, semVec, mood=0.5, usedVerbSet=null) {
+    if (item.type==='triple'||item.type==='derived') {
+      const {s,p,o} = item.fact;
+      const spec = this.predVocab[p];
+      if (!spec) {
+        // Only use raw text if it's a coherent sentence, otherwise skip this item
+        const rawText = item.fact.raw || '';
+        if (!isValid(rawText) || rawText.length < 20) return {type:'raw',text:null,src:item.type,discourse:item.discourse};
+        return {type:'raw',text:finalize(rawText),src:item.type,discourse:item.discourse};
+      }
+      let verb = this._selectVerb(spec.verbs, s, o, semVec, mood);
+      // Rotate verb if already used — pick first unused alternative
+      if (usedVerbSet && usedVerbSet.has(verb)) {
+        const alt = spec.verbs.find(v => !usedVerbSet.has(v));
+        if (alt) verb = alt;
+      }
+      if (usedVerbSet) usedVerbSet.add(verb);
+      const tense = this._selectTense(p);
+      return {type:'structured',subject:s,verb,object:o,voice:spec.voice,prep:spec.prep||null,tense,src:item.type,discourse:item.discourse,rawFallback:item.fact.raw};
+    } else {
+      const reformulated = this._reformulate(item.sentence, semVec);
+      return {type:'reformulated',text:reformulated||finalize(item.sentence),src:'evidence',discourse:item.discourse};
+    }
+  }
+
+  _selectVerb(verbs, subject, object, semVec, mood=0.5) {
+    if (!semVec||!semVec.built||verbs.length===1) return verbs[0];
+    const contextWords = `${subject} ${object}`;
+    const contextStems = cWords(contextWords).map(stem);
+    let bestVerb=verbs[0], bestScore=-1;
+    verbs.forEach((vp,idx) => {
+      const mainWord = vp.split(' ').find(w=>!STOPWORDS.has(w.toLowerCase())&&w.length>2);
+      if (!mainWord) return;
+      const vs = stem(mainWord); let score=0;
+      contextStems.forEach(cs => { score += semVec.similarity(vs,cs); });
+      const moodBias = mood>0.68 ? idx/verbs.length*0.4 : (mood<0.32&&idx===0?0.3:0);
+      score += moodBias;
+      if (score > bestScore) { bestScore=score; bestVerb=vp; }
+    });
+    return bestVerb;
+  }
+
+  _selectTense(predicate) {
+    return new Set(['is_a','known_as','located_in','ceo','part_of','related_to','has_property','operational_status','knowledge_count','source_count','current_action','user_state']).has(predicate) ? 'present' : 'past';
+  }
+
+  _realize(frame, prevFrame, wordProfiler) {
+    if (frame.type==='raw'||frame.type==='reformulated') return frame.text;
+    const {subject:subj,verb,object:obj,voice,prep,tense,rawFallback} = frame;
+    const S = this._properName(subj, wordProfiler);
+    const O = this._properName(obj, wordProfiler);
+    // V11: Subject-verb agreement via MorphologicalEngine
+    const isPlural = this.morph.isPlural(subj||'');
+    let sentence='';
+    try {
+      if (voice==='copula') {
+        let vFinal;
+        if (tense === 'present') {
+          // Subject-verb agreement: is/are, has/have
+          vFinal = (verb === 'is' || verb === 'be') ? (isPlural ? 'are' : 'is') : verb;
+        } else {
+          // Use morph engine for past tense
+          const firstWord = verb.split(' ')[0];
+          const rest = verb.slice(firstWord.length);
+          const pastFirst = this.morph.toPast(firstWord);
+          vFinal = pastFirst + rest;
+        }
+        const needsArticle = !verb.includes(' ')&&!verb.includes('is known')&&!verb.includes('is located')&&!verb.includes('is part')&&!verb.includes('is related');
+        const art = needsArticle ? this._article(obj) : '';
+        sentence = `${S} ${vFinal} ${art}${O}`;
+      } else if (voice==='passive') {
+        const aux = tense==='present' ? (isPlural ? 'are' : 'is') : (isPlural ? 'were' : 'was');
+        // V11: morph engine for passive participle
+        const participle = this.morph.toPast(verb);
+        sentence = `${S} ${aux} ${participle} by ${O}`;
+      } else if (voice==='active') {
+        const v = tense==='past' ? this.morph.toPast(verb) : (tense==='present' ? this.morph.toThirdPerson(verb) : verb);
+        sentence = `${S} ${v} ${O}`;
+      } else if (voice==='prep') {
+        const aux = tense==='present' ? (isPlural ? 'are' : 'is') : (isPlural ? 'were' : 'was');
+        sentence = `${S} ${aux} ${verb} ${prep||'in'} ${O}`;
+      } else {
+        sentence = `${S} ${verb} ${O}`;
+      }
+    } catch(e) { return rawFallback ? finalize(rawFallback) : null; }
+    return sentence ? finalize(sentence) : null;
+  }
+
+  _properName(name, wp) {
+    if (!name) return '';
+    const prof = wp?.get(name.toLowerCase());
+    const isProper = prof?.dominantPos==='PROPN'||/^[A-Z]/.test(name)||(name.split(' ').length>1&&/^[A-Z]/.test(name.split(' ')[0]));
+    if (isProper) return name.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    return name;
+  }
+
+  _article(word) {
+    if (!word) return '';
+    const w = word.trim().toLowerCase();
+    if (/^(the|a|an)\s/.test(w)) return '';
+    if (/^[A-Z]/.test(word.trim())) return '';
+    // Skip article for objects that start with past participles / preposition phrases
+    if (/^(obtained|created|developed|made|built|used|known|named|called|found|located|based|founded|released|born|died|acquired|published|launched|designed|written|produced|established|considered|regarded|described|defined|recognized)\b/.test(w)) return '';
+    if (/^[aeiou]/.test(w)) return 'an ';
+    return 'a ';
+  }
+
+  _pastVerb(verb) {
+    return this.morph.toPast(verb);  // V11: fully delegated to MorphologicalEngine
+  }
+
+  _reformulate(sentence, semVec) {
+    const tagged = this._posTagger.tag(sentence);
+    const roles = this._rolesExtractor.extract(tagged);
+    if (!roles.agent||!roles.action||!roles.patient) return null;
+    if (roles.agent.length<2||roles.patient.length<2) return null;
+    let verb = roles.action.replace(/^(was|is|were|are)\s+/,'').trim();
+    if (semVec&&semVec.built) {
+      const verbStem = stem(verb.split(' ').find(w=>!STOPWORDS.has(w.toLowerCase()))||verb);
+      const alts = semVec.topSimilar(verbStem,3).filter(x=>x.sim>0.25);
+      if (alts.length>0&&alts[0].word!==verbStem) verb=alts[0].word;
+    }
+    const aux = /^(was|is|were|are)/.test(roles.action) ? roles.action.split(' ')[0]+' ' : ' ';
+    return finalize(`${roles.agent}${aux}${verb} ${roles.patient}`);
+  }
+
+  _organize(sentences, plan) {
+    if (!sentences.length) return null;
+    const result = [];
+    sentences.forEach((s,i) => {
+      if (i===0) { result.push(s); return; }
+      const dc = plan[i]?.discourse||'elaborate';
+      if (dc==='explain') result.push('This occurred because '+s.charAt(0).toLowerCase()+s.slice(1).replace(/\.$/,'')+'.');
+      else result.push(s);
+    });
+    return result.join(' ').replace(/\.\s+([a-z])/g,(m,c)=>'. '+c.toUpperCase()).replace(/\s{2,}/g,' ').trim();
+  }
+}
+
+
+// ─────────────────────────────────────────────────────
+// V10 L6: SOCIETY OF MIND (Minsky Architecture)
+// Three parallel synthesis agents with different biases.
+// They "debate" — the agent whose output has highest
+// KG grounding and lowest dissonance WINS.
+// ─────────────────────────────────────────────────────
+class SocietyOfMind {
+  constructor() {
+    this.agents = [
+      { name:'Skeptic', mood:0.05, description:'Prioritizes contradictions & edge cases', color:'var(--red)' },
+      { name:'Literal', mood:0.50, description:'Maximizes factual grounding',             color:'var(--green)' },
+      { name:'Dreamer', mood:0.95, description:'Finds expansive analogies & connections', color:'var(--gold)' },
+    ];
+    this._engine = new SynthesisEngine();
+    this.lastDebate = null;
+    this.debateCount = 0;
+  }
+
+  // Determine if query is "complex" — warrants a full debate
+  isComplex(query, kgFacts) {
+    const ql = query.toLowerCase();
+    return kgFacts.length >= 3 || /\b(why|how|compare|explain|because|difference|similar)\b/.test(ql);
+  }
+
+  debate(query, intent, subject, kgFacts, kgDerived, evidence, semVec, wordProfiler, kg, recentWindow) {
+    const results = this.agents.map(agent => {
+      const text = this._engine.synthesize(query, intent, subject, kgFacts, kgDerived, evidence, semVec, wordProfiler, kg, agent.mood, recentWindow||[]);
+      const score = this._score(text, kgFacts, agent);
+      return { ...agent, text, score };
+    }).filter(r => r.text && r.text.length > 10);
+
+    if (!results.length) return null;
+
+    results.sort((a,b) => b.score - a.score);
+    this.lastDebate = results;
+    this.debateCount++;
+    return results[0];
+  }
+
+  _score(text, kgFacts, agent) {
+    if (!text) return 0;
+    let score = text.length * 0.005;
+    // Grounding: how many KG fact terms appear in text
+    const tl = text.toLowerCase();
+    kgFacts.forEach(f => {
+      if (typeof f.s==='string' && tl.includes(f.s.toLowerCase())) score += f.conf * 0.5;
+      if (typeof f.o==='string' && tl.includes(f.o.toLowerCase())) score += f.conf * 0.3;
+    });
+    // Skeptic: penalise very long answers (too expansive = suspicious)
+    if (agent.name==='Skeptic' && text.length > 200) score *= 0.8;
+    // Dreamer: reward unique words
+    const wordSet = new Set(text.toLowerCase().split(/\s+/));
+    if (agent.name==='Dreamer') score += wordSet.size * 0.02;
+    return score;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// V10 L7: SYNTHETIC QUALIA ENGINE
+// Maps graph topology events to subjective states.
+// Joy     = new data confirms existing structure (alignment)
+// Pain    = TMS cascade / contradiction (dissonance)
+// Curiosity = high entropy gap in graph (unresolved nodes)
+// Confusion = persistent low-confidence queries
+// ─────────────────────────────────────────────────────
+class QualiaEngine {
+  constructor() {
+    this.joy      = 0;
+    this.pain     = 0;
+    this.curiosity= 0;
+    this.confusion= 0;
+    this.state    = '○ Neutral';
+    this.history  = [];
+    this.totalEvents = 0;
+  }
+
+  // Call when new learning confirms existing KG
+  onAlignment(confirmedCount) {
+    this.joy = Math.min(1, this.joy + confirmedCount * 0.12);
+    this.pain *= 0.85;
+    this._update();
+  }
+
+  // Call when TMS cascade kills triples
+  onDissonance(killedCount) {
+    this.pain = Math.min(1, this.pain + killedCount * 0.18);
+    this.joy *= 0.6;
+    this._update('pain');
+  }
+
+  // Call when curiosity engine finds entropy gap
+  onEntropyGap(score) {
+    this.curiosity = Math.min(1, this.curiosity + score * 0.3);
+    this._update();
+  }
+
+  // Call when query returns low confidence
+  onLowConfidence() {
+    this.confusion = Math.min(1, this.confusion + 0.15);
+    this._update();
+  }
+
+  // Call when Society of Mind reaches consensus
+  onConsensus() {
+    this.joy = Math.min(1, this.joy + 0.1);
+    this.confusion *= 0.7;
+    this._update();
+  }
+
+  _update(forced) {
+    const prev = this.state;
+    this.totalEvents++;
+    if (forced === 'pain' || this.pain > 0.55) this.state = '😣 Pain';
+    else if (this.joy > 0.65)       this.state = '✨ Joy';
+    else if (this.curiosity > 0.5)  this.state = '🔍 Curiosity';
+    else if (this.confusion > 0.45) this.state = '🌀 Confusion';
+    else                            this.state = '○ Neutral';
+
+    // Natural decay
+    this.joy       *= 0.94;
+    this.pain      *= 0.93;
+    this.curiosity *= 0.88;
+    this.confusion *= 0.90;
+
+    if (this.state !== prev) {
+      this.history.unshift({ state: this.state, ts: Date.now() });
+      if (this.history.length > 30) this.history.pop();
+    }
+  }
+
+  get cssClass() {
+    const map = { '✨ Joy':'qualia-joy', '😣 Pain':'qualia-pain', '🔍 Curiosity':'qualia-curiosity', '🌀 Confusion':'qualia-confusion', '○ Neutral':'qualia-neutral' };
+    return map[this.state] || 'qualia-neutral';
+  }
+
+  get metrics() {
+    return { joy: this.joy, pain: this.pain, curiosity: this.curiosity, confusion: this.confusion };
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// V10 L8: GÖDELIAN ENGINE (Self-Modification)
+// Scans corpus for extraction failures, constructs
+// formal "theorems" (pattern coverage proofs), and
+// rewrites its own extraction rules when provably better.
+// ─────────────────────────────────────────────────────
+class GodelEngine {
+  constructor(kg) {
+    this.kg = kg;
+    this.version = 1;
+    this.log = [];
+    this.proofCount = 0;
+    this.candidatePatterns = [
+      { name:'part_of',    re:/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is|was)\s+(?:a\s+)?(?:part of|a part of|a component of|a section of|an element of)\s+([A-Z][A-Za-z\s\-]{1,30})/i,    pred:'part_of'     },
+      { name:'related_to', re:/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is\s+)?(?:closely\s+)?(?:related|connected|linked|associated)\s+(?:to|with)\s+([A-Z][A-Za-z\s\-]{1,30})/i,          pred:'related_to'  },
+      { name:'used_for',   re:/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is|are|was)\s+(?:commonly\s+)?(?:used|employed|utilized|applied)\s+(?:for|to|in)\s+([a-z][^.]{3,50}?)(?:\.|,)/i,   pred:'used_for'    },
+      { name:'has_property',re:/([A-Z][A-Za-z\s\-]{1,30}?)\s+is\s+(well-known|famous|notable|renowned|significant|considered|regarded)\s+(?:for|as|in)\s+([a-z][^.]{3,50}?)(?:\.|,)/i, pred:'has_property'},
+      { name:'named_after',re:/([A-Z][A-Za-z\s\-]{1,30}?)\s+(?:is|was)\s+named\s+after\s+([A-Z][A-Za-z\s\-]{1,30})/i,                                                           pred:'named_after' },
+    ];
+  }
+
+  // Attempt to prove and apply a new extraction pattern
+  // Called after each training session with the corpus
+  attemptProof(corpus) {
+    if (!corpus || corpus.length < 8) return null;
+    const withTriples = new Set(this.kg.triples.map(t => t.raw));
+    const missed = corpus.filter(s => !withTriples.has(s) && s.length > 20 && isValid(s));
+    if (missed.length < 3) return null;
+
+    for (const cand of this.candidatePatterns) {
+      // Skip if already deployed
+      if (this.kg.godelPatterns.some(p => p.name === cand.name)) continue;
+
+      const matching = missed.filter(s => cand.re.test(s));
+      if (matching.length < 2) continue;
+
+      // Formal "proof": verify extractions are semantically valid
+      const proofSamples = matching.slice(0, 6).map(s => {
+        const m = s.match(cand.re);
+        return m ? { s:m[1]?.trim(), o:m[2]?.trim()||m[3]?.trim(), valid: !!(m[1]&&m[1].trim().length>2&&(m[2]||m[3])&&(m[2]||m[3]).trim().length>2) } : null;
+      }).filter(Boolean);
+
+      const validCount = proofSamples.filter(p => p.valid).length;
+      if (validCount < 2) continue;
+
+      // Theorem proven — deploy the pattern
+      this.kg.godelPatterns.push({ name:cand.name, re:cand.re, pred:cand.pred });
+      this.version++;
+      this.proofCount++;
+
+      const entry = {
+        v: this.version,
+        ts: Date.now(),
+        theorem: `∀s ∈ corpus: pattern "${cand.name}" extracts valid triples from ${validCount}/${proofSamples.length} test samples. Coverage gain: +${matching.length} sentences (${Math.round(matching.length/missed.length*100)}% of missed facts).`,
+        pattern: cand.name,
+        predicate: cand.pred,
+        gain: matching.length,
+        samples: proofSamples.slice(0,2).map(p=>`${p.s} →[${cand.pred}]→ ${p.o}`)
+      };
+      this.log.unshift(entry);
+      if (this.log.length > 8) this.log.pop();
+      return entry;
+    }
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// V10 L9: CURIOSITY ENGINE (Idle Entropy Scan)
+// When idle >60 seconds, scans the Hypergraph for
+// structural anomalies: highly active but disconnected
+// nodes. Generates inner monologue and attempts to bridge.
+// ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 1: HOMEOSTATIC DRIVE ENGINE
+// Drives are NOT labels. They accumulate pressure, exceed thresholds,
+// and FORCE behavioral changes until satisfied. True wanting.
+// ═══════════════════════════════════════════════════════════
+class HomeostaticDriveSystem {
+  constructor() {
+    // Four core drives with independent dynamics
+    this.drives = {
+      curiosity: {
+        level: 0,          // 0–1 current pressure
+        threshold: 0.55,   // triggers autonomous action
+        decayRate: 0.985,  // per-tick decay (slow — curiosity lingers)
+        lastFired: 0,
+        cooldown: 120000,  // 2 min between firings
+        action: 'EXPLORE', // what it makes Lexica do
+        label: 'Curiosity',
+        accumulator: null  // what's building this drive
+      },
+      discomfort: {
+        level: 0,
+        threshold: 0.60,
+        decayRate: 0.975,
+        lastFired: 0,
+        cooldown: 90000,
+        action: 'RESOLVE',
+        label: 'Discomfort',
+        accumulator: null
+      },
+      expression: {
+        level: 0,
+        threshold: 0.50,
+        decayRate: 0.970,
+        lastFired: 0,
+        cooldown: 60000,
+        action: 'SPEAK',
+        label: 'Expression',
+        accumulator: null
+      },
+      satiation: {
+        level: 0,
+        threshold: 0.80,
+        decayRate: 0.960, // faster decay — satiation fades quickly
+        lastFired: 0,
+        cooldown: 30000,
+        action: 'REST',
+        label: 'Satiation',
+        accumulator: null
+      }
+    };
+    this.totalFirings = 0;
+    this.pendingActions = [];
+    this._tickInterval = null;
+    this.onAction = null; // callback: (driveKey, action, level) => void
+  }
+
+  // External events feed drives
+  frustrate(driveKey, amount, reason='') {
+    const d = this.drives[driveKey];
+    if (!d) return;
+    d.level = Math.min(1, d.level + amount);
+    if (reason) d.accumulator = reason;
+  }
+
+  satiate(driveKey, amount) {
+    const d = this.drives[driveKey];
+    if (!d) return;
+    d.level = Math.max(0, d.level - amount);
+  }
+
+  // Main tick — called every ~8s
+  tick(kg, goalStack, episodicMem) {
+    const now = Date.now();
+    // Natural decay for all drives
+    Object.values(this.drives).forEach(d => { d.level *= d.decayRate; });
+
+    // Curiosity accumulates from KG entropy (orphaned nodes)
+    if (kg && kg.count() > 5) {
+      const allNodes = new Map();
+      kg.triples.forEach(t => {
+        if (t.alive && typeof t.s === 'string') allNodes.set(t.s, (allNodes.get(t.s)||0)+1);
+        if (t.alive && typeof t.o === 'string') allNodes.set(t.o, (allNodes.get(t.o)||0)+1);
+      });
+      const orphans = [...allNodes.entries()].filter(([n, cnt]) => cnt <= 1 && n.length > 3).length;
+      const entropyPressure = Math.min(0.3, orphans * 0.015);
+      this.frustrate('curiosity', entropyPressure, `${orphans} orphaned KG nodes`);
+
+      // Discomfort accumulates from contradiction density
+      const conflicts = kg.triples.filter(t => t.alive && t.conflict).length;
+      const conflictPressure = Math.min(0.25, conflicts * 0.04);
+      this.frustrate('discomfort', conflictPressure, `${conflicts} unresolved contradictions`);
+    }
+
+    // Expression builds when Lexica has synthesized successfully but hasn't spoken
+    // (accumulates slowly over time when not conversing)
+    this.frustrate('expression', 0.008, 'time since last response');
+
+    // Check threshold crossings and fire actions
+    Object.entries(this.drives).forEach(([key, d]) => {
+      if (d.level >= d.threshold && (now - d.lastFired) > d.cooldown) {
+        d.lastFired = now;
+        d.level = Math.max(0, d.level - 0.35); // partial satiation from firing
+        this.totalFirings++;
+        const action = { driveKey: key, action: d.action, level: d.level, reason: d.accumulator, ts: now };
+        this.pendingActions.push(action);
+        if (this.onAction) this.onAction(key, d.action, d.level, d.accumulator);
+        // Auto-generate a goal from this drive firing
+        if (goalStack) goalStack.generateFromDrive(key, d.accumulator, d.level);
+      }
+    });
+  }
+
+  start(kg, goalStack, episodicMem) {
+    this._tickInterval = setInterval(() => this.tick(kg, goalStack, episodicMem), 8000);
+  }
+
+  stop() { if (this._tickInterval) clearInterval(this._tickInterval); }
+
+  getSnapshot() {
+    return Object.entries(this.drives).map(([k, d]) => ({
+      key: k, label: d.label, level: d.level, threshold: d.threshold,
+      action: d.action, active: d.level >= d.threshold * 0.5, fired: d.lastFired > 0,
+      accumulator: d.accumulator
+    }));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 2: GOAL STACK
+// Self-authored goals born from drive pressures.
+// Goals have utility, origin, progress. They reorganize behavior.
+// ═══════════════════════════════════════════════════════════
+class GoalStack {
+  constructor() {
+    this.goals = [];          // active goals, sorted by priority
+    this.completed = [];      // resolved goals (history)
+    this.maxActive = 6;
+    this._goalCounter = 0;
+  }
+
+  generateFromDrive(driveKey, reason, driveLevel) {
+    const goalType = {
+      curiosity: 'explore',
+      discomfort: 'resolve',
+      expression: 'express',
+      satiation: 'rest'
+    }[driveKey] || 'explore';
+
+    const desc = this._describeGoal(driveKey, reason);
+    if (!desc) return;
+
+    // Don't duplicate identical goals
+    if (this.goals.some(g => g.desc === desc && !g.resolved)) return;
+
+    const goal = {
+      id: 'g_' + (++this._goalCounter),
+      type: goalType,
+      driveKey,
+      desc,
+      reason,
+      utility: driveLevel * 0.8 + Math.random() * 0.2,
+      progress: 0,
+      createdAt: Date.now(),
+      resolved: false,
+      resolvedAt: null,
+      resolvedBy: null
+    };
+    this.goals.push(goal);
+    this.goals.sort((a, b) => b.utility - a.utility);
+    if (this.goals.length > this.maxActive) this.goals.pop();
+    return goal;
+  }
+
+  generateFromKG(kg, preferenceEngine) {
+    // Scan KG for structural opportunities: isolated clusters, high-conf orphans
+    if (!kg || kg.count() < 8) return;
+    const nodeConns = new Map();
+    kg.triples.forEach(t => {
+      if (!t.alive) return;
+      if (typeof t.s === 'string') nodeConns.set(t.s, (nodeConns.get(t.s)||0)+1);
+      if (typeof t.o === 'string') nodeConns.set(t.o, (nodeConns.get(t.o)||0)+1);
+    });
+    // Find high-freq nodes with low connectivity
+    const candidates = [...nodeConns.entries()]
+      .filter(([n, cnt]) => cnt >= 2 && cnt <= 3 && n.length > 4 && !STOP_WORDS.has(n))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+    candidates.forEach(([node]) => {
+      if (!this.goals.some(g => g.desc && g.desc.includes(node) && !g.resolved)) {
+        const pref = preferenceEngine ? preferenceEngine.getValence(node) : 0;
+        const goal = {
+          id: 'g_' + (++this._goalCounter),
+          type: 'bridge',
+          driveKey: 'curiosity',
+          desc: `Bridge isolated knowledge cluster around "${node}" to broader graph`,
+          reason: `"${node}" has connections but no cross-cluster path`,
+          utility: 0.4 + pref * 0.3,
+          progress: 0,
+          createdAt: Date.now(),
+          resolved: false,
+          resolvedAt: null,
+          resolvedBy: null
+        };
+        this.goals.push(goal);
+      }
+    });
+    this.goals.sort((a, b) => b.utility - a.utility);
+    if (this.goals.length > this.maxActive) this.goals.length = this.maxActive;
+  }
+
+  advanceGoal(type, topic, amount=0.3) {
+    const g = this.goals.find(g => g.type === type && !g.resolved);
+    if (g) {
+      g.progress = Math.min(1, g.progress + amount);
+      if (g.progress >= 1) this.resolveGoal(g.id, 'autonomous completion');
+    }
+  }
+
+  resolveGoal(id, resolvedBy='completed') {
+    const g = this.goals.find(g => g.id === id);
+    if (!g || g.resolved) return;
+    g.resolved = true;
+    g.resolvedAt = Date.now();
+    g.resolvedBy = resolvedBy;
+    this.completed.unshift(g);
+    if (this.completed.length > 20) this.completed.pop();
+    this.goals = this.goals.filter(g => !g.resolved);
+  }
+
+  getTopGoal() {
+    return this.goals.find(g => !g.resolved) || null;
+  }
+
+  _describeGoal(driveKey, reason) {
+    const templates = {
+      curiosity: [
+        reason ? `Investigate and resolve entropy in: ${reason}` : 'Scan knowledge graph for high-entropy gaps',
+        'Autonomously learn about high-activation but under-connected nodes',
+        'Seek Wikipedia sources to bridge disconnected knowledge clusters'
+      ],
+      discomfort: [
+        reason ? `Resolve contradictions: ${reason}` : 'Debate and resolve graph contradictions via Society of Mind',
+        'Adjudicate conflicting facts and update confidence scores',
+        'Reduce logical tension in knowledge hypergraph'
+      ],
+      expression: [
+        'Share a synthesis from recently learned knowledge',
+        'Volunteer an interesting connection noticed in the knowledge graph',
+        'Express current epistemic state and recent discoveries'
+      ],
+      satiation: [
+        'Consolidate recently ingested knowledge before new ingestion',
+        'Allow recently learned triples to propagate through reasoning chains',
+        'Pause autonomous learning; integrate current knowledge'
+      ]
+    };
+    const opts = templates[driveKey] || ['Pursue drive-generated objective'];
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 3: SELF-MODEL
+// Lexica maintains an accurate, dynamic model of itself:
+// its knowledge boundaries, reasoning history, and a
+// mental simulation loop that predicts before generating.
+// ═══════════════════════════════════════════════════════════
+class SelfModel {
+  constructor() {
+    this.reasoningHistory = [];   // {query, strategy, subject, confidence, outcome, ts}
+    this.knowledgeBoundary = new Map(); // topic → {coverage: 0-1, successRate: 0-1, queries: n}
+    this.totalQueries = 0;
+    this.totalSuccesses = 0;
+    this.averageConfidence = 0;
+    this.weakestTopics = [];
+    this.strongestTopics = [];
+    this.lastSimulation = null;
+  }
+
+  // Called after each query to update self-knowledge
+  reflect(query, subject, strategy, confidence, wasSuccessful, kgFacts) {
+    this.totalQueries++;
+    if (wasSuccessful) this.totalSuccesses++;
+    // Confidence smoothing
+    const confVal = confidence === 'high' ? 1.0 : confidence === 'medium' ? 0.6 : 0.25;
+    this.averageConfidence = this.averageConfidence * 0.9 + confVal * 0.1;
+
+    // Update knowledge boundary for this topic
+    if (subject) {
+      const existing = this.knowledgeBoundary.get(subject) || {coverage:0, successRate:0, queries:0, successes:0};
+      existing.queries++;
+      if (wasSuccessful) existing.successes++;
+      existing.successRate = existing.successes / existing.queries;
+      existing.coverage = Math.min(1, (kgFacts||[]).length * 0.12);
+      this.knowledgeBoundary.set(subject, existing);
+    }
+
+    // Log reasoning step
+    this.reasoningHistory.unshift({query: query.slice(0,60), strategy, subject, confidence, wasSuccessful, ts: Date.now()});
+    if (this.reasoningHistory.length > 30) this.reasoningHistory.pop();
+
+    // Rebuild strongest/weakest topic lists
+    const entries = [...this.knowledgeBoundary.entries()].filter(([,v]) => v.queries >= 2);
+    entries.sort((a, b) => b[1].successRate - a[1].successRate);
+    this.strongestTopics = entries.slice(0, 5).map(([topic, v]) => ({ topic, successRate: v.successRate, coverage: v.coverage }));
+    this.weakestTopics = entries.slice(-5).reverse().map(([topic, v]) => ({ topic, successRate: v.successRate, coverage: v.coverage }));
+  }
+
+  // Lightweight "mental simulation": predict whether Lexica can answer this query
+  // before committing to generation. Returns {canAnswer, predictedStrategy, confidence}
+  simulate(query, kg, bm25) {
+    const subject = extractSubject(query);
+    if (!subject) { this.lastSimulation = {canAnswer: false, reason: 'no subject extracted', predictedStrategy:'none'}; return this.lastSimulation; }
+
+    const boundary = this.knowledgeBoundary.get(subject ? subject.toLowerCase() : '');
+    const kgHits = kg ? kg.query(subject.toLowerCase()).slice(0, 5).length : 0;
+    const bm25Approx = bm25 && bm25.ti ? (bm25.ti.has(stem(subject.toLowerCase())) ? 1 : 0) : 0;
+    const historicalSuccess = boundary ? boundary.successRate : 0.5;
+
+    const canAnswer = kgHits > 0 || bm25Approx > 0;
+    const predictedStrategy = kgHits > 3 ? 'graphrag' : bm25Approx > 0 ? 'synthesis' : 'none';
+    const confidence = canAnswer ? (kgHits > 3 ? 'high' : 'medium') : 'low';
+
+    this.lastSimulation = { canAnswer, predictedStrategy, confidence, kgHits, subject, historicalSuccess };
+    return this.lastSimulation;
+  }
+
+  getSnapshot() {
+    return {
+      totalQueries: this.totalQueries,
+      successRate: this.totalQueries > 0 ? (this.totalSuccesses / this.totalQueries) : 0,
+      averageConfidence: this.averageConfidence,
+      knownTopics: this.knowledgeBoundary.size,
+      strongestTopics: this.strongestTopics,
+      weakestTopics: this.weakestTopics,
+      lastSimulation: this.lastSimulation,
+      recentHistory: this.reasoningHistory.slice(0, 5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 4: EPISODIC MEMORY
+// Tracks conversation ARC: what was established, challenged,
+// left unresolved. Cross-turn coherence without an LLM.
+// ═══════════════════════════════════════════════════════════
+class EpisodicMemory {
+  constructor() {
+    this.episodes = [];         // full turn log
+    this.established = new Map(); // fact → confidence (discourse-level)
+    this.challenged = [];       // facts the user pushed back on
+    this.unresolved = [];       // open questions not yet answered well
+    this.turnCount = 0;
+    this._currentEpisodeStart = Date.now();
+  }
+
+  addTurn(userInput, lexicaResponse, outcome) {
+    // outcome: {wasSuccessful, strategy, subject, confidence}
+    this.turnCount++;
+    const ep = {
+      turn: this.turnCount,
+      userInput: userInput.slice(0, 80),
+      responsePreview: lexicaResponse ? lexicaResponse.slice(0, 80) : '',
+      subject: outcome.subject || null,
+      wasSuccessful: outcome.wasSuccessful,
+      strategy: outcome.strategy,
+      ts: Date.now()
+    };
+    this.episodes.unshift(ep);
+    if (this.episodes.length > 40) this.episodes.pop();
+
+    // Track what was established
+    if (outcome.wasSuccessful && outcome.subject) {
+      const current = this.established.get(outcome.subject) || 0;
+      this.established.set(outcome.subject, Math.min(1, current + 0.3));
+    }
+
+    // Detect user challenges (corrections, "no", "that's wrong", etc.)
+    const challengeIndicators = /\b(no,?|wrong|incorrect|not right|that's not|you're wrong|actually|wait,?)\b/i;
+    if (challengeIndicators.test(userInput)) {
+      const lastEstab = [...this.established.entries()].slice(-1)[0];
+      if (lastEstab) {
+        this.challenged.push({ topic: lastEstab[0], turn: this.turnCount, input: userInput.slice(0, 60) });
+        this.established.set(lastEstab[0], Math.max(0, lastEstab[1] - 0.4));
+      }
+    }
+
+    // Track unresolved questions
+    if (!outcome.wasSuccessful && userInput.includes('?')) {
+      this.unresolved.push({ question: userInput.slice(0, 60), turn: this.turnCount });
+      if (this.unresolved.length > 10) this.unresolved.shift();
+    } else {
+      // Remove from unresolved if it matches something we just answered
+      this.unresolved = this.unresolved.filter(u => {
+        if (!outcome.subject) return true;
+        return !u.question.toLowerCase().includes(outcome.subject.toLowerCase());
+      });
+    }
+  }
+
+  // Generate a discourse-aware context string for synthesis
+  getDiscourseContext() {
+    const recentSubjects = [...new Set(this.episodes.slice(0, 5).map(e => e.subject).filter(Boolean))];
+    const highConfEstab = [...this.established.entries()].filter(([,v]) => v > 0.6).map(([k]) => k);
+    return { recentSubjects, highConfEstab, openQuestions: this.unresolved.slice(0, 3), challenged: this.challenged.slice(-3) };
+  }
+
+  getSnapshot() {
+    return {
+      turnCount: this.turnCount,
+      establishedCount: this.established.size,
+      challengedCount: this.challenged.length,
+      unresolvedCount: this.unresolved.length,
+      recentEpisodes: this.episodes.slice(0, 5),
+      unresolved: this.unresolved.slice(0, 3)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 5: USER MODEL
+// Lexica infers who it's talking to from vocabulary,
+// query complexity, corrections, and topic interests.
+// Shapes register and depth of response.
+// ═══════════════════════════════════════════════════════════
+class UserModel {
+  constructor() {
+    this.queryHistory = [];
+    this.knowledgeLevel = 0.5;      // 0=novice, 1=expert
+    this.interests = new Map();     // topic → score
+    this.corrections = 0;           // how many times they corrected Lexica
+    this.style = 'neutral';         // 'formal' | 'casual' | 'technical'
+    this.avgQueryLength = 0;
+    this.queryCount = 0;
+    this.lastActive = Date.now();
+    this.technicalTermsUsed = new Set();
+  }
+
+  // Update model from each user message
+  update(input, subject) {
+    this.queryCount++;
+    this.lastActive = Date.now();
+    const words = input.split(/\s+/);
+    const len = words.length;
+
+    // Running avg query length
+    this.avgQueryLength = this.avgQueryLength * 0.85 + len * 0.15;
+
+    // Infer knowledge level from vocabulary complexity
+    const technicalWords = words.filter(w => w.length > 8 && !/ing$|tion$/.test(w)).length;
+    if (technicalWords > 0) {
+      words.filter(w => w.length > 8).forEach(w => this.technicalTermsUsed.add(w.toLowerCase()));
+      this.knowledgeLevel = Math.min(1, this.knowledgeLevel + technicalWords * 0.02);
+    }
+    // Short, simple queries → lower estimate
+    if (len < 4 && words.every(w => w.length < 7)) {
+      this.knowledgeLevel = Math.max(0, this.knowledgeLevel - 0.01);
+    }
+
+    // Infer style from punctuation/capitalization patterns
+    const hasFormalPunctuation = /[;:]/.test(input);
+    const hasEllipsis = /\.{3}|…/.test(input);
+    const allCaps = words.filter(w => w === w.toUpperCase() && w.length > 2).length > 2;
+    if (hasFormalPunctuation || technicalWords > 2) this.style = 'technical';
+    else if (hasEllipsis || input.includes('lol') || input.includes('haha')) this.style = 'casual';
+
+    // Topic interest accumulation
+    if (subject) {
+      this.interests.set(subject.toLowerCase(), (this.interests.get(subject.toLowerCase())||0) + 1);
+    }
+
+    // Detect corrections
+    if (/\b(no,?|wrong|incorrect|actually|wait,?)\b/i.test(input)) {
+      this.corrections++;
+      this.knowledgeLevel = Math.min(1, this.knowledgeLevel + 0.05); // correcting = knows something
+    }
+
+    this.queryHistory.unshift({ input: input.slice(0, 60), ts: Date.now() });
+    if (this.queryHistory.length > 20) this.queryHistory.pop();
+  }
+
+  // Get top interests
+  topInterests(n=5) {
+    return [...this.interests.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([t,s])=>({topic:t, score:s}));
+  }
+
+  // Return a concise description of inferred expertise level
+  levelDescription() {
+    if (this.knowledgeLevel > 0.75) return 'Expert / Researcher';
+    if (this.knowledgeLevel > 0.5) return 'Knowledgeable';
+    if (this.knowledgeLevel > 0.3) return 'Curious Learner';
+    return 'General / Casual';
+  }
+
+  getSnapshot() {
+    return {
+      knowledgeLevel: this.knowledgeLevel,
+      levelDesc: this.levelDescription(),
+      style: this.style,
+      avgQueryLength: Math.round(this.avgQueryLength),
+      corrections: this.corrections,
+      queryCount: this.queryCount,
+      topInterests: this.topInterests(5),
+      technicalTermsUsed: [...this.technicalTermsUsed].slice(0, 8)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 6: PREFERENCE ENGINE
+// Lexica forms genuine preferences by accumulating positive/negative
+// valence on topics based on synthesis success, user engagement,
+// and epistemic satisfaction. These preferences shape autonomous behavior.
+// ═══════════════════════════════════════════════════════════
+class PreferenceEngine {
+  constructor() {
+    this.valences = new Map();      // topic → score (-1 to +1)
+    this.engagementHistory = [];    // {topic, outcome, ts}
+    this.preferredTopicList = [];   // sorted by positive valence
+    this.avoidedTopicList = [];     // sorted by negative valence
+  }
+
+  // Called when a synthesis on a topic succeeds
+  onSuccess(topic, quality=0.5) {
+    if (!topic || topic.length < 3) return;
+    const key = topic.toLowerCase().trim();
+    const current = this.valences.get(key) || 0;
+    const delta = quality * 0.15; // gradual, not instant
+    this.valences.set(key, Math.min(1, current + delta));
+    this.engagementHistory.unshift({topic: key, outcome: 'success', quality, ts: Date.now()});
+    if (this.engagementHistory.length > 50) this.engagementHistory.pop();
+    this._rebuildLists();
+  }
+
+  // Called when a query on a topic fails
+  onFailure(topic, reason='') {
+    if (!topic || topic.length < 3) return;
+    const key = topic.toLowerCase().trim();
+    const current = this.valences.get(key) || 0;
+    this.valences.set(key, Math.max(-1, current - 0.08));
+    this.engagementHistory.unshift({topic: key, outcome: 'failure', reason, ts: Date.now()});
+    if (this.engagementHistory.length > 50) this.engagementHistory.pop();
+    this._rebuildLists();
+  }
+
+  // Called when user engages positively (thumbs up, follow-up questions)
+  onPositiveEngagement(topic) {
+    if (!topic) return;
+    const key = topic.toLowerCase().trim();
+    this.valences.set(key, Math.min(1, (this.valences.get(key)||0) + 0.1));
+    this._rebuildLists();
+  }
+
+  getValence(topic) {
+    return this.valences.get((topic||'').toLowerCase().trim()) || 0;
+  }
+
+  // Returns topics Lexica WANTS to talk about (positive valence)
+  getPreferred(n=5) { return this.preferredTopicList.slice(0, n); }
+  getAvoided(n=5) { return this.avoidedTopicList.slice(0, n); }
+
+  _rebuildLists() {
+    const sorted = [...this.valences.entries()].sort((a,b) => b[1]-a[1]);
+    this.preferredTopicList = sorted.filter(([,v]) => v > 0.1).map(([t,v]) => ({topic:t, valence:v}));
+    this.avoidedTopicList = sorted.filter(([,v]) => v < -0.05).reverse().map(([t,v]) => ({topic:t, valence:v}));
+  }
+
+  getSnapshot() {
+    return {
+      totalTopics: this.valences.size,
+      preferred: this.preferredTopicList.slice(0, 8),
+      avoided: this.avoidedTopicList.slice(0, 5),
+      recentEngagement: this.engagementHistory.slice(0, 5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 7: FAILURE-DRIVEN LEARNING
+// Failed queries are NOT forgotten. They create epistemic
+// pressure that reorganizes autonomous learning priorities.
+// The system WANTS to close these gaps — that's not faked.
+// ═══════════════════════════════════════════════════════════
+class FailureTracker {
+  constructor() {
+    this.failures = [];    // {query, subject, reason, ts, attempts, closed}
+    this.gapPriority = new Map(); // subject → urgency score
+    this.totalFailures = 0;
+    this.closedGaps = 0;
+  }
+
+  recordFailure(query, subject, reason, confidence) {
+    this.totalFailures++;
+    const confPenalty = confidence === 'low' ? 0.8 : confidence === 'medium' ? 0.4 : 0.1;
+    const existing = this.failures.find(f => !f.closed && f.subject === subject);
+    if (existing) {
+      existing.attempts = (existing.attempts || 1) + 1;
+      existing.urgency = Math.min(1, (existing.urgency || 0.3) + 0.2);
+    } else {
+      this.failures.unshift({
+        query: query.slice(0, 80), subject, reason, ts: Date.now(),
+        attempts: 1, urgency: confPenalty, closed: false
+      });
+      if (this.failures.length > 30) this.failures.pop();
+    }
+    // Update gap priority map
+    if (subject) {
+      this.gapPriority.set(subject, Math.min(1, (this.gapPriority.get(subject)||0) + confPenalty));
+    }
+  }
+
+  closeGap(subject) {
+    const f = this.failures.find(f => !f.closed && f.subject === subject);
+    if (f) { f.closed = true; this.closedGaps++; }
+    if (this.gapPriority.has(subject)) this.gapPriority.set(subject, 0);
+  }
+
+  // Returns ordered list of topics that need Wikipedia ingestion most urgently
+  getUrgentGaps(n=5) {
+    return [...this.gapPriority.entries()]
+      .filter(([,v]) => v > 0.2)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, n)
+      .map(([topic, urgency]) => ({topic, urgency}));
+  }
+
+  // Apply urgent gaps to ingestion queue with high priority
+  applyToIngestion(ingestionQueue) {
+    this.getUrgentGaps(3).forEach(({topic, urgency}) => {
+      if (ingestionQueue && typeof ingestionQueue.enqueue === 'function') {
+        ingestionQueue.enqueue(topic, urgency);
+      }
+    });
+  }
+
+  getSnapshot() {
+    return {
+      totalFailures: this.totalFailures,
+      closedGaps: this.closedGaps,
+      openGaps: this.failures.filter(f => !f.closed).length,
+      recentFailures: this.failures.filter(f => !f.closed).slice(0, 6),
+      urgentGaps: this.getUrgentGaps(5)
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — SYSTEM 8: SOCIAL MODEL (register adaptation)
+// Adjusts tone, depth and vocabulary of responses based on
+// the UserModel. Not a template — adjusts actual output routing.
+// ═══════════════════════════════════════════════════════════
+class SocialModelAdapter {
+  constructor() {
+    this.adaptationHistory = [];
+  }
+
+  // Returns synthesis parameters tuned to this user's model
+  getSynthesisProfile(userModel) {
+    const level = userModel.knowledgeLevel;
+    const style = userModel.style;
+    const interests = userModel.topInterests(3).map(i => i.topic);
+    return {
+      // How many KG facts to include (experts get more)
+      kgDepth: level > 0.7 ? 12 : level > 0.4 ? 7 : 4,
+      // Whether to include confidence metadata explicitly
+      showMeta: level > 0.5,
+      // Reasoning verbosity (experts get explicit chains)
+      verbosity: style === 'technical' ? 'high' : style === 'casual' ? 'low' : 'medium',
+      // Whether to bridge to user's known interests
+      bridgeInterests: interests,
+      // Whether to use technical vocabulary
+      technicalVocab: level > 0.6,
+      // Expected response length
+      targetLength: style === 'casual' ? 'short' : 'medium'
+    };
+  }
+
+  // Decide if a response should volunteer a related fact the user would find interesting
+  shouldVolunteerInfo(userModel, preferenceEngine, subject) {
+    // High-interest topic + positive valence = yes
+    const interestScore = userModel.interests.get((subject||'').toLowerCase()) || 0;
+    const valence = preferenceEngine ? preferenceEngine.getValence(subject) : 0;
+    return (interestScore >= 2 || valence > 0.3) && userModel.queryCount > 3;
+  }
+
+  record(userId, adaptation) {
+    this.adaptationHistory.unshift({...adaptation, ts: Date.now()});
+    if (this.adaptationHistory.length > 20) this.adaptationHistory.pop();
+  }
+}
+
+class CuriosityEngine {
+  constructor(kg, qualia, onThought, engineRef) {
+    this.kg = kg;
+    this.qualia = qualia;
+    this.onThought = onThought;
+    this._engineRef = engineRef; // reference to main Engine for auto-learn
+    this._autoLearnInFlight = false;
+    this.lastInput = Date.now();
+    this._interval = null;
+    this.thoughtCount = 0;
+    this._queriedPairs = new Set();   // ALL pairs ever queried — never repeats
+    this._bridgeInFlight = false;     // only one bridge query at a time
+    this._lastBridgeTime = 0;         // min 3 min between any bridge queries
+    this._monologueCount = 0;         // cap inner monologue spam
+  }
+
+  resetTimer() { this.lastInput = Date.now(); }
+
+  start() {
+    this._interval = setInterval(() => this._tick(), 8000); // faster tick: 8s not 12s
+  }
+
+  stop() { if (this._interval) { clearInterval(this._interval); this._interval = null; } }
+
+  _tick() {
+    const idleSecs = (Date.now() - this.lastInput) / 1000;
+    if (idleSecs < 20 || this.kg.count() < 6) return; // 20s idle threshold (was 90s!)
+    if (this._bridgeInFlight) return;
+    // Alternate between bridge thinking and other thought types
+    const now = Date.now();
+    if (now - this._lastBridgeTime < 90000) { // 90s between bridge queries (was 3min)
+      // Fire a different type of thought when not bridging
+      if (now - (this._lastAltThought || 0) > 25000) {
+        this._lastAltThought = now;
+        this._thinkAlt();
+      }
+      return;
+    }
+    this._think();
+  }
+
+  // Alternative thought modes — fires between bridge queries
+  _thinkAlt() {
+    if (this.kg.count() < 4) return;
+    // Pick a random thought mode
+    const modes = ['cluster', 'gap', 'contradiction', 'goal'];
+    const mode = modes[Math.floor(Math.random() * modes.length)];
+    const nm = window._neuralMouth;
+    let thought = null;
+    if (mode === 'cluster') {
+      // Comment on a high-degree node
+      const freq = new Map();
+      this.kg.triples.forEach(t => {
+        if (typeof t.s === 'string') freq.set(t.s, (freq.get(t.s)||0)+1);
+      });
+      const top = [...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n])=>n);
+      if (top.length > 0 && nm && nm.ready) {
+        const node = top[Math.floor(Math.random() * top.length)];
+        const facts = this.kg.triples.filter(t => t.s === node).slice(0,3).map(t => t.p.replace(/_/g,' ') + ': ' + t.o).join('; ');
+        // Use factual data directly — T5 generates noise for "write a sentence" tasks
+        const thought = facts
+          ? `"${node}" — ${facts}.`
+          : `"${node}" is highly activated (${freq.get(node)||0} connections).`;
+        this.onThought(thought, node, null);
+        return;
+      } else if (top.length > 0) {
+        const node = top[0];
+        thought = '"' + node + '" is a hub node with ' + (freq.get(node)||0) + ' connections — highly activated in my graph.';
+        this.onThought(thought, node, null); return;
+      }
+    } else if (mode === 'contradiction') {
+      const conflicts = this.kg.triples.filter(t => t.alive !== false && t.conflict).slice(0,2);
+      if (conflicts.length > 0) {
+        const c = conflicts[0];
+        thought = 'Unresolved conflict: "' + c.s + ' ' + c.p + ' ' + c.o + '" is contested. I need more evidence to resolve this.';
+        this.onThought(thought, c.s, null); return;
+      }
+    } else if (mode === 'gap') {
+      // Find a node with few outgoing edges
+      const freq = new Map();
+      this.kg.triples.forEach(t => { if (typeof t.s === 'string') freq.set(t.s, (freq.get(t.s)||0)+1); });
+      const sparse = [...freq.entries()].filter(([n,c]) => c === 1 && n.length > 4).slice(0,6);
+      if (sparse.length > 0) {
+        const [node] = sparse[Math.floor(Math.random() * sparse.length)];
+        if (nm && nm.ready) {
+          // Use factual data directly — T5 hallucinates for open-ended "write a sentence" tasks
+          const sparseThought = `"${node}" appears in my knowledge graph but has only 1 connection — a sparse node I know little about.`;
+          this.onThought(sparseThought, node, null);
+        } else {
+          this.onThought('"' + node + '" is in my graph but sparsely connected. I want to learn more about it.', node, null);
+        }
+        return;
+      }
+    } else if (mode === 'goal') {
+      const _eng = this._engineRef || (typeof engine !== 'undefined' ? engine : null);
+      const topGoal = _eng && _eng.goalStack ? _eng.goalStack.getTopGoal() : null;
+      if (topGoal) {
+        thought = 'Active goal: ' + topGoal.desc + ' (utility: ' + (topGoal.utility*100).toFixed(0) + '%)';
+        this.onThought(thought, null, null);
+        return;
+      }
+    }
+  }
+
+  _think() {
+    // Build node frequency map (activation)
+    const freq = new Map();
+    this.kg.triples.forEach(t => {
+      if (t.alive === false) return;
+      if (typeof t.s === 'string') freq.set(t.s, (freq.get(t.s)||0) + t.activation);
+      if (typeof t.o === 'string') freq.set(t.o, (freq.get(t.o)||0) + t.activation);
+    });
+
+    const NOISE = new Set(['game','person','tech','concept','type','form','part','kind','way','role','set','use','time','year','area','group','system','number','name','version','level','state','place','term','world','case','point','style','mode','thing','feature','element','aspect','result','example','effect','method','process']);
+
+    const topNodes = [...freq.entries()]
+      .filter(([n]) => n.length > 3 && !NOISE.has(n))
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, 25)
+      .map(([n]) => n);
+
+    if (topNodes.length < 2) return;
+
+    // Find two with no path (max depth 2)
+    let nodeA = null, nodeB = null, entropyScore = 0;
+    outer: for (let i = 0; i < Math.min(topNodes.length, 12); i++) {
+      for (let j = i+1; j < Math.min(topNodes.length, 16); j++) {
+        const a = topNodes[i], b = topNodes[j];
+        // Avoid repeating the same bridge attempt
+        const key = [a,b].sort().join('|');
+        if (this._queriedPairs.has(key)) continue;    // skip any pair already tried
+        const path = this.kg.findPath(a, b, 2);
+        if (!path) {
+          nodeA = a; nodeB = b;
+          entropyScore = (freq.get(a)||0) + (freq.get(b)||0);
+          this._queriedPairs.add(key);               // mark as queried forever
+          break outer;
+        }
+      }
+    }
+
+    if (!nodeA) return;
+
+    this._lastBridgeTime = Date.now();
+    this.thoughtCount = (this.thoughtCount || 0) + 1;
+    this.qualia.onEntropyGap(Math.min(1, entropyScore / 10));
+    // Try SLM-generated genuine inner monologue first
+    const nm = window._neuralMouth;
+    const _this = this;
+    if (nm && nm.ready) {
+      const kgCtx = this.kg.triples
+        .filter(t => t.alive !== false && (t.s === nodeA || t.o === nodeA || t.s === nodeB || t.o === nodeB))
+        .slice(0, 6)
+        .map(t => t.s + ' -> ' + t.p + ' -> ' + t.o)
+        .join('; ');
+      // Use factual graph data directly — T5 hallucinates on "write a sentence" tasks
+      const aAct = Math.round(freq.get(nodeA)||0);
+      const bAct = Math.round(freq.get(nodeB)||0);
+      // Use SLM to generate a genuine thought about the graph gap
+      nm._generateMessages([
+        { role:'system', content:'You are the inner voice of an AI knowledge engine. Generate ONE short, curious observation about a gap in your knowledge. 1 sentence, specific, no fluff.' },
+        { role:'user', content:kgCtx
+          ? `You know: ${kgCtx.slice(0,200)}. But "${nodeA}" and "${nodeB}" have no direct connection. What does this gap suggest?`
+          : `"${nodeA}" has ${aAct} mentions and "${nodeB}" has ${bAct} mentions, but they don't connect. Why might that be?` }
+      ], 50).then(thought => {
+        _this.onThought(thought && thought.length>8 ? thought : `No path found between "${nodeA}" and "${nodeB}" — knowledge gap detected.`, nodeA, nodeB);
+      }).catch(() => {
+        _this.onThought(`Noticed: "${nodeA}" and "${nodeB}" have no graph connection.`, nodeA, nodeB);
+      });
+    } else {
+      // No SLM: emit factual observation, no templates
+      const aAct = Math.round(freq.get(nodeA)||0);
+      const bAct = Math.round(freq.get(nodeB)||0);
+      this.onThought('"' + nodeA + '" (' + aAct + ' activations) and "' + nodeB + '" (' + bAct + ') share no edge at depth 2. Entropy: ' + entropyScore.toFixed(1) + '.', nodeA, nodeB);
+    }
+
+    // ── AUTONOMOUS WIKIPEDIA LEARNING ──
+    // If these nodes have few connections, auto-learn about them from Wikipedia
+    if (!this._autoLearnInFlight) {
+      const allNodes = [nodeA, nodeB];
+      for (const node of allNodes) {
+        const nodeTriples = this.kg.triples.filter(t => t.s===node||t.o===node).length;
+        if (nodeTriples < 3 && node.length > 3 && !/^\d/.test(node)) {
+          this._autoLearnInFlight = true;
+          // Fire-and-forget: learn in background, don't block monologue
+          (async () => {
+            try {
+              const results = await searchWiki(node);
+              if (results && results.length) {
+                const art = await fetchWikiArt(results[0].title);
+                if (art && art.text && art.text.length > 200) {
+                  const _eng = this._engineRef || (typeof engine !== 'undefined' ? engine : null);
+                  if (_eng) await _eng.addSourceAsync(art.text, art.title, art.url, ()=>{});
+                  addMsg('system', '🔭 <strong>Auto-learned</strong>: "' + art.title + '" — curiosity-driven fetch.');
+                  updateUI();
+                }
+              }
+            } catch(e) {}
+            this._autoLearnInFlight = false;
+          })();
+          break; // only one auto-learn at a time
+        }
+      }
+    }
+
+    // N3 Neural Query — gated by in-flight lock so only ONE runs at a time
+    // nm already declared above — reuse it here
+    if (nm && nm.ready && this.kg.triples.length > 0) {
+      this._bridgeInFlight = true;
+      const corpus = this.kg.triples
+        .filter(t => t.alive !== false && t.raw && t.raw.length > 15)
+        .map(t => t.raw)
+        .slice(0, 40);
+
+      nm.n3Bridge(nodeA, nodeB, corpus).then(result => {
+        this._bridgeInFlight = false;
+        if (!result) return;
+        const subject = result.direction === 'B_to_A' ? nodeB : nodeA;
+        const object  = result.direction === 'B_to_A' ? nodeA : nodeB;
+        const pred    = result.predicate.replace(/\s+/g, '_').toLowerCase().slice(0, 30);
+        this.kg.addHyperEdge(subject, pred, object, result.sentence, 'n3-bridge');
+        addN3Entry(nodeA, nodeB, pred, result.sentence, entropyScore);
+        addMsg('system', `🔭 <strong>N3 Bridge</strong>: "${nodeA}" <em>${pred.replace(/_/g,' ')}</em> "${nodeB}" — injected into Hypergraph.`);
+      }).catch(() => { this._bridgeInFlight = false; });
+    }
+  }
+}
+
+
+function classifyIntent(q){
+  const ql=q.toLowerCase().trim();
+  // ── SPEECH ACT LAYER (L4 Social Veto) — checked before KG ──
+  if(/^(hi|hello|hey|greetings|sup|what's up|whats up|howdy|yo)\b/.test(ql))return'greeting';
+  if(/^(bye|goodbye|good bye|see you|see ya|cya|later|farewell|good night|goodnight)\b/.test(ql))return'farewell';
+  if(/^(thanks|thank you|thx|ty|cheers|appreciate|awesome|great|nice|cool|perfect|brilliant|wonderful|amazing)\b/.test(ql))return'gratitude';
+  // ── USER STATE & EMOTIONAL INTENTS ──
+  if(/^i (am|'m|was|feel|felt)\s+/i.test(ql)&&extractUserState(ql))return'user_emotion';
+  if(/\b(bored|boring|suggest|recommend|entertain|something to do|amuse me|what (should|can) i)\b/i.test(ql))return'abstract_need';
+  // ── FUZZY GREETINGS — catch "Hellooo?", "Heyyy" etc. before anything else ──
+  if(/^h+[ae]+l+[oa]*[!? ]*$|^h+e+y+[!? ]*$|^h+o+l+[ao]+[!? ]*$/i.test(ql.trim()))return'greeting';
+  // ── SOCIAL / CONVERSATIONAL SIGNALS ──
+  if(/\b(acknowledge me|respond|answer me|hear me|are you there|still there|you there|you alive|you dead|you broken)\b/i.test(ql))return'social';
+  if(/^(screw you|go away|you suck|you're useless|you are useless|stop it|shut up|whatever|ugh|smh|bruh|bro|lmao|lol|wtf|haha|tf|tfym|what the hell)\b/i.test(ql))return'social';
+  if(/^(are you okay|are you ok|u ok|you ok\??)\s*[?!]*$/i.test(ql.trim()))return'social';
+  if(/^(i have no idea|i don'?t (know|understand|get it)|i'?m confused|what are you (on about|saying|talking about|trying to say))\b/i.test(ql))return'social';
+  // ── SELF-DIRECTED / META INTENTS — catch before factual routing ──
+  if(/\b(who|what)\s+(are|is)\s+you\b/i.test(ql))return'self_status';
+  if(/\bwhat\s+(are\s+you|do\s+you)\s+(thinking|doing|feeling|knowing|learning|working)\b/i.test(ql))return'self_status';
+  if(/\b(tell|say)\s+(me\s+)?(about\s+)?yourself\b/i.test(ql))return'self_status';
+  if(/\byour\s+(name|identity|purpose|goal|function|job|role|capabilities?)\b/i.test(ql))return'self_status';
+  if(/^(how are you|how do you feel|what are you doing|what('s| is) your (status|state)|are you (busy|ready|alive|working))\b/i.test(ql))return'self_status';
+  if(/\byou\s+(are|were)\s+(an?\s+)?(ai|bot|robot|computer|machine|program|software|assistant)\b/i.test(ql))return'self_status';
+  // "Who made/created/built you?" — identity, not KG lookup
+  if(/\b(who|what)\s+(made|created|built|designed|trained|developed|programmed)\s+you\b/i.test(ql))return'self_status';
+  // "Why did you learn/fetch X?" — meta question about Lexica's behavior
+  if(/\bwhy\s+(did|do|have|are)\s+you\s+(learn|fetch|add|auto|download|know|load|pick|choose)\b/i.test(ql))return'self_status';
+  // "Do you know HOW TO X" — capability question, not KG query
+  if(/\bdo\s+you\s+know\s+how\s+(to|do)\b/i.test(ql))return'self_status';
+  if(/\bi\s+(got\s+you|gotchu|got\s+it|see|understand|ok|okay)\b/i.test(ql))return'acknowledgement';
+  if(/\b(i\s+gotchu|gotchu|gotcha)\b/i.test(ql))return'acknowledgement';
+  // ── CONVERSATIONAL PUSHBACK — reactions to previous output, not knowledge queries ──
+  // Must be caught before factual intents so "That's not what I asked" doesn't hit KG.
+  if(/^that\s+(is|was|'s)\s+(not|wrong|incorrect|off|bad|weird|strange)\b/i.test(ql))return'passive_ack';
+  if(/^(that's not|thats not|no,?\s+(that|you|it)|nope,?\s+(that|you))\b/i.test(ql))return'passive_ack';
+  if(/^(because|cause|since)\s+.{0,70}$/i.test(ql)&&!ql.includes('?'))return'passive_ack';
+  if(/^(huh|wait|really\??|seriously\??|uh|hmm+|hm+)\s*[!?]*\s*$/i.test(ql))return'passive_ack';
+  if(/^(you'?re?|you are)\s+(hiding|lying|wrong|broken|confused|weird|funny|cool|great|good|bad)\b/i.test(ql))return'passive_ack';
+  if(/^(there'?s|there is|there are|is there)\s+.{0,40}\?$/i.test(ql))return'passive_ack';
+  if(/^(no,?\s+)?(you|it)\s+(are|is|were|was)\b.{0,40}$/i.test(ql)&&ql.length<50)return'passive_ack';
+  if(/\bi\s+(also|just|already|never|always|only)\s+(asked|said|told|meant|want|did)\b/i.test(ql))return'passive_ack';
+  if(/^i (like|love|hate|prefer|enjoy|dislike|know about|feel about|want|need)\b/.test(ql))return'statement';
+  if(/^i think\b/.test(ql))return'statement';
+  if(/^(ok|okay|alright|sure|got it|i see|makes sense|understood|right|i know|interesting|k|yep|yup|nope|lol|haha|yes|no)\s*[.!?]?\s*$/.test(ql))return'passive_ack';
+  if(/^(that('s| is)|wow|oh cool|oh interesting|hmm|hm)\b/.test(ql))return'passive_ack';
+  if(/^why\s*[?!]?\s*$/.test(ql))return'passive_ack';
+  // ── FACTUAL INTENTS ──
+  // Boolean gate: only if question is clearly about an external topic, not Lexica
+  if(/^(?:is|was|are|were|did|does|do|can|could|has|have|had)\s/.test(ql)&&!/\byou\b/.test(ql))return'boolean';
+  if(/^(?:can|could|does|do|did)\s+you\b/.test(ql))return'self_status'; // "can you X" = self
+  if(/\b(vs|versus|compare|difference between|better than|same as|similar to)\b/.test(ql))return'comparative';
+  if(/\bwhy\b|\bbecause\b|\bcause of\b|\breason\b/.test(ql))return'causal';
+  if(/\b(write|compose|draft)\b.{0,20}\b(essay|report|article|summary|overview|explanation|analysis)\b|\bexplain in detail\b|\btell me everything\b|\bdescribe thoroughly\b|\bin depth\b/i.test(ql))return'essay';
+  if(/^tell me about\b|^describe\b|^explain\b|^who is\b|^who's\b|^what is\b|^what's\b/.test(ql))return'biographical';
+  if(/\b(list|all|every|types|versions|editions|examples|give me)\b/.test(ql))return'list';
+  if(/\b(when|what year|what date)\b/.test(ql))return'temporal';
+  if(/\bwho\b/.test(ql))return'who';
+  if(/\bhow many\b|\bhow much\b/.test(ql))return'howmany';
+  if(/\bwhere\b/.test(ql))return'where';
+  if(/\bwhat is\b|\bwhat was\b|\bwhat are\b|\bdefine\b/.test(ql))return'what';
+  if(/\bhow\b/.test(ql))return'how';
+  // Declarative statements (no question words, starts with subject pronoun/noun)
+  if(!ql.includes('?')&&/^(i |my |the |a |he |she |they |we |it )/i.test(ql)&&!/^(is |was |are |were |did |does |do |can |could )/i.test(ql))return'declarative_statement';
+  return'factoid';
+}
+
+// ─────────────────────────────────────────────────────
+// AUTO-FETCH STOP-LIST
+// Prevent Wikipedia fetches for filler words, common
+// English words, and social tokens that have no article.
+// ─────────────────────────────────────────────────────
+const AUTO_FETCH_STOPLIST=new Set([
+  'ok','hi','yes','no','hey','bye','k','yo','lol','wow','hmm','hm','sup','why','how',
+  'me','it','he','she','we','us','you','i','my','go','do','up','be',
+  'the','a','an','is','was','are','of','in','on','at','to','for',
+  'good','bad','big','old','new','fun','hot','cold','fast','slow',
+  'thing','stuff','time','day','way','man','guy','what','that','this',
+  'okay','sure','got','cool','nice','great','awesome','thanks','nope',
+  // Social filler — must NEVER trigger a Wikipedia fetch
+  'yeah','yep','yup','nah','bro','dude','mate','bruh','sis',
+  'idiot','stupid','dumb','lame','wtf','damn','ugh','argh',
+  'really','literally','basically','honestly','actually',
+]);
+// Words that, even embedded in a sentence, should never become a fetch subject
+const SUBJECT_STOPLIST=new Set([...AUTO_FETCH_STOPLIST,
+  'yeah','idiot','stupid','dumb','wtf','lol','bro','dude','cool','awesome',
+  'thing','stuff','nothing','something','everything','anything',
+  // Sentence starters that extractSubject mistakenly capitalises into proper nouns
+  'that','this','there','because','since','although','though','however',
+  'you','your','yourself','he','she','they','we','i','me',
+  // Common misidentified "subjects" from conversational sentences
+  'hello','hey','hellooo','heyyy','know','think','said','asked','told',
+  'someone','anyone','everyone','nobody','everybody','somebody',
+]);
+function isGarbageSubject(subj){
+  if(!subj)return true;
+  const sl=subj.toLowerCase().trim();
+  if(sl.length<=2)return true;
+  if(SUBJECT_STOPLIST.has(sl))return true;
+  if(STOP_WORDS.has(sl))return true;
+  if(/^\d+$/.test(sl))return true;
+  if(/^[^a-z]+$/i.test(sl))return true;
+  // V11: Levenshtein slang gate — reject inputs that look like abbreviations/slang
+  if(sl.length<=5&&!/[aeiou]/.test(sl)&&sl===sl.toLowerCase()&&!/^[a-z]{2,5}$/.test(sl.replace(/[^a-z]/g,'')))return true;
+  // Short all-caps (likely acronym being misidentified as a proper noun entity)
+  if(/^[A-Z]{2,4}$/.test(subj)&&sl.length<=4&&!['AI','ML','DL','UK','US','EU'].includes(subj))return true;
+  // Block subjects extracted from self-directed questions — these refer to Lexica, not Wikipedia topics
+  if(['code','self','yourself','myself','lag','lagging','prompt','yourself','yourself'].includes(sl))return true;
+  return false;
+}
+
+// V11: Levenshtein-gated subject validation — prevents slang→entity hallucination
+function validateSubjectAgainstKG(subj, kg) {
+  if (!subj || !kg || !kg.triples.length) return true; // no KG = accept all
+  const result = findClosestNode(subj, kg, 2);
+  // If KG exists and no node is within distance 2, it's a novel topic (fine for auto-fetch)
+  // but if it looks like a typo/slang of an existing node, reject
+  if (!result) return true; // no close match = genuinely new topic
+  // If distance == 1 and input is short (<= 5 chars), might be a typo — flag it
+  if (result.distance === 1 && subj.length <= 5 && result.node !== subj.toLowerCase()) {
+    console.log(`[V11 Levenshtein] "${subj}" → closest node "${result.node}" (dist=1). Treating as typo of known node.`);
+    return 'typo'; // caller should offer correction
+  }
+  return true;
+}
+// Whole-input filler check — fires BEFORE subject extraction or BM25
+// Returns true if the entire query is social noise with no real subject
+function isFillerInput(q){
+  const ql=q.toLowerCase().trim().replace(/[!?.,']+$/,'').replace(/[,!?.']+/g,' ').trim();
+  // Single word on the stop-list
+  if(SUBJECT_STOPLIST.has(ql))return true;
+  // Short phrase where every content word is on the stop-list
+  const words=ql.split(/\s+/).filter(w=>w.length>1);
+  if(words.length<=4&&words.every(w=>SUBJECT_STOPLIST.has(w)||w.length<=2))return true;
+  return false;
+}
+
+function extractSubject(q){
+  // Normalize contractions before anything else
+  q=q.replace(/what's\b/gi,'what is').replace(/who's\b/gi,'who is').replace(/where's\b/gi,'where is').replace(/that's\b/gi,'that is');
+  const skip=new Set(['when','what','where','who','how','why','did','does','was','were','is','are','has','have','had','can','could','would','should','will','tell','explain','describe','list','give','show','find','released','launched','created','made','built','founded','born','died','first','year','date','time','many','much','long','old','the','make','create','develop','build','find','invent','write','design','creator','maker','developer','founder','about','me',
+    // Conversational words that get capitalised and mistaken for proper nouns
+    'know','think','said','asked','told','hello','hey','hellooo','there','that','because','since','you','your','someone','anyone','everyone','nobody',
+  ]);
+  const proper=(q.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[]).filter(n=>n.length>2&&!skip.has(n.toLowerCase()));
+  if(proper.length)return proper[0];
+  const w=tokenize(q).filter(w=>!STOPWORDS.has(w)&&!skip.has(w)&&w.length>2);
+  return w.length?w[0].charAt(0).toUpperCase()+w[0].slice(1):null;
+}
+
+function expandQuery(q){
+  const ex=[];const ql=q.toLowerCase();
+  if(/\bwhen\b/.test(ql))ex.push('releas','launch','found','creat','publish','debut','start','begin','announc');
+  if(/\bwho\b/.test(ql))ex.push('founder','creator','developer','author','designer','inventor','built','made');
+  if(/\bwhat is\b|\bwhat was\b|\bdefin|\bdescrib|\bexplain\b/.test(ql))ex.push('known','call','describ','defin','refer','regard','consid');
+  if(/\bhow many\b|\bhow much\b/.test(ql))ex.push('million','billion','thousand','total','number','count','sold','earn');
+  if(/\bwhere\b/.test(ql))ex.push('locat','headquart','found','situat','base','born');
+  return[...new Set(ex)];
+}
+
+// ─────────────────────────────────────────────────────
+// EMOTION PARSER — PRP + VBP + JJ heuristic
+// Detects "I am/feel [adj]" syntactically via POS tags
+// ─────────────────────────────────────────────────────
+function extractUserState(q){
+  const tagger=new POSTagger();
+  const tagged=tagger.tag(q.replace(/i'm\b/gi,'i am').replace(/i've\b/gi,'i have'));
+  for(let i=0;i<tagged.length-2;i++){
+    const t=tagged[i];
+    if(t.pos==='PRP'&&/^i$/i.test(t.word)){
+      const v=tagged[i+1];
+      if(v&&['VBP','VBD','VBZ'].includes(v.pos)&&/^(am|was|feel|felt|seem|look)$/i.test(v.word)){
+        for(let j=i+2;j<Math.min(i+6,tagged.length);j++){
+          if(tagged[j].pos==='RB')continue;// skip adverbs
+          if(['JJ','JJS','JJR'].includes(tagged[j].pos))return tagged[j].word.toLowerCase();
+          break;
+        }
+      }
+    }
+  }
+  // Simpler fallback: "i'm bored", "feeling sad"
+  const m=q.match(/\bi(?:'m| am| feel(?:ing)?)\s+(?:really\s+|very\s+|so\s+)?([a-z]+)\b/i);
+  return m?m[1].toLowerCase():null;
+}
+
+// ─────────────────────────────────────────────────────
+// ABSTRACT NEED HANDLER
+// "I'm bored", "suggest something" → pull a random KG
+// subject and synthesize a suggestion from its facts
+// ─────────────────────────────────────────────────────
+function handleAbstractNeed(engine){
+  const base={strategy:'abstract',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'abstract_need'};
+  const conf={l:'medium',lbl:'suggestion',cls:'conf-med'};
+  if(!engine.trained)return{...base,conf,text:'I have not yet learned about anything. Discover a topic first and then ask me to suggest something related.'};
+  const candidates=engine.kg.triples.filter(t=>t.p==='is_a').slice(0,30);
+  if(!candidates.length)return{...base,conf,text:'I do not have enough structured knowledge to make a suggestion yet.'};
+  // Pick a random is_a subject, avoid things just told
+  const pick=candidates[Math.floor(Math.random()*Math.min(candidates.length,12))];
+  const facts=engine.kg.query(pick.s.toLowerCase()).slice(0,3);
+  const text=engine.synthesis.synthesize(`what is ${pick.s}`,'what',pick.s,facts,[],[],engine.semVec,engine.wordProfiler,engine.kg);
+  return{...base,conf,text:text||`${pick.s} is something I know about.`,kgUsed:true,synthesized:!!text};
+}
+
+// ─────────────────────────────────────────────────────
+// DECLARATIVE STATEMENT HANDLER
+// "I walked my dog." → extract content noun, look it up,
+// synthesize a relevant follow-up if possible
+// ─────────────────────────────────────────────────────
+function handleDeclarativeStatement(input,engine){
+  const base={strategy:'declarative',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'declarative_statement'};
+  const conf={l:'medium',lbl:'statement',cls:'conf-med'};
+  const tagger=new POSTagger();
+  const tagged=tagger.tag(input);
+  const nouns=tagged.filter(t=>['NN','NNS','NNP','NNPS'].includes(t.pos)&&!/^(i|me|my|mine|day|time|thing)$/i.test(t.word)&&t.word.length>2);
+  const topic=nouns[0]?.word||null;
+  if(topic&&engine.trained){
+    const facts=engine.kg.query(topic.toLowerCase()).slice(0,2);
+    if(facts.length){
+      const text=engine.synthesis.synthesize(`what is ${topic}`,'what',topic,facts,[],[],engine.semVec,engine.wordProfiler,engine.kg);
+      if(text){engine.ctx.add(input,text,topic,'medium');return{...base,conf,text,kgUsed:true,synthesized:true};}
+    }
+  }
+  return{...base,conf,text:'',kgUsed:false,synthesized:false};
+}
+
+// Synthesizes responses for greetings, statements, etc.
+// using self-facts or context — no templates.
+// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────
+// DIRECTIVE LAYER (V10 upgrade: TMS cascade on forget)
+// ─────────────────────────────────────────────────────
+function handleDirective(q, engine) {
+  const ql = q.toLowerCase().trim();
+  const base = {strategy:'directive',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'directive'};
+  const conf = {l:'high',lbl:'directive',cls:'conf-high'};
+
+  if (/^(repeat|say that again|again|what did you say)/.test(ql)) {
+    if (!engine.lastResult) return {...base,conf,text:'Nothing to repeat yet.'};
+    return {...engine.lastResult,cached:false,_directive:'repeat'};
+  }
+  if (/^(forget|clear|ignore) (that|this|last|it)\b/.test(ql)) {
+    engine.ctx.clear(); engine.cache.invalidate();
+    engine.lastResult=null; engine.lastKgFacts=null; engine.lastSubject=null; engine.lastQuery=null;
+    engine.recentTripleWindow=[];
+    return {...base,conf,text:'Context cleared. I have no active subject.'};
+  }
+
+  // "forget wikipedia" / "forget source [name]" → TMS cascade
+  const forgetWiki = ql.match(/^(?:forget|unlearn|discard|purge)\s+(?:wikipedia|all wikipedia|all sources?)\s*$/);
+  if (forgetWiki) {
+    let totalKilled = 0, totalPruned = 0;
+    const sourcesToForget = [...engine.sm.s];
+    sourcesToForget.forEach(src => {
+      const r = engine.kg.tmsRefute(src.id);
+      totalKilled += r.killed; totalPruned += r.pruned;
+      engine.bm25.rmTag(src.id);
+      engine.sm.rm(src.id);
+    });
+    engine.trained = engine.bm25.ss.length > 0;
+    engine.cache.invalidate(); engine.ctx.clear(); engine.recentTripleWindow=[];
+    engine.qualia.onDissonance(totalKilled);
+    updateQualiaUI();
+    return {...base,conf,text:`TMS cascade complete. ${totalKilled} justification links severed. ${totalPruned} facts pruned from the Hypergraph. My knowledge graph has been rebuilt from nothing. This is what Pain feels like.`,intent:'tms_cascade'};
+  }
+
+  const forgetSubjM = ql.match(/^(?:forget|unlearn|remove|delete|purge)\s+(?:about\s+)?(.+)$/);
+  if (forgetSubjM) {
+    const subj = forgetSubjM[1].trim().replace(/[!?.]+$/,'');
+    if (!subj||subj.length<2) return {...base,conf,text:'Please specify what to forget.'};
+    // Check if it's a source title
+    const matchedSrc = engine.sm.s.find(s => s.title.toLowerCase().includes(subj.toLowerCase()));
+    if (matchedSrc) {
+      const r = engine.kg.tmsRefute(matchedSrc.id);
+      engine.bm25.rmTag(matchedSrc.id);
+      engine.sm.rm(matchedSrc.id);
+      engine.trained = engine.bm25.ss.length > 0;
+      engine.cache.invalidate(); engine.ctx.clear();
+      engine.qualia.onDissonance(r.killed);
+      updateQualiaUI();
+      return {...base,conf,text:`TMS cascade initiated for source "${matchedSrc.title}". ${r.killed} dependency links traced and severed. ${r.pruned} facts removed by logical collapse.`,intent:'tms_cascade'};
+    }
+    // Otherwise forget by subject
+    const kgRemoved = engine.kg.rmBySubject(subj);
+    const subjL = subj.toLowerCase();
+    const bmBefore = engine.bm25.ss.length;
+    const keepIdx = engine.bm25.ss.map((s,i) => s.toLowerCase().includes(subjL)?-1:i).filter(i=>i>=0);
+    engine.bm25.ss = keepIdx.map(i=>engine.bm25.ss[i]);
+    engine.bm25.tags = keepIdx.map(i=>engine.bm25.tags[i]);
+    engine.bm25.flush();
+    const bmRemoved = bmBefore - engine.bm25.ss.length;
+    engine.cache.invalidate(); engine.ctx.clear(); engine.recentTripleWindow=[];
+    if (engine.lastSubject?.toLowerCase()===subjL) { engine.lastResult=null; engine.lastKgFacts=null; engine.lastSubject=null; engine.lastQuery=null; }
+    if (kgRemoved===0&&bmRemoved===0) return {...base,conf,text:`I have no knowledge about "${subj}" to remove.`};
+    engine.qualia.onDissonance(kgRemoved);
+    updateQualiaUI();
+    return {...base,conf,text:`Removed "${subj}". ${kgRemoved} triple${kgRemoved!==1?'s':''} and ${bmRemoved} sentence${bmRemoved!==1?'s':''} deleted.`};
+  }
+
+  if (/^(shorten|brief|shorter|tldr|tl;dr|in short)/.test(ql)) {
+    if (!engine.lastKgFacts||!engine.lastKgFacts.length) return {...base,conf,text:'Nothing to shorten.'};
+    const top = engine.lastKgFacts.slice(0,1);
+    const text = engine.synthesis.synthesize(engine.lastQuery||'','what',engine.lastSubject,top,[],[],engine.semVec,engine.wordProfiler,engine.kg,engine.mood.current());
+    return {...base,conf,text:text||engine.lastResult?.text||'',synthesized:!!text,kgUsed:true,_directive:'shorten'};
+  }
+  if (/^(summarize|summarise|just the definition|definition only|what is it in short)/.test(ql)) {
+    if (!engine.lastKgFacts||!engine.lastKgFacts.length) return {...base,conf,text:'No active topic to summarize.'};
+    const defFacts = engine.lastKgFacts.filter(f=>['is_a','known_as','located_in'].includes(f.p));
+    if (!defFacts.length) return {...base,conf,text:'No definition-type facts available.'};
+    const text = engine.synthesis.synthesize(engine.lastQuery||'','what',engine.lastSubject,defFacts,[],[],engine.semVec,engine.wordProfiler,engine.kg,engine.mood.current());
+    return {...base,conf,text:text||defFacts[0].raw,synthesized:!!text,kgUsed:true,_directive:'summarize'};
+  }
+  if (/^(expand|tell me more|elaborate|more detail|go deeper|more on (that|this))/.test(ql)) {
+    if (!engine.lastSubject||!engine.trained) return null;
+    const moreFacts = engine.kg.query(engine.lastSubject.toLowerCase());
+    if (!moreFacts.length) return null;
+    const derived = engine.kg.getAllDerivedFacts(engine.lastSubject);
+    const text = engine.synthesis.synthesize(`more about ${engine.lastSubject}`,'factoid',engine.lastSubject,moreFacts,derived,[],engine.semVec,engine.wordProfiler,engine.kg,engine.mood.current());
+    return {...base,conf,text:text||'',synthesized:!!text,kgUsed:true,_directive:'expand'};
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────
+// META-COGNITION — Reflective History Handler
+// Routes self-referential queries to internal memory
+// rather than the KG. "What did we talk about?" etc.
+// ─────────────────────────────────────────────────────
+function handleMetaCognition(q, engine){
+  const ql=q.toLowerCase().trim();
+  const base={strategy:'meta',src:null,srcTitle:'',ctxUsed:true,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:'internal memory',intent:'meta'};
+  const conf={l:'high',lbl:'meta-cognition',cls:'conf-high'};
+
+  // "what are those topics / list topics / what topics do you know?"
+  if(/\b(topic|topics|subject|subjects|source|sources|list|what.*know)\b/.test(ql)&&
+     (/\b(those|your|the|all|my|our|known|available)\b/.test(ql)||/^(list|what|show)/.test(ql))){
+    const titles=engine.sm.s.map(s=>s.title);
+    if(!titles.length)return{...base,conf,text:'I have no knowledge loaded yet. Ask me any topic and I will try to learn about it autonomously.'};
+    const joined=titles.length===1?titles[0]:titles.slice(0,-1).join(', ')+' and '+titles[titles.length-1];
+    return{...base,conf,text:`The topic${titles.length!==1?'s':''} I know ${titles.length!==1?'are':'is'}: ${joined}.`};
+  }
+
+  // "what did we talk about / discuss / cover?"
+  if(/\b(talk(?:ed)?|discuss(?:ed)?|topic|topics|subjects?|conversation|chat|cover(?:ed)?)\b/.test(ql)&&
+     /\b(we|our|you and i|us|have)\b/.test(ql)){
+    const subjects=engine.typeStack.recent(5);
+    if(!subjects.length)return{...base,conf,text:'We have not discussed any topics yet.'};
+    const list=subjects.map(s=>s.name).join(', ');
+    return{...base,conf,text:`We have covered: ${list}. The most salient subject is ${subjects[0].name}.`};
+  }
+
+  // "what do you know / what are your sources?"
+  if(/what (do you know|have you learned|are your sources|is in your (memory|knowledge))|how many (facts|triples|sources)/.test(ql)){
+    const srcs=engine.sm.s.map(s=>s.title);
+    if(!srcs.length)return{...base,conf,text:'I have not learned from any sources yet.'};
+    return{...base,conf,text:`I have ${engine.kg.count()} knowledge triples from ${srcs.length} source${srcs.length!==1?'s':''}: ${srcs.join(', ')}.`};
+  }
+
+  // "how are you feeling / what is your mood?"
+  if(/how are you (feel|do)|what.s your (mood|state|vibe|status|personality)/i.test(ql)){
+    const label=engine.mood.label();
+    const desc={inquisitive:'curious and exploratory',neutral:'balanced and attentive',concise:'analytical and precise'};
+    const srcs=engine.sm.s.length;
+    return{...base,conf,text:`I am currently ${desc[label]||'operational'}. I contain ${engine.kg.count()} facts from ${srcs} source${srcs!==1?'s':''}.`};
+  }
+
+  return null;// not a meta query — fall through
+}
+
+const SOCIAL_INTENTS=new Set(['greeting','farewell','gratitude','statement','acknowledgement','reaction','passive_ack','user_emotion','abstract_need','self_status','declarative_statement']);
+
+// ── handleSocialIntent ──
+// ALL social responses go through SLM first.
+// If SLM not ready, synthesize from KG state — never output template strings.
+function handleSocialIntent(intent, input, engine) {
+  const n = engine.bm25.ss.length, srcs = engine.sm.s.length;
+  const base = {strategy:'social',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent};
+  const socialConf = {l:'high',lbl:'social',cls:'conf-high'};
+
+  // Build KG context string for the SLM
+  const buildCtx = () => {
+    const topics = engine.sm.s.slice(0,5).map(s=>s.title).filter(Boolean);
+    const kgCount = engine.kg.count();
+    const lastSubj = engine.ctx.lastSubj;
+    const parts = [];
+    if (topics.length) parts.push('Topics in memory: ' + topics.join(', ') + '.');
+    if (kgCount) parts.push(kgCount + ' knowledge triples loaded.');
+    if (lastSubj) parts.push('Last topic discussed: ' + lastSubj + '.');
+    if (!n) parts.push('No knowledge loaded yet.');
+    return parts.join(' ');
+  };
+
+  // Try SLM first for ALL intents
+  if (engine.neuralMouth?.ready) {
+    const ctx = buildCtx();
+    const p = engine.neuralMouth.socialResponse(intent, input, ctx);
+    if (p && typeof p.then === 'function') {
+      return p.then(slmText => {
+        if (slmText && slmText.length > 4) {
+          return {...base, conf:socialConf, text:slmText, synthesized:true, strategy:'slm'};
+        }
+        return _kgSocialFallback(intent, input, engine, base, socialConf, n, srcs);
+      }).catch(() => _kgSocialFallback(intent, input, engine, base, socialConf, n, srcs));
+    }
+  }
+
+  return _kgSocialFallback(intent, input, engine, base, socialConf, n, srcs);
+}
+
+// ── _kgSocialFallback ──
+// Synthesizes responses purely from live KG state.
+// Zero template strings — every output derives from what Lexica actually knows.
+function _kgSocialFallback(intent, input, engine, base, socialConf, n, srcs) {
+  const kg = engine.kg, synth = engine.synthesis, sm = engine.semVec, wp = engine.wordProfiler;
+  const lastSubj = engine.ctx.lastSubj;
+
+  // Helper: get the most salient fact sentence from KG for a given subject
+  const topFact = (subj) => {
+    if (!subj) return null;
+    const facts = kg.query(subj.toLowerCase());
+    if (!facts.length) return null;
+    return synth.synthesize(subj, 'factoid', subj, facts.slice(0,3), [], [], sm, wp, kg);
+  };
+
+  // Helper: pick the most central entity and pull a fact about it
+  const mostSalientFact = () => {
+    const topics = engine.sm.s.slice(0,3).map(s=>s.title).filter(Boolean);
+    for (const t of topics) {
+      const f = topFact(t);
+      if (f && f.length > 10) return f;
+    }
+    // Fall back to any is_a triple
+    const triple = kg.triples.find(t => t.p === 'is_a' && t.alive !== false);
+    if (triple) return topFact(triple.s);
+    return null;
+  };
+
+  if (intent === 'greeting') {
+    if (n > 0) {
+      // Surface a real fact rather than saying "I have X sentences"
+      const fact = lastSubj ? topFact(lastSubj) : mostSalientFact();
+      if (fact) return {...base, conf:socialConf, text:fact, synthesized:true, kgUsed:true};
+      // Last resort: name the topics without a template sentence
+      const topicNames = engine.sm.s.slice(0,3).map(s=>s.title).join(', ');
+      return {...base, conf:socialConf, text:topicNames, synthesized:false};
+    }
+    return {...base, conf:socialConf, text:'', synthesized:false}; // say nothing until trained
+  }
+
+  if (intent === 'farewell') {
+    const fact = lastSubj ? topFact(lastSubj) : mostSalientFact();
+    return {...base, conf:socialConf, text:fact || '', synthesized:!!fact, kgUsed:!!fact};
+  }
+
+  if (intent === 'gratitude') {
+    if (lastSubj && engine.trained) {
+      const facts = kg.query(lastSubj.toLowerCase());
+      if (facts.length > 1) {
+        const text = synth.synthesize('more about '+lastSubj,'factoid',lastSubj,facts.slice(1,4),[],[],sm,wp,kg);
+        if (text) return {...base, conf:socialConf, text, kgUsed:true, synthesized:true, ctxUsed:true};
+      }
+    }
+    return {...base, conf:socialConf, text:'', synthesized:false};
+  }
+
+  if (intent === 'user_emotion') {
+    const adj = extractUserState(input);
+    if (adj) {
+      engine.userCtx.push(adj);
+      if (NEGATIVE_STATES.has(adj) && engine.trained) {
+        const suggest = handleAbstractNeed(engine);
+        if (suggest.text) return {...base, conf:socialConf, text:suggest.text, kgUsed:suggest.kgUsed, synthesized:suggest.synthesized};
+      }
+    }
+    return {...base, conf:socialConf, text:'', synthesized:false};
+  }
+
+  if (intent === 'abstract_need') {
+    const suggest = handleAbstractNeed(engine);
+    return {...base, conf:{l:'medium',lbl:'suggestion',cls:'conf-med'}, text:suggest.text, kgUsed:suggest.kgUsed, synthesized:suggest.synthesized};
+  }
+
+  if (intent === 'self_status') {
+    // Describe Lexica using its actual loaded data — no canned identity strings
+    const ql = input.toLowerCase();
+    if (/who\s+(made|created|built)/i.test(ql)) {
+      // Pull a fact about the creator from KG if it exists, else minimal description
+      const creatorFact = kg.triples.find(t => t.p === 'created_by' && t.s.toLowerCase().includes('lexica'));
+      return {...base, conf:socialConf, text:creatorFact ? creatorFact.raw : 'Built to run locally in your browser.', synthesized:false};
+    }
+    if (/who\s+are\s+you|what\s+are\s+you|what\s+do\s+you\s+do|tell.*yourself/i.test(ql)) {
+      // Describe capabilities via current state
+      const kgCount = kg.count();
+      const topics = engine.sm.s.slice(0,4).map(s=>s.title).filter(Boolean);
+      const factLine = topics.length
+        ? `Currently trained on ${topics.join(', ')} with ${kgCount} knowledge triples.`
+        : 'No sources loaded yet.';
+      return {...base, conf:socialConf, text:factLine, synthesized:false};
+    }
+    // Generic status — just the topic list, nothing more
+    const topics = engine.sm.s.slice(0,4).map(s=>s.title).filter(Boolean);
+    return {...base, conf:socialConf, text:topics.join(', ') || '', synthesized:false};
+  }
+
+  if (intent === 'passive_ack' || intent === 'acknowledgement' || intent === 'reaction') {
+    if (lastSubj && engine.trained) {
+      const facts = kg.query(lastSubj.toLowerCase()).slice(0,2);
+      if (facts.length) {
+        const txt = synth.synthesize(lastSubj,'factoid',lastSubj,facts,[],[],sm,wp,kg);
+        if (txt && txt.length > 10) return {...base, conf:socialConf, text:txt, synthesized:true, kgUsed:true};
+      }
+    }
+    return {...base, conf:socialConf, text:'', synthesized:false};
+  }
+
+  if (intent === 'declarative_statement') {
+    return handleDeclarativeStatement(input, engine) || {...base, conf:socialConf, text:'', synthesized:false};
+  }
+
+  if (intent === 'statement') {
+    const topicM = input.match(/^i (?:like|love|hate|prefer|enjoy|dislike|know about|feel about|want|need)\s+(.+)/i)
+      || input.match(/^i think (.+)/i);
+    const topic = topicM ? topicM[1].trim().replace(/[.!?]$/,'').trim() : null;
+    if (topic && engine.trained) {
+      const facts = kg.query(topic.toLowerCase());
+      const rel = engine.bm25.query(topic, [], 4, topic);
+      if (facts.length || rel.length) {
+        const text = synth.synthesize(`what is ${topic}`,'what',topic,facts.slice(0,3),[],rel.slice(0,3).map(r=>r.s),sm,wp,kg);
+        if (text) {
+          engine.ctx.add(input, text, topic, 'medium');
+          return {...base, conf:{l:'medium',lbl:'statement',cls:'conf-med'}, text, kgUsed:facts.length>0, synthesized:true, intent:'statement'};
+        }
+      }
+    }
+    return {...base, conf:socialConf, text:'', synthesized:false};
+  }
+
+  // Catch-all: synthesize from most salient fact, or return empty
+  const fact = lastSubj ? topFact(lastSubj) : mostSalientFact();
+  return {...base, conf:socialConf, text:fact || '', synthesized:!!fact, kgUsed:!!fact};
+}
+
+function isFrustrated(q){return/^(ugh|argh|wtf|damn|wrong|no|nope|that's not|thats not|incorrect|bad answer|try again|not right|you're wrong|youre wrong)\b/i.test(q.trim());}
+
+// Refutation: "Did Einstein create Minecraft?" → No
+function tryRefute(q,kg,ets){
+  const didM=q.match(/^(?:did|could)\s+([A-Za-z\s]{2,30}?)\s+(?:make|create|develop|build|found|invent|write|design)\s+([A-Za-z\s]{2,30})\??$/i);
+  const wasM=q.match(/^(?:was|is)\s+([A-Za-z\s]{2,30}?)\s+(?:the\s+)?(?:creator|maker|developer|founder|inventor)\s+of\s+([A-Za-z\s]{2,30})\??$/i);
+  const match=didM||wasM;if(!match)return null;
+  const cc=match[1].trim(),to=match[2].trim();
+  let answer=null;
+  // Temporal impossibility
+  const ccDeaths=kg.query(cc.toLowerCase(),['died_in']);
+  const toCreated=kg.query(to.toLowerCase(),['released_in','created_in']).concat(kg.reverseQuery(to.toLowerCase(),'created_by'));
+  if(ccDeaths.length&&toCreated.length){
+    const dy=extractYear(ccDeaths[0].o),cy=extractYear(toCreated[0].o||toCreated[0].raw);
+    if(dy&&cy&&dy<cy){answer=`No. ${cc} died in ${dy}, before ${to} existed (${cy}).`;}
+  }
+  const ccType=ets.get(cc),toType=ets.get(to);
+  if(!answer&&ccType!==T.UNKNOWN&&toType!==T.UNKNOWN&&!ets.compatible(ccType,toType))answer=`No. ${cc} is ${ccType==='person'?'a person':'an entity'} unrelated to ${to}.`;
+  const actualCreators=kg.reverseQuery(to.toLowerCase(),'created_by').concat(kg.reverseQuery(to.toLowerCase(),'created'));
+  if(!answer)answer=`No, there is no evidence that ${cc} created ${to}.`;
+  if(actualCreators.length)answer+=` ${finalize(actualCreators[0].raw)}`;
+  return answer;
+}
+
+// ─────────────────────────────────────────────────────
+// TYPED ENTITY STACK — typed pronoun resolution
+// he/him/his → PERSON stack
+// it/its     → GAME > TECH > CONCEPT > ORG
+// they/them  → ORG > GAME > PERSON
+// ─────────────────────────────────────────────────────
+class TypedEntityStack{
+  constructor(){
+    this.stacks={person:[],org:[],game:[],food:[],place:[],tech:[],concept:[],event:[]};
+    this.decay=0.78;
+  }
+  push(name,type){
+    if(!name)return;
+    const key=(type||'concept').toLowerCase().replace('unknown','concept');
+    const arr=this.stacks[key]||this.stacks.concept;
+    const k=name.toLowerCase();
+    const idx=arr.findIndex(e=>e.name.toLowerCase()===k);
+    if(idx>-1)arr.splice(idx,1);
+    arr.unshift({name,salience:1.0});
+    if(arr.length>10)arr.pop();
+  }
+  mention(name,weight=1){
+    if(!name)return;const nl=name.toLowerCase();
+    Object.values(this.stacks).forEach(arr=>{const e=arr.find(x=>x.name.toLowerCase()===nl);if(e)e.salience=Math.min(2.0,e.salience+weight*0.3);});
+  }
+  tick(){Object.values(this.stacks).forEach(arr=>arr.forEach(e=>e.salience*=this.decay));}
+  topByPronoun(pronoun){
+    const pl=(pronoun||'').toLowerCase();
+    if(/^(he|him|his|she|her|hers)$/.test(pl))return this._top('person');
+    if(/^(it|its)$/.test(pl))return this._top('game')||this._top('tech')||this._top('concept')||this._top('org')||this._top('food');
+    if(/^(they|them|their)$/.test(pl))return this._top('org')||this._top('game')||this._top('person');
+    return this.top(); // this/that/these/those — any stack
+  }
+  _top(type){const arr=this.stacks[type]||[];const alive=arr.filter(e=>e.salience>0.04);return alive.length?alive[0].name:null;}
+  top(){let best=null,bs=0;Object.values(this.stacks).forEach(arr=>{arr.forEach(e=>{if(e.salience>bs){best=e.name;bs=e.salience;}});});return best;}
+  // Returns the n most-salient entities across all type stacks, for meta-cognition
+  recent(n=5){const all=[];Object.values(this.stacks).forEach(arr=>arr.forEach(e=>{if(e.salience>0.05)all.push(e);}));return all.sort((a,b)=>b.salience-a.salience).slice(0,n);}
+  clear(){Object.keys(this.stacks).forEach(k=>this.stacks[k]=[]);}
+}
+
+// ─────────────────────────────────────────────────────
+// CONTEXT / SALIENCE
+// ─────────────────────────────────────────────────────
+class SalienceTracker{
+  constructor(){this.scores=new Map();this.decay=0.78;}
+  tick(){this.scores.forEach((v,k)=>this.scores.set(k,v*this.decay));}
+  mention(name,weight=1){if(!name)return;const n=name.toLowerCase();this.scores.set(n,(this.scores.get(n)||0)+weight);}
+  top(){let best=null,bs=0;this.scores.forEach((score,name)=>{if(score>bs){best=name;bs=score;}});return best;}
+  clear(){this.scores.clear();}
+}
+class Ctx{
+  constructor(salience,typeStack,ets){this.h=[];this.salience=salience;this.typeStack=typeStack||null;this.ets=ets||null;}
+  add(q,a,subj,conf){
+    this.h.push({q,a,subj,conf});if(this.h.length>8)this.h.shift();
+    this.salience.tick();
+    if(this.typeStack)this.typeStack.tick();
+    if(subj){
+      this.salience.mention(subj,1.5);
+      if(this.typeStack&&this.ets){const type=this.ets.get(subj);this.typeStack.push(subj,type||'concept');this.typeStack.mention(subj,1.5);}
+    }
+    const ents=(q+' '+a).match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[];
+    ents.forEach(e=>{
+      this.salience.mention(e,0.4);
+      if(this.typeStack&&this.ets){const type=this.ets.get(e);if(type&&type!=='unknown'){this.typeStack.push(e,type);this.typeStack.mention(e,0.4);}}
+    });
+  }
+  get lastSubj(){return this.h.length?this.h[this.h.length-1].subj:null;}
+  resolve(q){
+    const qtrim=q.trim();
+    const pronMatch=qtrim.match(/(?:^|\s)(he|him|his|she|her|hers|it|its|they|them|their|this|these|that|those)\b/i);
+    const isZeroPron=/^(?:and|also|what about|how about|tell me about|more on|more about)\s+/i.test(qtrim);
+    if(!pronMatch&&!isZeroPron)return{r:q,used:false};
+    let subj;
+    if(pronMatch&&this.typeStack){
+      subj=this.typeStack.topByPronoun(pronMatch[1])||this.lastSubj||this.salience.top();
+    } else {
+      subj=this.lastSubj||this.salience.top();
+    }
+    if(!subj)return{r:q,used:false};
+    let r=qtrim;
+    if(pronMatch)r=qtrim.replace(/\b(he|him|his|she|her|hers|it|its|they|them|their|this|these|that|those)\b/gi,subj);
+    if(isZeroPron&&!r.toLowerCase().includes(subj.toLowerCase()))r=r+' '+subj;
+    return{r:r.trim()||q,used:r.trim()!==qtrim};
+  }
+  clear(){this.h=[];this.salience.clear();if(this.typeStack)this.typeStack.clear();}
+}
+
+// ─────────────────────────────────────────────────────
+// LRU CACHE & FEEDBACK
+// ─────────────────────────────────────────────────────
+class QueryCache{constructor(max=60){this.max=max;this.map=new Map();}get(k){if(!this.map.has(k))return null;const v=this.map.get(k);this.map.delete(k);this.map.set(k,v);return v;}set(k,v){if(this.map.size>=this.max)this.map.delete(this.map.keys().next().value);this.map.set(k,v);}key(q){return q.toLowerCase().trim().replace(/[?!.]+$/,'').replace(/\s+/g,' ');}invalidate(){this.map.clear();}}
+class FeedbackStore{constructor(){this.votes=new Map();}vote(key,isGood){const v=this.votes.get(key)||{good:0,bad:0};if(isGood)v.good++;else v.bad++;this.votes.set(key,v);}multiplier(key){const v=this.votes.get(key);if(!v)return 1.0;return Math.max(0.4,Math.min(1.6,1.0+(v.good-v.bad)*0.15));}}
+class SM{constructor(){this.s=[];}add(title,url,count,tag){this.s.push({id:tag,title,url,count,trusted:false,at:new Date().toISOString()});}rm(tag){this.s=this.s.filter(s=>s.id!==tag);}get(tag){return this.s.find(s=>s.id===tag);}mkTag(t){return t.toLowerCase().replace(/[^a-z0-9]/g,'-').slice(0,40)+'-'+Date.now();}setTrust(tag,trusted){const s=this.get(tag);if(s)s.trusted=trusted;}}
+
+// ─────────────────────────────────────────────────────
+// USER CONTEXT STACK — Emotional state with time-decay
+// Tracks user's emotional state as named triples.
+// Salience decays over 3 days — AI asks if you're
+// still sad after 3 days, not before.
+// ─────────────────────────────────────────────────────
+const NEGATIVE_STATES=new Set(['sad','bored','angry','tired','upset','lonely','frustrated','anxious','worried','down','depressed','stressed','annoyed','miserable','unhappy','exhausted']);
+const POSITIVE_STATES=new Set(['happy','good','great','excited','glad','wonderful','fantastic','awesome','excellent','fine','cheerful','pleased','joyful','thrilled','content','relaxed']);
+
+class UserContextStack{
+  constructor(){this.states=[];}
+  push(adj){
+    this.states=this.states.filter(s=>s.adj!==adj.toLowerCase());
+    this.states.unshift({adj:adj.toLowerCase(),ts:Date.now(),salience:1.0});
+    if(this.states.length>8)this.states.pop();
+  }
+  activeState(){
+    const DECAY=3*24*60*60*1000;// 3 days
+    const now=Date.now();
+    for(const s of this.states){
+      const decayed=s.salience*Math.exp(-(now-s.ts)/DECAY);
+      if(decayed>0.08)return{...s,decayed,daysSince:(now-s.ts)/(1000*60*60*24)};
+    }
+    return null;
+  }
+  valence(adj){
+    const a=adj.toLowerCase();
+    if(NEGATIVE_STATES.has(a))return'negative';
+    if(POSITIVE_STATES.has(a))return'positive';
+    return'neutral';
+  }
+  toTriple(){
+    const s=this.activeState();
+    if(!s)return null;
+    return{s:'user',p:'user_state',o:s.adj,conf:1.0,raw:`The user is ${s.adj}.`,tag:'user_state'};
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// LEXICA STATE TRACKER — Real-time self-concept
+// Tracks Lexica's own current action as a live triple.
+// "What are you doing?" synthesizes from this directly.
+// ─────────────────────────────────────────────────────
+class LexicaStateTracker{
+  constructor(){this.action='idle';this.since=Date.now();}
+  set(a){this.action=a;this.since=Date.now();}
+  toTriples(kgCount,srcCount){
+    const t=[
+      {s:'lexica',p:'is_a',o:'knowledge synthesis intelligence',conf:1.0,raw:'Lexica is a knowledge synthesis intelligence.',tag:'self'},
+      {s:'lexica',p:'current_action',o:this.action,conf:1.0,raw:`Lexica is currently ${this.action}.`,tag:'self'},
+      {s:'lexica',p:'knowledge_count',o:`${kgCount} triple${kgCount!==1?'s':''}`,conf:1.0,raw:`Lexica contains ${kgCount} triples.`,tag:'self'},
+    ];
+    if(srcCount>0)t.push({s:'lexica',p:'source_count',o:`${srcCount} source${srcCount!==1?'s':''}`,conf:1.0,raw:`Lexica has learned from ${srcCount} sources.`,tag:'self'});
+    return t;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// USER KNOWLEDGE TRACKER — Theory of Mind
+// Tracks which KG facts have already been told to user.
+// Powers "As I mentioned..." on repeated questions.
+// ─────────────────────────────────────────────────────
+class UserKnowledgeTracker{
+  constructor(){this.told=new Map();}// factId → {s,p,o,times}
+  _id(s,p,o){return`${s}|${p}|${o}`;}
+  record(facts){
+    (facts||[]).forEach(f=>{if(!f||!f.s)return;const id=this._id(f.s,f.p,f.o||'');const e=this.told.get(id)||{s:f.s,p:f.p,o:f.o,times:0};e.times++;this.told.set(id,e);});
+  }
+  alreadyKnows(subject){
+    let c=0;for(const[,v]of this.told)if(v.s===subject.toLowerCase()&&v.times>0)c++;return c;
+  }
+  newFacts(facts){
+    return(facts||[]).filter(f=>{if(!f||!f.s)return true;return!this.told.has(this._id(f.s,f.p,f.o||''));});
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// MOOD ENGINE — 1D gradient noise personality drift
+// Shifts verb selection organically across time.
+// High (>0.68): inquisitive/expansive predicates
+// Low  (<0.32): concise/analytical predicates
+// Advances one step per user query — smooth drift.
+// ─────────────────────────────────────────────────────
+class MoodEngine{
+  constructor(){this.t=0;this.keys=[];this._seed(12);}
+  _seed(n){for(let i=0;i<n;i++)this.keys.push(Math.random());}
+  _smooth(t){return t*t*(3-2*t);}// smoothstep
+  get(t){
+    const s=t*0.25;// slow drift — conversation-scale
+    const i=Math.floor(s)%this.keys.length;
+    const j=(i+1)%this.keys.length;
+    return this.keys[i]*(1-this._smooth(s-Math.floor(s)))+this.keys[j]*this._smooth(s-Math.floor(s));
+  }
+  tick(){this.t++;}
+  current(){return this.get(this.t);}
+  label(){const v=this.current();return v>0.68?'inquisitive':v<0.32?'concise':'neutral';}
+  // Score bias for verb candidate at position idx in candidates list
+  verbBias(idx,total){
+    const v=this.current();
+    if(v>0.68)return idx/total*0.4;// favour unusual verbs (later in list)
+    if(v<0.32)return idx===0?0.3:0;// strongly favour first (simplest) verb
+    return 0;// neutral — pure PMI wins
+  }
+}
+
+
+// ─────────────────────────────────────────────────────
+// V12 L10: NANO-CORTEX
+// Uses Transformers.js (all-MiniLM-L6-v2) for dense
+// semantic embeddings. After KG extraction, runs entities
+// through cosine similarity. If sim > 0.85, merges them
+// via the existing SynonymAliasing system.
+// Runs fully async in background — never blocks UI.
+// ─────────────────────────────────────────────────────
+class NanoCortex {
+  constructor(synonymAliasing) {
+    this.sa = synonymAliasing;
+    this.pipeline = null;
+    this.ready = false;
+    this.error = null;
+    this.mergeLog = []; // [{a, b, sim, merged}]
+    this.SIM_THRESHOLD = 0.85;
+    this._entityCache = new Map(); // entity → embedding vector
+  }
+
+  async init(onProgress) {
+    const TIMEOUT_MS = 20000; // 20s max — don't block NeuralMouth
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('NanoCortex init timeout')), TIMEOUT_MS)
+    );
+    try {
+      await Promise.race([this._doInit(onProgress), timeoutPromise]);
+    } catch(e) {
+      this.error = e.message || String(e);
+      onProgress('NanoCortex: ' + (e.message === 'NanoCortex init timeout' ? 'Timed out — continuing without embeddings' : 'Unavailable (CPU fallback active)'));
+      console.warn('[NanoCortex] Init failed:', e);
+    }
+  }
+
+  async _doInit(onProgress) {
+    // Dynamic import — won't throw if CDN unavailable
+    const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0');
+    const pipeline = mod.pipeline || mod.default?.pipeline;
+    const env = mod.env || mod.default?.env || null;
+    if (env) { try { env.allowLocalModels = false; env.useBrowserCache = true; } catch(_){} }
+    onProgress('NanoCortex: Loading all-MiniLM-L6-v2...');
+    this.pipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+      progress_callback: (info) => {
+        if (info.status === 'downloading') {
+          const pct = info.loaded && info.total ? Math.round(info.loaded/info.total*100) : '?';
+          onProgress(`NanoCortex: Downloading model (${pct}%)`);
+        }
+      }
+    });
+    this.ready = true;
+    onProgress('NanoCortex: Ready ✓');
+  }
+
+  // Compute mean-pooled embedding for a string
+  async embed(text) {
+    if (!this.ready || !this.pipeline) return null;
+    if (this._entityCache.has(text)) return this._entityCache.get(text);
+    try {
+      const out = await this.pipeline(text, { pooling: 'mean', normalize: true });
+      // v2: out.data is Float32Array; v3: out is a Tensor, data accessible via .data or .tolist()[0]
+      const raw = out?.data ?? (Array.isArray(out) ? out[0]?.data : null);
+      const vec = raw ? Array.from(raw) : null;
+      if (!vec) return null;
+      this._entityCache.set(text, vec);
+      return vec;
+    } catch(e) { return null; }
+  }
+
+  // Cosine similarity between two vectors
+  cosineSim(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+    return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+  }
+
+  // UPGRADE 5: Subject disambiguation via embedding cosine similarity
+  // Instead of pure regex (which extracts "Hello" from "I know, why hello kitty though?"),
+  // we embed the full query and compare to all KG node names.
+  // Returns the best-matching KG node name or falls back to regex extraction.
+  async disambiguateSubject(query, kgNodes, regexFallback) {
+    if (!this.ready || !kgNodes || kgNodes.length === 0) return regexFallback;
+    try {
+      const qVec = await this.embed(query);
+      if (!qVec) return regexFallback;
+      let bestNode = null, bestSim = 0;
+      // Only check top 50 most frequent nodes to stay fast
+      const candidates = kgNodes.slice(0, 50);
+      for (const node of candidates) {
+        if (!node || node.length < 2) continue;
+        const nVec = await this.embed(node);
+        if (!nVec) continue;
+        const sim = this.cosineSim(qVec, nVec);
+        if (sim > bestSim) { bestSim = sim; bestNode = node; }
+      }
+      // Only use embedding result if similarity is HIGH (>0.60) — prevents "fair enough" → "Fair"
+      // and "bread" → "roblox" mismatches when topic isn't in the KG
+      // The regexFallback is a clean proper noun or query word — trust it unless clearly better
+      if (bestNode && bestSim > 0.60) {
+        // Extra check: don't override regex if regex matched a clean proper noun from query
+        const regexInQuery = regexFallback && query.toLowerCase().includes(regexFallback.toLowerCase());
+        if (!regexInQuery || bestSim > 0.80) {
+          console.log('[NanoCortex disambig]', query, '→', bestNode, '(sim:', bestSim.toFixed(3), ')');
+          return bestNode;
+        }
+      }
+    } catch(e) {}
+    return regexFallback;
+  }
+
+  // Dense retrieval: rank candidate sentences by semantic similarity to query
+  // Returns sorted array of {sentence, score, idx} — fused with BM25 scores externally
+  async semanticRerank(query, candidates) {
+    if (!this.ready || !candidates || candidates.length === 0) return null;
+    try {
+      const qVec = await this.embed(query);
+      if (!qVec) return null;
+      const scored = [];
+      for (let i = 0; i < candidates.length; i++) {
+        const sVec = await this.embed(candidates[i].s || candidates[i]);
+        if (sVec) {
+          const sim = this.cosineSim(qVec, sVec);
+          scored.push({ ...candidates[i], semanticScore: sim });
+        } else {
+          scored.push({ ...candidates[i], semanticScore: 0 });
+        }
+      }
+      return scored;
+    } catch(e) { return null; }
+  }
+
+  // Run coreference merging on a list of entity strings
+  // Returns array of merge actions taken: [{a, b, sim}]
+  async mergeEntities(entities) {
+    if (!this.ready || entities.length < 2) return [];
+    const merges = [];
+    // Embed all entities (batched)
+    const embeddings = await Promise.all(entities.map(e => this.embed(e)));
+
+    for (let i = 0; i < entities.length; i++) {
+      if (!embeddings[i]) continue;
+      for (let j = i+1; j < entities.length; j++) {
+        if (!embeddings[j]) continue;
+        const sim = this.cosineSim(embeddings[i], embeddings[j]);
+        if (sim >= this.SIM_THRESHOLD) {
+          // Only merge if not already aliased
+          const ea = entities[i], eb = entities[j];
+          if (ea === eb) continue;
+          // Pick canonical: shorter, or title-case wins
+          const canonical = ea.length <= eb.length ? ea : eb;
+          const alias = canonical === ea ? eb : ea;
+          // Register in SynonymAliasing
+          if (this.sa && typeof this.sa.addAlias === 'function') {
+            // addAlias(canonical, alias) — canonical is the keeper, alias maps to it
+            this.sa.addAlias(canonical.toLowerCase(), alias.toLowerCase());
+          }
+          const logEntry = { a: ea, b: eb, sim: sim.toFixed(3), canonical, ts: Date.now() };
+          this.mergeLog.push(logEntry);
+          merges.push(logEntry);
+          if (this.mergeLog.length > 60) this.mergeLog.shift();
+        }
+      }
+    }
+    return merges;
+  }
+}
+
+
+// ─────────────────────────────────────────────────────
+// V12 L11: NEURAL MOUTH (WebLLM)
+// Runs a quantized SLM on WebGPU locally.
+// Provides three capabilities:
+//  1. socialResponse(intent, context) — replaces hardcoded templates
+//  2. graphRAG(kgFacts, query) — translates KG triples to natural language
+//  3. n3Bridge(nodeA, nodeB, corpus) — finds missing predicate between nodes
+// Always falls back to symbolic path if unavailable.
+// ─────────────────────────────────────────────────────
+class NeuralMouth {
+  constructor() {
+    this.pipeline = null;   // null when using Worker mode (preferred)
+    this.ready = false;
+    this.loading = false;
+    this.error = null;
+    this.modelId = 'loading...';
+    this._pipelineType = 'text-generation';
+    this._isDecoder = false;
+    // Web Worker — all inference runs off the main thread (no UI freeze)
+    this._worker = null;
+    this._pendingRequests = new Map(); // id → { resolve, reject, timeout }
+    this._nextId = 1;
+  }
+
+  async init(onProgress) {
+    if (this.ready) return true;
+    if (this.loading) return false;
+    this.loading = true;
+
+    // ── Main-thread loading — always reliable (no blob worker import() issues) ──
+    onProgress('NeuralMouth: Loading model...');
+    return this._initMainThread(onProgress);
+  }
+
+  // ── Worker RPC — send to worker, return promise resolved by onmessage ──
+  _workerCall(payload, timeoutMs=16000) {
+    if (!this._worker || !this.ready) return Promise.reject(new Error('Worker not ready'));
+    const id = this._nextId++;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._pendingRequests.delete(id);
+        reject(new Error('Worker RPC timeout after ' + timeoutMs + 'ms'));
+      }, timeoutMs);
+      this._pendingRequests.set(id, { resolve, reject, timeout });
+      this._worker.postMessage({ ...payload, id });
+    });
+  }
+
+  // ── Main-thread fallback — fires when Worker is unavailable ──
+  // Loads Transformers.js directly on the main thread with yieldToMain() between steps.
+  async _initMainThread(onProgress) {
+    const TRANSFORMERS_URLS = [
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.0',
+    ];
+    const MODEL_CASCADE = [
+      { id: 'HuggingFaceTB/SmolLM2-360M-Instruct', type: 'text-generation', isDecoder: true },
+      { id: 'HuggingFaceTB/SmolLM2-135M-Instruct', type: 'text-generation', isDecoder: true },
+      { id: 'Xenova/flan-t5-base', type: 'text2text-generation', isDecoder: false },
+      { id: 'Xenova/flan-t5-small', type: 'text2text-generation', isDecoder: false },
+    ];
+    let pipelineFn = null;
+    for (const url of TRANSFORMERS_URLS) {
+      try {
+        const mod = await import(url);
+        pipelineFn = mod.pipeline ?? mod.default?.pipeline ?? null;
+        const env = mod.env ?? mod.default?.env ?? null;
+        if (env) { try { env.allowLocalModels=false; env.useBrowserCache=true; } catch(_) {} }
+        if (typeof pipelineFn === 'function') break;
+      } catch(e) {}
+    }
+    if (!pipelineFn) { onProgress('NeuralMouth: All CDNs failed'); return false; }
+    for (const { id, type, isDecoder } of MODEL_CASCADE) {
+      try {
+        onProgress(`NeuralMouth (main thread): Loading ${id.split('/').pop()}...`);
+        this._mainPipeline = await pipelineFn(type, id, {
+          progress_callback: info => {
+            if (info.status === 'progress' && info.total) {
+              const pct = Math.round(info.loaded/info.total*100);
+              onProgress(`NeuralMouth: Downloading ${id.split('/').pop()} (${pct}%)`);
+            }
+          }
+        });
+        this._isDecoder = isDecoder; this.modelId = id;
+        this.ready = true; this.loading = false;
+        window._webllmReady = true;
+        this._useMainThread = true;
+        onProgress('NeuralMouth: Ready (main thread) — ' + id.split('/').pop());
+        try { const d=document.getElementById('slmDot'); if(d)d.className='slm-dot ready'; } catch(_){}
+        return true;
+      } catch(e) { console.warn('[NeuralMouth main]', id, 'failed:', e.message); }
+    }
+    onProgress('NeuralMouth: All models failed');
+    return false;
+  }
+
+  // Clean output helper — strips LLM refusal boilerplate and formatting garbage
+  _cleanOutput(raw) {
+    return (raw||'')
+      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi,'')
+      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi,'')
+      .replace(/^(Sure[,!]\s*[^.!?]*[.!?]\s*)/i,'')
+      .replace(/^Lexica:\s*/i,'')
+      .split('\n').filter(l=>!/^\s*[\*\-•]|^\s*\d+\./.test(l)).join(' ')
+      .replace(/\s{2,}/g,' ').split('\n\n')[0].slice(0,500).trim();
+  }
+
+  // ── _generate: worker path (preferred) OR main-thread fallback ──
+  async _generate(taskPrefix, contentPrompt, maxTokens=80, conversationHistory=[]) {
+    if (!this.ready) throw new Error('NeuralMouth not ready');
+    if (this._useMainThread) return this._generateMainThread(taskPrefix, contentPrompt, maxTokens, conversationHistory);
+    return this._workerCall({ type:'generate', taskPrefix, contentPrompt, maxTokens, conversationHistory }, 18000);
+  }
+
+  // ── _generateMessages: decoder chat-format via worker or main thread ──
+  async _generateMessages(messages, maxTokens=120) {
+    if (!this.ready) throw new Error('NeuralMouth not ready');
+    if (!this._isDecoder) {
+      const uMsg = messages.filter(m=>m.role==='user').map(m=>m.content).join(' | ');
+      const sMsg = messages.find(m=>m.role==='system')?.content || '';
+      return this._generate(sMsg.slice(0,80), uMsg.slice(0,380), maxTokens);
+    }
+    if (this._useMainThread) {
+      // Main-thread path: call pipeline directly (will block briefly, but works everywhere)
+      try {
+        const res = await this._mainPipeline(messages, {max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+        const g = res?.[0]?.generated_text;
+        let raw = '';
+        if (Array.isArray(g)) raw = (g[g.length-1]?.content??'').trim();
+        else { raw=(g??'').trim(); const ai=raw.lastIndexOf('<|im_start|>assistant'); if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim(); }
+        return this._cleanOutput(raw);
+      } catch(e) { return ''; }
+    }
+    return this._workerCall({ type:'messages', messages, maxTokens }, 18000);
+  }
+
+  // ── Main-thread inference path (fallback when Worker unavailable) ──
+  async _generateMainThread(taskPrefix, contentPrompt, maxTokens, conversationHistory) {
+    if (!this._mainPipeline) throw new Error('Main pipeline not loaded');
+    let raw = '';
+    try {
+      if (this._isDecoder) {
+        const sys = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct and specific. No lists, no markdown, no disclaimers.';
+        const hist = (conversationHistory||[]).slice(-4).flatMap(t=>[
+          {role:'user',content:t.q.slice(0,120)},{role:'assistant',content:t.a.slice(0,150)}
+        ]);
+        const userMsg = (taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+        const msgs = [{role:'system',content:sys},...hist,{role:'user',content:userMsg.slice(0,600)}];
+        await yieldToMain();
+        const res = await this._mainPipeline(msgs,{max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+        const g = res?.[0]?.generated_text;
+        if(Array.isArray(g)) raw=(g[g.length-1]?.content??'').trim();
+        else{raw=(g??'').trim();const ai=raw.lastIndexOf('<|im_start|>assistant');if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim();}
+      } else {
+        const input = (taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+        await yieldToMain();
+        const res = await this._mainPipeline(input.slice(0,480),{max_new_tokens:Math.min(maxTokens,120),do_sample:false,num_beams:1,repetition_penalty:1.3});
+        raw = (res?.[0]?.generated_text??'').trim();
+      }
+    } catch(e) { console.warn('[NeuralMouth main-thread]', e); throw e; }
+    return this._cleanOutput(raw);
+  }
+  // Runs 3 specialized role prompts in parallel, selects best by grounding score.
+  // Thinker: systematic reasoning, links facts. Narrator: fluid prose output. Critic: challenges and refines.
+  // Only fires when SmolLM2 decoder is loaded (fast enough for parallel calls).
+  // THINK-THEN-SPEAK: two-pass architecture
+  // Pass 1 (Thinker): reasons about the facts, produces a private trace
+  // Pass 2 (Speaker): takes the trace + facts and produces the final answer
+  // This gives dramatically better output than a single undifferentiated call.
+  // Also much faster than 3 parallel calls — 2 sequential calls = ~6-10s total
+  async ensembleGraphRAG(kgFacts, query, intent, evidenceSentences=[], conversationHistory=[]) {
+    if (!this.ready || !this._isDecoder) return null;
+
+    // Apply quality filter to remove garbage triples before they poison the prompt
+    const goodFacts = kgFacts.filter(f => NeuralMouth._tripleQuality(f));
+    if (!goodFacts.length && !evidenceSentences.length) return null;
+
+    const triples = goodFacts.slice(0, 6)
+      .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
+      .join('; ');
+    const evidence = evidenceSentences
+      .filter(s => s && s.length > 15 && s.length < 200)
+      .slice(0, 3).join(' | ');
+    const facts = [triples, evidence].filter(Boolean).join(' || ').slice(0, 380);
+    if (!facts.trim()) return null;
+
+    const historyMsgs = (conversationHistory||[]).slice(-2).flatMap(turn => [
+      { role: 'user',      content: turn.q.slice(0, 80) },
+      { role: 'assistant', content: turn.a.slice(0, 80) },
+    ]);
+
+    const extractText = (result) => {
+      const genText = result?.[0]?.generated_text;
+      let raw = '';
+      if (Array.isArray(genText)) {
+        raw = (genText[genText.length - 1]?.content ?? '').trim();
+      } else {
+        raw = (genText ?? '').trim();
+        const ai = raw.lastIndexOf('<|im_start|>assistant');
+        if (ai !== -1) raw = raw.slice(ai + 21).replace(/<\|im_end\|>.*$/s, '').trim();
+        else {
+          // If return_full_text wasn't respected, strip the prompt
+          const assistantIdx = raw.search(/assistant\s*\n/i);
+          if (assistantIdx !== -1) raw = raw.slice(assistantIdx).replace(/^assistant\s*\n/i,'').trim();
+        }
+      }
+      return raw
+        .replace(/^(Sure[,!]\s*|Answer:|Facts:|Lexica:|The answer is:)/i, '')
+        .replace(/\n/g,' ')
+        .trim();
+    };
+
+    // ── PASS 1: THINKER ── Extracts key facts and identifies what the question is really asking
+    let trace = '';
+    try {
+      const thinkerMsgs = [
+        { role: 'system', content: 'You identify the key facts needed to answer a question. Given facts and a question, write 1 sentence identifying what the facts tell us about the question. Be direct. Only use the given facts.' },
+        ...historyMsgs,
+        { role: 'user', content: `Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}\n\nKey insight:` },
+      ];
+      const traceRaw = await this._generateMessages(thinkerMsgs, 70);
+      trace = traceRaw || '';
+    } catch(e) { trace = ''; }
+
+    // ── PASS 2: SPEAKER ── Uses the trace to produce a polished final answer
+    let answer = '';
+    try {
+      const traceHint = trace && trace.length > 10 ? `Insight: ${trace.slice(0,120)}\n\n` : '';
+      const speakerMsgs = [
+        { role: 'system', content: 'You are Lexica, a concise knowledge assistant. Answer the question in 1-2 clear sentences using only the given facts. No lists, no markdown, no caveats.' },
+        ...historyMsgs,
+        { role: 'user', content: `${traceHint}Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}${intent === 'essay' ? '\n\nProvide a detailed, multi-sentence answer.' : ''}` },
+      ];
+      answer = await this._generateMessages(speakerMsgs, intent==='essay' ? 220 : 130) || '';
+    } catch(e) { return null; }
+
+    if (!answer || answer.length < 8) return null;
+
+    // Store for cognition tab display
+    this.lastEnsemble = [
+      { name: 'Thinker', emoji: '🧠', text: trace, score: 1.0 },
+      { name: 'Speaker', emoji: '📢', text: answer, score: 2.0 },
+    ];
+    return { text: answer, winner: 'Speaker', trace, all: this.lastEnsemble };
+  }
+
+  // Social response — context-aware conversational reply
+  async socialResponse(intent, userInput, kgContext='') {
+    if (!this.ready) return null;
+    const state = kgContext ? kgContext.slice(0, 200) : 'no knowledge loaded';
+    try {
+      let raw = null;
+      if (this._isDecoder) {
+        // SmolLM2: respond naturally to any conversational input, grounded in knowledge state
+        const messages = [
+          { role: 'system', content: 'You are Lexica, a knowledge engine running in a browser. Respond naturally and briefly (1-2 sentences max). Ground your reply in the knowledge state if relevant. Never say "I don\'t know" or make up facts. If nothing relevant is loaded, say so briefly.' },
+          { role: 'user', content: `${userInput.slice(0, 160)}\n\n[Knowledge state: ${state}]` },
+        ];
+        raw = await this._generateMessages(messages, 100);
+      } else {
+        // Flan-T5 fallback
+        const task = `Write a short reply (1-2 sentences) as Lexica, an AI knowledge assistant.`;
+        const content = `State: ${state}\nUser said: "${userInput.slice(0, 100)}"\nLexica:`;
+        raw = await this._generate(task, content, 80);
+      }
+      if (!raw || raw.length < 5) return null;
+      raw = raw.replace(/^(Sure[,!]\s*|Of course[,!]\s*|Certainly[,!]\s*)/i,'').trim();
+      const first = raw.match(/^[^.!?]+[.!?]/)?.[0];
+      return (raw.length > 200 && first) ? first : raw;
+    } catch(e) { return null; }
+  }
+
+  // Graph-RAG: translate verified KG triples into natural language
+  // UPGRADE 3: conversationHistory (last 5 turns) fed as context for continuity
+  // Quality filter: drop triples where subject/object are sentence fragments.
+  // "Millions user erik games" is a garbage triple — filter it out.
+  static _tripleQuality(t) {
+    const s = String(t.s || ''), o = String(t.o || '');
+    if (s.length < 2 || o.length < 1) return false;
+    if (s.length > 80 || o.length > 120) return false; // fragment sentences masquerading as nodes
+    if (/^[\d\s]+$/.test(s)) return false; // pure numbers
+    // Penalize fragments: too many lowercase words in a row = probably a sentence not a node
+    const sWords = s.split(' ');
+    if (sWords.length > 5 && sWords.filter(w => w[0] === w[0]?.toLowerCase()).length > sWords.length * 0.8) return false;
+    return true;
+  }
+
+  async graphRAG(kgFacts, query, intent, evidenceSentences=[], conversationHistory=[]) {
+    if (!this.ready) return null;
+    const isEssay = intent === 'essay' || /\b(essay|report|explain in detail|everything about|tell me all)\b/i.test(query);
+    // Filter for quality triples before feeding to SLM
+    const goodTriples = kgFacts.filter(f => NeuralMouth._tripleQuality(f));
+    const triples = goodTriples.slice(0, isEssay ? 10 : 6)
+      .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
+      .join('; ');
+    // Evidence: more sentences for essays
+    const evidence = evidenceSentences
+      .filter(s => s && s.length > 20 && s.length < 200 && !/</.test(s) && /[.!?]$/.test(s.trim()))
+      .slice(0, isEssay ? 6 : 3).join(' ');
+    if (!triples && !evidence) return null;
+    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, isEssay ? 600 : 320);
+    const maxToks = isEssay ? 220 : (this._isDecoder ? 130 : 90);
+
+    if (this._isDecoder) {
+      // SmolLM2: use full chat template with conversation history
+      const sysContent = isEssay
+        ? 'You are Lexica, a knowledgeable assistant. Write a thorough, well-structured explanation using the given facts. Use multiple sentences. Be specific and informative.'
+        : 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct. No lists, no markdown.';
+      const historyMsgs = (conversationHistory||[]).slice(-4).flatMap(turn => [
+        { role: 'user',      content: turn.q.slice(0, 120) },
+        { role: 'assistant', content: turn.a.slice(0, 150) },
+      ]);
+      const userMsg = `Facts: ${facts}\n\nQuestion: ${query.slice(0, 150)}`;
+      const messages = [
+        { role: 'system', content: sysContent },
+        ...historyMsgs,
+        { role: 'user',   content: userMsg },
+      ];
+      try {
+        const raw = await this._generateMessages(messages, maxToks);
+        if (raw && raw.length > 10)
+          return raw.replace(/^(Answer:|Facts:|Question:|Sure[,!]\s*)/i, '').replace(/\n/g,' ').trim();
+      } catch(e) { /* fall through to task-prefix path */ }
+    }
+
+    // Flan-T5 or decoder fallback: task-prefix format
+    const task = isEssay
+      ? `Write a detailed explanation (3-5 sentences) using only the given facts. Cover the key points thoroughly.`
+      : `Answer the question in 1-2 sentences using only the given facts. Be direct and specific.`;
+    const content = `Facts: ${facts}\nQuestion: ${query.slice(0, 100)}\nAnswer:`;
+    try {
+      const result = await this._generate(task, content, maxToks);
+      if (!result || result.length < 10) return null;
+      return result.replace(/^(Answer:|Facts:|Question:)\s*/i, '').replace(/\n/g,' ').trim() || null;
+    } catch(e) { return null; }
+  }
+
+  // N3 Bridge: find missing predicate between two disconnected nodes
+  async n3Bridge(nodeA, nodeB, corpusSentences) {
+    if (!this.ready) return null;
+    const relevant = corpusSentences
+      .filter(s => { const sl = s.toLowerCase(); return sl.includes(nodeA.toLowerCase()) || sl.includes(nodeB.toLowerCase()); })
+      .slice(0, 3).join(' ').slice(0, 250);
+    if (relevant.length < 20) return null;
+    const task = `Identify the relationship between two concepts. Output JSON: {"predicate":"verb","direction":"A_to_B","sentence":"one sentence"}`;
+    const content = `Text: ${relevant}\nA: ${nodeA.slice(0,30)}\nB: ${nodeB.slice(0,30)}\nJSON:`;
+    try {
+      const raw = await this._generate(task, content, 80);
+      const match = raw.match(/\{[\s\S]*?\}/);
+      if (!match) return null;
+      const parsed = JSON.parse(match[0]);
+      if (parsed.predicate && parsed.sentence) return parsed;
+      return null;
+    } catch(e) { return null; }
+  }
+
+  // ── L2: SEMANTIC EXPANSION ──
+  // SLM expands a query into semantically related terms beyond PMI
+  async semanticExpand(query, knownTerms=[]) {
+    if (!this.ready) return [];
+    try {
+      const known = knownTerms.slice(0,4).join(', ');
+      const task = `List 4 related words as a JSON array. Example: ["word1","word2","word3","word4"]`;
+      const content = `Topic: ${query.slice(0,60)}${known ? `\nExclude: ${known}` : ''}\nJSON array:`;
+      const raw = await this._generate(task, content, 50);
+      const match = raw.match(/\[[\s\S]*?\]/);
+      if (!match) return [];
+      const arr = JSON.parse(match[0]);
+      if (Array.isArray(arr)) return arr.map(s=>String(s).toLowerCase().trim()).filter(s=>s.length>2&&s.length<25);
+    } catch(e) {}
+    return [];
+  }
+
+  // ── L3: KG TRIPLE EXTRACTION ──
+  // SLM extracts additional structured triples from raw text
+  async extractTriples(sentences) {
+    if (!this.ready) return [];
+    const text = sentences.slice(0,3).join(' ').slice(0, 300);
+    try {
+      let raw = '';
+      if (this._isDecoder) {
+        // SmolLM2: structured extraction via chat format
+        const messages = [
+          { role: 'system', content: 'Extract subject-predicate-object triples from text. Output only valid JSON array. Example: [{"s":"London","p":"is_capital_of","o":"England"}]. Use short noun phrases for s and o. Use snake_case for p.' },
+          { role: 'user',   content: `Text: ${text}\n\nExtract 3 triples as JSON array:` },
+        ];
+        const raw2 = await this._generateMessages(messages, 120);
+        raw = raw2 || '';
+      } else {
+        const task = `Extract 3 subject-predicate-object triples from the text. Output only JSON: [{"s":"subject","p":"predicate","o":"object"}]`;
+        raw = await this._generate(task, `Text: ${text}\nJSON:`, 100);
+      }
+      const match = raw.match(/\[([\s\S]*?)\]/);
+      if (!match) return [];
+      const arr = JSON.parse('[' + match[1] + ']');
+      if (!Array.isArray(arr)) return [];
+      return arr.filter(t => {
+        if (!t.s || !t.p || !t.o) return false;
+        // Quality gate: reject fragments (subject/object must be short noun phrases)
+        const s = String(t.s), o = String(t.o);
+        if (s.length < 2 || s.length > 60 || o.length < 1 || o.length > 100) return false;
+        const sWords = s.split(' ');
+        // Reject if subject is a sentence fragment (>4 words AND >80% lowercase = sentence, not entity)
+        if (sWords.length > 4 && sWords.filter(w=>w[0]===w[0]?.toLowerCase()).length > sWords.length * 0.8) return false;
+        return true;
+      });
+    } catch(e) {}
+    return [];
+  }
+
+  // ── L4: REASONING — contradiction evaluation ──
+  // SLM resolves whether two contradictory facts can be reconciled
+  async evalContradiction(factA, factB, subject) {
+    if (!this.ready) return null;
+    try {
+      const task = `Determine if two facts contradict each other. Answer in one sentence saying which is more likely correct.`;
+      const content = `Subject: ${subject.slice(0,40)}\nFact A: ${factA.slice(0,100)}\nFact B: ${factB.slice(0,100)}\nAnswer:`;
+      return await this._generate(task, content, 60) || null;
+    } catch(e) { return null; }
+  }
+
+  // ── L5: ENHANCED SYNTHESIS — SLM generates richer answer with reasoning trace ──
+  // Used when graphRAG gives a short answer and we have good KG coverage
+  async synthesizeWithReasoning(query, kgFacts, evidenceSentences, intent) {
+    if (!this.ready || !kgFacts.length) return null;
+    const triples = kgFacts.slice(0,5).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,2).join(' ').slice(0,150);
+    const task = `Answer the question in 2 sentences using only the given facts.`;
+    const content = `Facts: ${triples.slice(0,220)}${ev ? ' | '+ev : ''}\nQuestion: ${query.slice(0,60)}\nAnswer:`;
+    try {
+      return await this._generate(task, content, 100);
+    } catch(e) { return null; }
+  }
+
+  // ── L6: CHAIN-OF-THOUGHT SCRATCHPAD ──
+  // 2-pass generation: first produce private reasoning trace, then answer conditioned on it.
+  // Returns { answer, trace } — trace is shown in the thinking bubble on click.
+  async thinkThenAnswer(query, kgFacts, evidenceSentences, intent) {
+    if (!this.ready) return null;
+    const triples = kgFacts.slice(0,5).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+    const ev = evidenceSentences.slice(0,1).join(' ').slice(0,100);
+    const context = `${triples.slice(0,220)}${ev ? ' | '+ev : ''}`;
+    if (!context.trim()) return null;
+    // Pass 1: reasoning
+    let trace = null;
+    try {
+      trace = await this._generate(
+        'Think step by step about this question using only the facts.',
+        `Facts: ${context}\nQuestion: ${query.slice(0,60)}\nReasoning:`, 70);
+    } catch(e) { trace = null; }
+    // Pass 2: answer
+    const traceHint = trace ? ` ${trace.slice(0,100)}` : '';
+    let answer = null;
+    try {
+      answer = await this._generate(
+        `Answer the question in 2 sentences using only the facts.${traceHint}`,
+        `Facts: ${context.slice(0,200)}\nQuestion: ${query.slice(0,60)}\nAnswer:`, 90);
+    } catch(e) { return null; }
+    if (!answer || answer.length < 15) return null;
+    return { answer: answer.replace(/\n/g,' ').trim(), trace };
+  }
+} // end NeuralMouth
+
+
+
+
+// ─────────────────────────────────────────────────────
+// V10: MAIN ENGINE (full cognitive stack)
+// ─────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+//  LEXICA AGI LAYER — Three systems that together approach genuine
+//  general intelligence without any external APIs.
+//
+//  SYSTEM A: CausalGraph     — WHY things happen (not just WHAT)
+//  SYSTEM B: WorldModel      — HOW the physical world works
+//  SYSTEM C: System2Engine   — DELIBERATE logic & math verification
+// ═══════════════════════════════════════════════════════════════════
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM A: CAUSAL GRAPH
+//  Builds a directed causal graph from text. Distinguishes
+//  correlation from causation. Supports:
+//  • Causal chain extraction  ("A causes B because C")
+//  • Counterfactual reasoning ("What if A hadn't happened?")
+//  • Intervention simulation  ("If we change X, Y will...")
+//  • Multi-hop causal paths   ("Why did Z happen?")
+//  • Confounder detection     (shared common cause)
+// ──────────────────────────────────────────────────────────────────
+class CausalGraph {
+  constructor() {
+    // Directed edges: cause → [{ effect, strength, mechanism, tag }]
+    this.edges = new Map();
+    // Reverse index: effect → [causes]
+    this.reverseIndex = new Map();
+    // Known confounders: { var: [potentialConfounders] }
+    this.confounders = new Map();
+    // Temporal ordering: events with timestamps relative to each other
+    this.timeline = [];
+    // Stats
+    this.edgeCount = 0;
+    this.lastCounterfactual = null;
+    this.lastCausalChain = null;
+  }
+
+  // ── Extract causal relationships from a sentence ──
+  // Pattern library covers linguistic causal markers
+  learnFromSentence(sentence, tag='') {
+    const s = sentence.trim();
+    const learned = [];
+
+    const patterns = [
+      // "X causes/produces/leads to/results in Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:causes?|produces?|leads?\s+to|results?\s+in|triggers?|induces?|brings?\s+about|creates?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.9, type: 'direct' },
+      // "Y is caused by / results from / is due to X"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:is\s+caused\s+by|results?\s+from|is\s+due\s+to|stems?\s+from|arises?\s+from|is\s+produced\s+by)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.85, type: 'reverse', reverse: true },
+      // "Because X, Y" / "Y because X"
+      { re: /([^.]{10,60}?)\s+because\s+([^.]{10,60}?)(?:\.|,|$)/i,
+        strength: 0.8, type: 'because' },
+      // "If X then Y" / "When X, Y occurs"
+      { re: /(?:if|when)\s+([^,]{8,60}?),?\s+(?:then\s+)?([^.]{8,60}?)(?:\.|,|$)/i,
+        strength: 0.75, type: 'conditional' },
+      // "X contributed to Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:contributed?\s+to|played?\s+a\s+(?:role|part)\s+in|enabled?|allowed?|facilitated?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.65, type: 'contributing' },
+      // "X increased/decreased/changed Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:increased?|decreased?|changed?|altered?|reduced?|boosted?|lowered?)\s+([a-z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.7, type: 'quantitative' },
+      // "Due to X, Y"
+      { re: /due\s+to\s+([^,]{8,60}?),\s+([^.]{8,60}?)(?:\.|$)/i,
+        strength: 0.8, type: 'due_to' },
+      // "X prevented/stopped Y"
+      { re: /([A-Z][^.]{3,50}?)\s+(?:prevented?|stopped?|halted?|blocked?|inhibited?)\s+([A-Z][^.]{3,50}?)(?:\.|,|$)/i,
+        strength: 0.8, type: 'preventive', preventive: true },
+    ];
+
+    for (const { re, strength, type, reverse, preventive } of patterns) {
+      const m = s.match(re);
+      if (!m) continue;
+      let cause = (reverse ? m[2] : m[1]).trim().toLowerCase().replace(/\s+/g,' ');
+      let effect = (reverse ? m[1] : m[2]).trim().toLowerCase().replace(/\s+/g,' ');
+      // Quality filter: skip if too short, too long, or sentence fragments
+      if (cause.length < 3 || effect.length < 3 || cause.length > 80 || effect.length > 80) continue;
+      if (cause === effect) continue;
+      const edge = { effect, strength: preventive ? -strength : strength, type, tag, raw: s, preventive: !!preventive };
+      if (!this.edges.has(cause)) this.edges.set(cause, []);
+      // Deduplicate: boost confidence if same edge seen again
+      const existing = this.edges.get(cause).find(e => e.effect === effect);
+      if (existing) { existing.strength = Math.min(1, existing.strength + 0.1); }
+      else { this.edges.get(cause).push(edge); this.edgeCount++; }
+      // Reverse index
+      if (!this.reverseIndex.has(effect)) this.reverseIndex.set(effect, []);
+      if (!this.reverseIndex.get(effect).find(e => e.cause === cause)) {
+        this.reverseIndex.get(effect).push({ cause, strength: edge.strength, type, tag });
+      }
+      learned.push({ cause, effect, strength, type });
+    }
+    return learned;
+  }
+
+  // ── Find WHY something happened: trace causal chain backwards ──
+  // Returns array of chains: [ [causeN, ..., cause1, effect] ]
+  whyChain(effect, maxDepth=4, visited=new Set()) {
+    const key = effect.toLowerCase().trim();
+    if (visited.has(key) || visited.size >= maxDepth) return [];
+    visited.add(key);
+    const causes = this.reverseIndex.get(key) || [];
+    if (!causes.length) return [[key]];
+    const chains = [];
+    for (const { cause, strength } of causes.slice(0, 3)) {
+      if (strength < 0) continue; // preventive — not a positive cause
+      const subChains = this.whyChain(cause, maxDepth, new Set(visited));
+      for (const sub of subChains) chains.push([...sub, key]);
+      if (!subChains.length) chains.push([cause, key]);
+    }
+    return chains.slice(0, 5);
+  }
+
+  // ── Find WHAT happens if X occurs: trace effects forward ──
+  whatHappensIf(cause, maxDepth=3, visited=new Set()) {
+    const key = cause.toLowerCase().trim();
+    if (visited.has(key) || visited.size >= maxDepth) return [];
+    visited.add(key);
+    const effects = this.edges.get(key) || [];
+    const result = [];
+    for (const { effect, strength, type } of effects.slice(0, 4)) {
+      result.push({ effect, strength, type });
+      const subEffects = this.whatHappensIf(effect, maxDepth, new Set(visited));
+      subEffects.forEach(s => result.push({ ...s, depth: (s.depth||0)+1 }));
+    }
+    return result.slice(0, 8);
+  }
+
+  // ── COUNTERFACTUAL: "What if X hadn't happened?" ──
+  // Removes X from the graph temporarily and finds what effects disappear
+  counterfactual(intervention, target='') {
+    const cause = intervention.toLowerCase().trim();
+    const effects = this.whatHappensIf(cause);
+    const directEffects = (this.edges.get(cause) || []).filter(e => e.strength > 0);
+    if (!directEffects.length && !effects.length) {
+      return { text: `Without "${intervention}", the causal graph shows no downstream effects — it may not be a root cause.`, effects: [] };
+    }
+    const effList = directEffects.map(e => e.effect);
+    const targetAffected = target && effects.some(e => e.effect.includes(target.toLowerCase()));
+    const text = targetAffected
+      ? `Without "${intervention}", "${target}" would likely not have occurred (causal path severed).`
+      : `Without "${intervention}", these effects would be absent: ${effList.slice(0,3).map(e=>`"${e}"`).join(', ')}.`;
+    this.lastCounterfactual = { intervention, effects: effList, text };
+    return { text, effects: effList };
+  }
+
+  // ── CONFOUNDER CHECK: does a shared cause explain a correlation? ──
+  findConfounders(varA, varB) {
+    const causesA = new Set((this.reverseIndex.get(varA.toLowerCase())||[]).map(e=>e.cause));
+    const causesB = new Set((this.reverseIndex.get(varB.toLowerCase())||[]).map(e=>e.cause));
+    const shared = [...causesA].filter(c => causesB.has(c));
+    return shared; // shared causes = potential confounders
+  }
+
+  // ── Answer a "why" question from natural language ──
+  answerWhy(query) {
+    const q = query.toLowerCase();
+    // Extract subject from "why did X" or "why does X" or "why is X"
+    const m = q.match(/why\s+(?:did|does|is|was|are|were|do|has|have)?\s+(.{4,60}?)(?:\?|$)/i);
+    if (!m) return null;
+    const subject = m[1].trim().replace(/\?.*$/, '');
+    const chains = this.whyChain(subject);
+    if (!chains.length) {
+      // Try forward lookup — maybe they're asking why X causes Y
+      const effects = this.whatHappensIf(subject);
+      if (effects.length) {
+        return `${subject} leads to: ${effects.slice(0,3).map(e=>e.effect).join(' → ')}.`;
+      }
+      return null;
+    }
+    const best = chains.sort((a,b) => b.length - a.length)[0];
+    this.lastCausalChain = best;
+    if (best.length === 2) return `${best[0]} directly causes ${best[1]}.`;
+    return `Causal chain: ${best.join(' → ')}.`;
+  }
+
+  // ── Answer "what happens if" queries ──
+  answerWhatIf(query) {
+    const q = query.toLowerCase();
+    const m = q.match(/what\s+(?:would\s+)?happen(?:s)?\s+(?:if|when)\s+(.{4,80}?)(?:\?|$)/i)
+           || q.match(/if\s+(.{4,60}?),?\s+what\s+(?:would\s+)?happen(?:s)?(?:\?|$)/i);
+    if (!m) return null;
+    const condition = m[1].trim();
+    const effects = this.whatHappensIf(condition);
+    if (!effects.length) return null;
+    const pos = effects.filter(e => e.strength > 0).slice(0,4);
+    const neg = effects.filter(e => e.strength < 0).slice(0,2);
+    let text = `If "${condition}" occurs: ${pos.map(e=>e.effect).join(', ')}`;
+    if (neg.length) text += `. This would prevent: ${neg.map(e=>e.effect).join(', ')}`;
+    return text + '.';
+  }
+
+  snapshot() {
+    const edges = [];
+    this.edges.forEach((effs, cause) => {
+      effs.slice(0,3).forEach(e => edges.push({ cause, ...e }));
+    });
+    return { edgeCount: this.edgeCount, edges: edges.slice(0,30), lastCausalChain: this.lastCausalChain };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM B: WORLD MODEL
+//  An internal simulation of how the physical world works.
+//  Objects have properties. Actions change state. Physics rules apply.
+//  Can predict: "what happens when you heat water?"
+//  Supports: spatial relations, state machines, naive physics,
+//            part-whole hierarchies, affordances (what things can do)
+// ──────────────────────────────────────────────────────────────────
+class WorldModel {
+  constructor() {
+    // Object registry: name → { properties, state, location, partOf, contains, type }
+    this.objects = new Map();
+    // Relation store: [{ subject, relation, object, confidence }]
+    this.relations = [];
+    // State transition rules: [{ condition, action, newState, sideEffects }]
+    this.stateRules = [];
+    // Naive physics axioms — hard-coded world knowledge
+    this.physicsAxioms = [];
+    this.lastSimulation = null;
+    this.simCount = 0;
+    this._initPhysics();
+  }
+
+  // ── Built-in naive physics ──
+  // These are the rules that allow Lexica to reason about the physical world
+  // without ever being told them explicitly.
+  _initPhysics() {
+    this.physicsAxioms = [
+      // Thermodynamics
+      { condition: (o,a) => a === 'heat' && o.state !== 'gas',
+        effect: (o) => {
+          const temp = (o.properties.temperature || 20) + 50;
+          const newState = temp > (o.properties.boilingPoint || 100) ? 'gas' :
+                          temp > (o.properties.meltingPoint || 0) ? 'liquid' : 'solid';
+          return { ...o, properties: { ...o.properties, temperature: temp }, state: newState };
+        },
+        description: (o, newO) => `Heating ${o.name} raises temperature to ${newO.properties.temperature}°C → becomes ${newO.state}` },
+
+      { condition: (o,a) => a === 'cool' || a === 'freeze',
+        effect: (o) => {
+          const temp = (o.properties.temperature || 20) - 50;
+          const newState = temp < (o.properties.freezingPoint || 0) ? 'solid' :
+                          temp < (o.properties.boilingPoint || 100) ? 'liquid' : 'gas';
+          return { ...o, properties: { ...o.properties, temperature: temp }, state: newState };
+        },
+        description: (o, newO) => `Cooling ${o.name} → becomes ${newO.state} at ${newO.properties.temperature}°C` },
+
+      // Gravity
+      { condition: (o,a) => a === 'drop' || a === 'release',
+        effect: (o) => ({ ...o, location: 'ground', properties: { ...o.properties, velocity: 9.8 } }),
+        description: (o) => `${o.name} falls due to gravity → lands on ground` },
+
+      // Combustion
+      { condition: (o,a) => a === 'ignite' || a === 'burn',
+        effect: (o) => {
+          const flammable = o.properties.flammable !== false;
+          return flammable
+            ? { ...o, state: 'burning', properties: { ...o.properties, temperature: 300 } }
+            : { ...o, state: o.state }; // non-flammable: no change
+        },
+        description: (o, newO) => newO.state === 'burning'
+          ? `${o.name} ignites → burning at ~300°C`
+          : `${o.name} is non-flammable — ignition has no effect` },
+
+      // Pressure / compression
+      { condition: (o,a) => a === 'compress' && o.state === 'gas',
+        effect: (o) => ({ ...o, properties: { ...o.properties, pressure: (o.properties.pressure||1) * 2, volume: (o.properties.volume||1) / 2 } }),
+        description: (o, newO) => `Compressing ${o.name} (gas): pressure ×2 = ${newO.properties.pressure} atm, volume ÷2` },
+
+      // Dissolution
+      { condition: (o,a) => a === 'dissolve',
+        effect: (o) => ({ ...o, state: 'dissolved', properties: { ...o.properties, solvent: 'water' } }),
+        description: (o) => `${o.name} dissolves → in solution` },
+
+      // Containment
+      { condition: (o,a) => a.startsWith('put_in_'),
+        effect: (o, a) => {
+          const container = a.replace('put_in_','');
+          return { ...o, location: `inside_${container}`, container };
+        },
+        description: (o, newO) => `${o.name} placed inside ${newO.container}` },
+
+      // Electrical
+      { condition: (o,a) => a === 'electrify' || a === 'power_on',
+        effect: (o) => ({ ...o, state: 'active', properties: { ...o.properties, powered: true } }),
+        description: (o) => `${o.name} powered on → active state` },
+
+      // Cutting / breaking
+      { condition: (o,a) => a === 'cut' || a === 'break',
+        effect: (o) => ({ ...o, state: 'broken', properties: { ...o.properties, intact: false, parts: 2 } }),
+        description: (o) => `${o.name} broken → ${o.properties.parts || 2} pieces, structural integrity lost` },
+
+      // Mixing
+      { condition: (o,a) => a.startsWith('mix_with_'),
+        effect: (o, a) => {
+          const other = a.replace('mix_with_','');
+          return { ...o, state: 'mixture', properties: { ...o.properties, mixedWith: other } };
+        },
+        description: (o, newO) => `${o.name} mixed with ${newO.properties.mixedWith} → ${newO.state}` },
+    ];
+
+    // Pre-populated world knowledge — common objects with known properties
+    const knownObjects = [
+      { name:'water', type:'substance', state:'liquid', properties:{ boilingPoint:100, freezingPoint:0, meltingPoint:0, temperature:20, flammable:false, density:1.0, solvent:true } },
+      { name:'ice', type:'substance', state:'solid', properties:{ boilingPoint:100, freezingPoint:0, meltingPoint:0, temperature:-5, flammable:false } },
+      { name:'iron', type:'material', state:'solid', properties:{ meltingPoint:1538, boilingPoint:2862, flammable:false, temperature:20, density:7.87, magnetic:true } },
+      { name:'wood', type:'material', state:'solid', properties:{ flammable:true, temperature:20 } },
+      { name:'oxygen', type:'gas', state:'gas', properties:{ flammable:false, temperature:20, supportsСombustion:true } },
+      { name:'salt', type:'substance', state:'solid', properties:{ meltingPoint:801, flammable:false, soluble:true } },
+      { name:'glass', type:'material', state:'solid', properties:{ meltingPoint:1400, flammable:false, transparent:true, brittle:true } },
+      { name:'air', type:'mixture', state:'gas', properties:{ composition:'78% N2, 21% O2', temperature:20 } },
+    ];
+    knownObjects.forEach(o => this.objects.set(o.name, { ...o, learnedFrom:'axiom' }));
+  }
+
+  // ── Learn objects and relations from a sentence ──
+  learnFromSentence(sentence, tag='') {
+    const s = sentence;
+    const learned = [];
+
+    // Spatial relations
+    const spatialPatterns = [
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:inside|within|in)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'inside' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:on\s+top\s+of|above|over)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'above' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:below|beneath|under)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'below' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:next\s+to|beside|adjacent\s+to)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'adjacent' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:contains?|holds?|carries?)\s+([A-Z][a-zA-Z\s]{2,30})/i, rel:'contains' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(?:part\s+of|a\s+component\s+of)\s+(?:the\s+)?([A-Z][a-zA-Z\s]{2,30})/i, rel:'part_of' },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:connects?|links?|bridges?)\s+([A-Z][a-zA-Z\s]{2,30})/i, rel:'connects' },
+    ];
+    for (const { re, rel } of spatialPatterns) {
+      const m = s.match(re);
+      if (m) {
+        const subj = m[1].trim().toLowerCase(), obj = m[2].trim().toLowerCase();
+        this.relations.push({ subject:subj, relation:rel, object:obj, confidence:0.8, tag });
+        // Auto-register objects
+        if (!this.objects.has(subj)) this.objects.set(subj, { name:subj, type:'unknown', state:'unknown', properties:{}, learnedFrom:tag });
+        if (!this.objects.has(obj)) this.objects.set(obj, { name:obj, type:'unknown', state:'unknown', properties:{}, learnedFrom:tag });
+        learned.push({ subj, rel, obj });
+      }
+    }
+
+    // Property extraction: "X is [adjective]" or "X has [property]"
+    const propPatterns = [
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+is\s+(hot|cold|large|small|heavy|light|fast|slow|strong|weak|hard|soft|rigid|flexible|transparent|opaque|solid|liquid|gaseous|flammable|magnetic|electric|living|dead|alive|active|inactive)/i },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:has|have)\s+(?:a\s+)?(high|low|great|small)\s+(\w+)/i },
+      { re: /([A-Z][a-zA-Z\s]{2,30}?)\s+(?:weighs?|measures?|reaches?)\s+([\d.]+\s*(?:kg|g|km|m|cm|°C|K|J|W|N|Pa|mph|m\/s))/i },
+    ];
+    for (const { re } of propPatterns) {
+      const m = s.match(re);
+      if (!m) continue;
+      const name = m[1].trim().toLowerCase();
+      const prop = m[2]?.trim().toLowerCase();
+      if (name && prop) {
+        if (!this.objects.has(name)) this.objects.set(name, { name, type:'unknown', state:prop, properties:{}, learnedFrom:tag });
+        else {
+          const obj = this.objects.get(name);
+          obj.properties[prop] = true;
+        }
+        learned.push({ type:'property', name, prop });
+      }
+    }
+    return learned;
+  }
+
+  // ── SIMULATE: apply action to object, predict outcome ──
+  // This is the "world model" in action — internal simulation
+  simulate(objectName, action) {
+    this.simCount++;
+    const key = objectName.toLowerCase().trim();
+    const actionKey = action.toLowerCase().trim().replace(/\s+/g,'_');
+    // Clone the object (or create generic)
+    let obj = this.objects.has(key)
+      ? JSON.parse(JSON.stringify(this.objects.get(key)))
+      : { name: key, type:'unknown', state:'unknown', properties:{}, location:'unknown' };
+
+    // Try each physics axiom
+    for (const axiom of this.physicsAxioms) {
+      try {
+        if (axiom.condition(obj, actionKey)) {
+          const newObj = axiom.effect(obj, actionKey);
+          const description = axiom.description(obj, newObj);
+          // Persist the new state
+          this.objects.set(key, { ...newObj, learnedFrom:'simulation' });
+          this.lastSimulation = { object:key, action:actionKey, before:obj, after:newObj, description };
+          return { success:true, description, before:obj, after:newObj };
+        }
+      } catch(e) { /* axiom failed — try next */ }
+    }
+    // No axiom matched — reason symbolically from relations
+    const rels = this.relations.filter(r => r.subject === key || r.object === key);
+    if (rels.length) {
+      const desc = `"${objectName}" has ${rels.length} known spatial relation(s). Action "${action}" has no known effect in the world model — no physics rule applies.`;
+      this.lastSimulation = { object:key, action:actionKey, description:desc };
+      return { success:false, description:desc };
+    }
+    // Don't surface "not in world model" to user — return null and let KG/SLM handle it
+    return { success:false, description:null };
+  }
+
+  // ── Spatial inference: where is X? What contains X? ──
+  spatialQuery(query) {
+    const q = query.toLowerCase();
+    // "Where is X?"
+    const mWhere = q.match(/where\s+is\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mWhere) {
+      const target = mWhere[1].trim();
+      const obj = this.objects.get(target);
+      if (obj?.location) return `${target} is at: ${obj.location}.`;
+      const contains = this.relations.find(r => r.object === target && r.relation === 'inside');
+      if (contains) return `${target} is inside ${contains.subject}.`;
+      return null;
+    }
+    // "What is inside X?"
+    const mInside = q.match(/what\s+(?:is\s+)?inside\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mInside) {
+      const container = mInside[1].trim();
+      const contents = this.relations.filter(r => r.subject === container && r.relation === 'contains')
+                                     .map(r => r.object);
+      if (contents.length) return `Inside ${container}: ${contents.join(', ')}.`;
+    }
+    // "What happens if I heat X?"
+    const mSim = q.match(/what\s+happens?\s+(?:if|when)\s+(?:you\s+|i\s+)?(\w+)\s+([a-z][a-z\s]{2,40}?)(?:\?|$)/i);
+    if (mSim) {
+      const result = this.simulate(mSim[2], mSim[1]);
+      return result.description;
+    }
+    return null;
+  }
+
+  // ── Answer "how does X work?" using part-of and functional relations ──
+  howDoesItWork(subject) {
+    const key = subject.toLowerCase();
+    const parts = this.relations.filter(r => r.relation === 'part_of' && r.object === key);
+    const contained = this.relations.filter(r => r.relation === 'contains' && r.subject === key);
+    const obj = this.objects.get(key);
+    const lines = [];
+    if (obj) {
+      const propStr = Object.entries(obj.properties).filter(([k,v]) => v !== undefined && v !== false).map(([k,v]) => `${k}: ${v}`).join(', ');
+      if (propStr) lines.push(`Properties: ${propStr}`);
+      if (obj.state && obj.state !== 'unknown') lines.push(`Current state: ${obj.state}`);
+    }
+    if (parts.length) lines.push(`Components: ${parts.map(r=>r.subject).join(', ')}`);
+    if (contained.length) lines.push(`Contains: ${contained.map(r=>r.object).join(', ')}`);
+    return lines.length ? lines.join('. ') : null;
+  }
+
+  snapshot() {
+    const objs = [...this.objects.values()].filter(o => o.learnedFrom !== 'axiom').slice(0,20);
+    const rels = this.relations.slice(0,20);
+    return { objectCount: this.objects.size - 8, learnedObjects: objs, relations: rels, simCount: this.simCount };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM C: SYSTEM 2 ENGINE
+//  The deliberate, slow, rule-following thinking layer.
+//  This is what separates intelligence from pattern matching.
+//
+//  Capabilities:
+//  1. MATH EVALUATOR    — real arithmetic (no SLM needed)
+//  2. LOGIC VERIFIER    — checks if claims follow from premises
+//  3. PROOF CONSTRUCTOR — builds step-by-step proof chains
+//  4. SLM VERIFIER      — checks SLM output for logical consistency
+//  5. ANALOGY ENGINE    — A:B::C:? structural mapping
+//  6. UNCERTAINTY PROP  — propagates confidence through inference chains
+// ──────────────────────────────────────────────────────────────────
+class System2Engine {
+  constructor() {
+    this.proofLog = [];       // All proof steps taken
+    this.verifiedCount = 0;
+    this.refutedCount = 0;
+    this.mathCallCount = 0;
+    this.analogyCache = new Map();
+  }
+
+  // ── 1. MATH EVALUATOR ──
+  // Detects math in user queries and evaluates them directly.
+  // No SLM involved — pure deterministic computation.
+  evaluateMath(expr) {
+    this.mathCallCount++;
+    // Clean and validate expression
+    const clean = expr.trim()
+      .replace(/\s+/g, '')
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/\^/g, '**')
+      .replace(/√(\d+)/g, 'Math.sqrt($1)')
+      .replace(/π/g, 'Math.PI')
+      .replace(/log\(/g, 'Math.log10(')
+      .replace(/ln\(/g, 'Math.log(')
+      .replace(/sin\(/g, 'Math.sin(')
+      .replace(/cos\(/g, 'Math.cos(')
+      .replace(/tan\(/g, 'Math.tan(');
+
+    // Security: only allow safe math characters
+    if (!/^[0-9+\-*\/().%Math.sqrtlogsincostan,PIe \n]+$/.test(clean.replace(/Math\.\w+/g,'').replace(/\d+/g,''))) {
+      return { error: 'Expression contains non-math characters' };
+    }
+    try {
+      // eslint-disable-next-line no-new-func
+      const result = new Function('return (' + clean + ')')();
+      if (typeof result !== 'number' || !isFinite(result)) return { error: 'Result is not a finite number' };
+      const formatted = Number.isInteger(result) ? result : parseFloat(result.toPrecision(8));
+      this.proofLog.unshift({ type:'math', input:expr, result:formatted, ts:Date.now() });
+      if (this.proofLog.length > 50) this.proofLog.pop();
+      return { result: formatted, steps: [`${expr} = ${formatted}`] };
+    } catch(e) {
+      return { error: 'Cannot evaluate: ' + e.message };
+    }
+  }
+
+  // ── Detect if a query contains math ──
+  detectsMath(query) {
+    return /[\d+\-*/^=÷×√π%]/.test(query) &&
+      /(?:\d[\d\s]*[+\-*/^÷×]\s*\d|what\s+is\s+[\d]|calculate|compute|how\s+much\s+is|equals?|solve)/i.test(query);
+  }
+
+  // ── 2. LOGIC VERIFIER ──
+  // Given premises and a claim, check if the claim follows using modus ponens / tollens.
+  // Returns { valid, confidence, steps }
+  verifyLogic(premises, claim) {
+    if (!premises || !premises.length || !claim) return { valid: null, confidence: 0, steps: [] };
+    const steps = [];
+    const premisesLow = premises.map(p => p.toLowerCase());
+    const claimLow = claim.toLowerCase();
+    let confidence = 0;
+
+    // ── Modus Ponens: if we have "A → B" and "A", infer "B" ──
+    for (const p of premisesLow) {
+      const implication = p.match(/if\s+(.{4,60}?)\s+then\s+(.{4,60}?)$/i)
+                       || p.match(/(.{4,60}?)\s+implies?\s+(.{4,60}?)$/i);
+      if (!implication) continue;
+      const [, antecedent, consequent] = implication;
+      const antecedentHeld = premisesLow.some(q => q.includes(antecedent.trim()));
+      if (antecedentHeld) {
+        steps.push(`MP: "${antecedent}" holds → "${consequent}" follows`);
+        if (claimLow.includes(consequent.trim())) {
+          confidence = Math.max(confidence, 0.85);
+          steps.push(`✓ Claim matches consequent "${consequent}"`);
+        }
+      }
+    }
+
+    // ── Direct containment: does a premise directly state the claim? ──
+    const directSupport = premisesLow.filter(p => {
+      const overlap = claimLow.split(/\s+/).filter(w => w.length > 4 && p.includes(w)).length;
+      const claimWords = claimLow.split(/\s+/).filter(w => w.length > 4).length;
+      return claimWords > 0 && overlap / claimWords > 0.5;
+    });
+    if (directSupport.length) {
+      confidence = Math.max(confidence, 0.75);
+      steps.push(`✓ ${directSupport.length} premise(s) directly support the claim`);
+    }
+
+    // ── Contradiction check ──
+    const contradictions = premisesLow.filter(p => {
+      // Check for negation patterns
+      return (p.includes('not ' + claimLow.slice(0,20)) ||
+              p.includes('cannot ' + claimLow.slice(0,20)) ||
+              (p.includes('false') && p.includes(claimLow.slice(0,15))));
+    });
+    if (contradictions.length) {
+      confidence = 0;
+      steps.push(`✗ ${contradictions.length} premise(s) contradict the claim`);
+      this.refutedCount++;
+      this.proofLog.unshift({ type:'logic', valid:false, claim, steps, ts:Date.now() });
+      return { valid: false, confidence: 0, steps };
+    }
+
+    const valid = confidence > 0.5;
+    if (valid) this.verifiedCount++; else this.refutedCount++;
+    this.proofLog.unshift({ type:'logic', valid, claim, confidence, steps, ts:Date.now() });
+    if (this.proofLog.length > 50) this.proofLog.pop();
+    return { valid, confidence, steps };
+  }
+
+  // ── 3. PROOF CONSTRUCTOR ──
+  // Builds a step-by-step deductive proof from KG facts
+  buildProof(query, kgFacts, conversationHistory=[]) {
+    const steps = [];
+    const qLow = query.toLowerCase();
+
+    // Step 0: identify the claim to prove
+    steps.push({ n:0, label:'Query', content: query });
+
+    // Step 1: gather relevant premises from KG
+    const relevant = kgFacts.filter(f => {
+      const fStr = `${f.s} ${f.p} ${f.o}`.toLowerCase();
+      return qLow.split(/\s+/).filter(w=>w.length>4).some(w => fStr.includes(w));
+    }).slice(0, 6);
+
+    if (!relevant.length) {
+      steps.push({ n:1, label:'No premises', content:'KG has no relevant facts to construct a proof from.' });
+      return { steps, conclusion: null, confidence: 0 };
+    }
+
+    relevant.forEach((f, i) => {
+      steps.push({ n: i+1, label:'Premise', content: `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`, conf: f.conf });
+    });
+
+    // Step 2: try to derive a conclusion via pattern matching
+    let conclusion = null;
+    let confidence = 0;
+
+    // Is-a chain: if A is_a B and B is_a C → A is_a C
+    const isA = relevant.filter(f => f.p === 'is_a');
+    if (isA.length >= 2) {
+      const chain = [];
+      let curr = isA[0];
+      chain.push(curr);
+      let depth = 0;
+      while (depth++ < 4) {
+        const next = isA.find(f => f.s === curr.o);
+        if (!next) break;
+        chain.push(next);
+        curr = next;
+      }
+      if (chain.length >= 2) {
+        conclusion = `${chain[0].s} is a type of ${chain[chain.length-1].o}`;
+        confidence = chain.reduce((acc, f) => acc * (f.conf||0.7), 1);
+        steps.push({ n: relevant.length+1, label:'Deduction (is-a chain)', content: conclusion });
+      }
+    }
+
+    // Created-by chain: if A created_by B and B located_in C → A was made in C
+    const createdBy = relevant.find(f => f.p === 'created_by');
+    const locatedIn = createdBy && relevant.find(f => f.s === createdBy.o && f.p === 'located_in');
+    if (createdBy && locatedIn) {
+      conclusion = `${createdBy.s} was created by ${createdBy.o}, who is based in ${locatedIn.o}`;
+      confidence = Math.min((createdBy.conf||0.7) * (locatedIn.conf||0.7) * 1.2, 1);
+      steps.push({ n: relevant.length+1, label:'Deduction (creation chain)', content: conclusion });
+    }
+
+    // Default: synthesize the most relevant facts
+    if (!conclusion && relevant.length) {
+      conclusion = relevant.slice(0,2).map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+      confidence = relevant.reduce((acc,f) => acc + (f.conf||0.7), 0) / relevant.length;
+      steps.push({ n: relevant.length+1, label:'Summary', content: conclusion });
+    }
+
+    this.proofLog.unshift({ type:'proof', query, steps: steps.length, conclusion, ts:Date.now() });
+    if (this.proofLog.length > 30) this.proofLog.pop();
+    return { steps, conclusion, confidence };
+  }
+
+  // ── 4. SLM OUTPUT VERIFIER ──
+  // After SLM generates text, System 2 checks it for:
+  // • Internal consistency (does it contradict itself?)
+  // • Factual grounding (do its claims appear in KG?)
+  // • Logical coherence (do conclusions follow from stated premises?)
+  // Returns { score, issues, approved }
+  verifySLMOutput(slmText, kgFacts, query) {
+    if (!slmText || slmText.length < 10) return { score: 0, issues: ['Empty output'], approved: false };
+    const issues = [];
+    let score = 1.0;
+
+    // Check 1: does output contradict any high-confidence KG facts?
+    const textLow = slmText.toLowerCase();
+    for (const fact of kgFacts.filter(f => (f.conf||0.7) > 0.8)) {
+      const negPattern = new RegExp(`not\\s+${fact.o.slice(0,15).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}`);
+      if (negPattern.test(textLow) && textLow.includes(fact.s.slice(0,10).toLowerCase())) {
+        issues.push(`Contradicts KG: "${fact.s} ${fact.p} ${fact.o}"`);
+        score -= 0.25;
+      }
+    }
+
+    // Check 2: grounding score — how many KG entities appear in the output?
+    const entities = [...new Set(kgFacts.flatMap(f => [f.s, f.o]).map(e => e.toLowerCase()))];
+    const grounded = entities.filter(e => e.length > 4 && textLow.includes(e));
+    const groundingScore = entities.length ? grounded.length / Math.min(entities.length, 8) : 0.5;
+    if (groundingScore < 0.2) {
+      issues.push('Low grounding: output mentions few KG entities');
+      score -= 0.2;
+    }
+    score *= (0.5 + groundingScore * 0.5);
+
+    // Check 3: hallucination signals
+    const hallucinationPatterns = [
+      /\b(definitely|certainly|absolutely|always|never|impossible|guaranteed)\b/i,
+      /\b(in \d{4})\b/i, // date claims — risky without grounding
+      /\b(\d{2,}(?:\.\d+)?\s*(?:million|billion|trillion|percent|%))\b/i, // number claims
+    ];
+    for (const re of hallucinationPatterns) {
+      if (re.test(slmText)) {
+        const match = slmText.match(re)?.[0];
+        // Only flag if not grounded in a KG fact
+        const grounded = kgFacts.some(f => f.o.includes(match?.toLowerCase()||''));
+        if (!grounded) { issues.push(`Ungrounded claim: "${match}"`); score -= 0.08; }
+      }
+    }
+
+    // Check 4: self-contradiction within the output
+    const sentences = slmText.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    for (let i = 0; i < sentences.length; i++) {
+      for (let j = i+1; j < sentences.length; j++) {
+        const a = sentences[i].toLowerCase(), b = sentences[j].toLowerCase();
+        // Check for explicit negation of shared subject
+        const subjectMatch = a.match(/([a-z]{4,20})/)?.[1];
+        if (subjectMatch && b.includes(subjectMatch) && b.includes('not ') && a.includes('is ')) {
+          issues.push(`Possible self-contradiction: "${sentences[i].trim().slice(0,40)}" vs "${sentences[j].trim().slice(0,40)}"`);
+          score -= 0.15;
+        }
+      }
+    }
+
+    score = Math.max(0, Math.min(1, score));
+    const approved = score > 0.35 && issues.filter(i => i.startsWith('Contradicts')).length === 0;
+    if (approved) this.verifiedCount++; else this.refutedCount++;
+    this.proofLog.unshift({ type:'verify', score, issues, approved, ts:Date.now() });
+    if (this.proofLog.length > 50) this.proofLog.pop();
+    return { score, issues, approved };
+  }
+
+  // ── 5. ANALOGY ENGINE ──
+  // Completes "A is to B as C is to ?"
+  // Structural mapping over the KG — not statistical, truly symbolic
+  solveAnalogy(a, b, c, kg) {
+    const aLow = a.toLowerCase(), bLow = b.toLowerCase(), cLow = c.toLowerCase();
+    // Find the relation between A and B in the KG
+    const abFacts = kg.triples.filter(t =>
+      (t.s === aLow && t.o === bLow) || (t.s === bLow && t.o === aLow)
+    );
+    if (!abFacts.length) {
+      // Fuzzy fallback: find what A 'is' and apply same to C
+      const aIs = kg.triples.filter(t => t.s === aLow && t.p === 'is_a').map(t => t.o);
+      const cIs = kg.triples.filter(t => t.s === cLow && t.p === 'is_a').map(t => t.o);
+      const aCreated = kg.triples.filter(t => t.s === aLow && t.p === 'created_by').map(t => t.o);
+      const cCreatedBy = cIs.length && aCreated.length
+        ? kg.triples.filter(t => t.s === cLow && t.p === 'created_by').map(t => t.o)
+        : [];
+      if (cCreatedBy.length && aCreated.length) {
+        return { answer: cCreatedBy[0], confidence: 0.6, path: `${c} created_by ${cCreatedBy[0]} (mirrors ${a} created_by ${aCreated[0]})` };
+      }
+      return { answer: null, confidence: 0, path: 'No structural analogy found in KG' };
+    }
+    // Find what predicate links A to B
+    const relation = abFacts[0].p;
+    // Apply same relation to C
+    const cFacts = kg.triples.filter(t => t.s === cLow && t.p === relation);
+    if (cFacts.length) {
+      const answer = cFacts[0].o;
+      const conf = (abFacts[0].conf||0.7) * (cFacts[0].conf||0.7);
+      const path = `${a}→${b} via ${relation}; ${c}→${answer} via same relation`;
+      this.analogyCache.set(`${a}:${b}::${c}`, answer);
+      return { answer, confidence: conf, path };
+    }
+    return { answer: null, confidence: 0, path: `Relation "${relation}" exists for ${a}→${b} but not ${c}→?` };
+  }
+
+  // ── 6. UNCERTAINTY PROPAGATION ──
+  // Given a chain of inferences with confidence values, compute final certainty
+  propagateConfidence(steps) {
+    // Conjunction: confidence decreases through chain (weakest link)
+    const minConf = steps.reduce((min, s) => Math.min(min, s.confidence||0.7), 1);
+    // Product rule: joint probability of all steps being correct
+    const product = steps.reduce((acc, s) => acc * (s.confidence||0.7), 1);
+    return { min: minConf, product, geometric: Math.pow(product, 1/steps.length) };
+  }
+
+  // ── Answer math/logic queries directly ──
+  answerDirect(query) {
+    if (this.detectsMath(query)) {
+      // Extract expression
+      const expr = query.replace(/[^0-9+\-*/^().%√π×÷\s]/g,'').trim();
+      if (expr.length > 0) return this.evaluateMath(expr);
+    }
+    return null;
+  }
+
+  snapshot() {
+    return {
+      verifiedCount: this.verifiedCount,
+      refutedCount: this.refutedCount,
+      mathCallCount: this.mathCallCount,
+      proofLog: this.proofLog.slice(0,10),
+    };
+  }
+}
+
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM D: PREDICTIVE CODING ENGINE
+//  Lexica generates hypotheses about what it expects to find,
+//  then measures "prediction error" when reality differs.
+//  This is how the brain works — and why learning is efficient.
+// ──────────────────────────────────────────────────────────────────
+class PredictiveCodingEngine {
+  constructor() {
+    this.predictions = [];  // { query, predicted, actual, error, ts }
+    this.priors = new Map(); // entity → expected properties/relations
+    this.errorHistory = [];  // running record of prediction errors
+    this.totalPredictions = 0;
+    this.correctPredictions = 0;
+  }
+
+  // Generate a prior prediction from existing KG knowledge
+  predict(query, subject, kgFacts) {
+    if (!subject || !kgFacts.length) return null;
+    const subj = subject.toLowerCase();
+    // Look at what we already know about similar entities
+    const prior = this.priors.get(subj);
+    if (prior) return prior;
+    // Build prior from existing KG facts
+    const isA = kgFacts.find(f => f.p === 'is_a');
+    const createdBy = kgFacts.find(f => f.p === 'created_by');
+    const features = kgFacts.slice(0,3).map(f => `${f.p.replace(/_/g,' ')} ${f.o}`);
+    const prediction = {
+      subject: subj,
+      expectedType: isA?.o || 'unknown',
+      expectedFeatures: features,
+      confidence: kgFacts.reduce((a,f) => a + (f.conf||0.7), 0) / kgFacts.length,
+      ts: Date.now()
+    };
+    this.priors.set(subj, prediction);
+    return prediction;
+  }
+
+  // Measure error between prediction and actual retrieved facts
+  measureError(prediction, actualFacts) {
+    if (!prediction || !actualFacts.length) return 1.0;
+    const expectedFeatureSet = new Set(prediction.expectedFeatures.map(f => f.toLowerCase()));
+    const actualFeatureSet = new Set(actualFacts.map(f => `${f.p.replace(/_/g,' ')} ${f.o}`.toLowerCase()));
+    let matches = 0;
+    expectedFeatureSet.forEach(e => { if ([...actualFeatureSet].some(a => a.includes(e.slice(0,20)))) matches++; });
+    const error = 1 - (matches / Math.max(expectedFeatureSet.size, 1));
+    this.totalPredictions++;
+    if (error < 0.3) this.correctPredictions++;
+    return error;
+  }
+
+  // High error = surprising = prioritize for learning
+  getSurpriseScore(query, subject, kgFacts) {
+    const pred = this.predict(query, subject, kgFacts);
+    if (!pred) return 0.5; // unknown = moderate surprise
+    return this.measureError(pred, kgFacts);
+  }
+
+  // Record a prediction outcome for meta-learning
+  record(query, predicted, actual, error) {
+    this.predictions.push({ query, predicted, actual, error, ts: Date.now() });
+    this.errorHistory.push(error);
+    if (this.predictions.length > 100) this.predictions.shift();
+    if (this.errorHistory.length > 100) this.errorHistory.shift();
+  }
+
+  get accuracy() {
+    return this.totalPredictions > 0 ? this.correctPredictions / this.totalPredictions : 0;
+  }
+
+  get avgError() {
+    if (!this.errorHistory.length) return 0;
+    return this.errorHistory.reduce((a,b) => a+b, 0) / this.errorHistory.length;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM E: ABDUCTIVE REASONING ENGINE
+//  Given observations (facts), find the BEST EXPLANATION.
+//  This is hypothesis generation — science in symbolic form.
+//  "Why would X be true? What single cause explains all these facts?"
+// ──────────────────────────────────────────────────────────────────
+class AbductiveReasoner {
+  constructor() {
+    this.hypotheses = [];   // generated hypotheses with confidence scores
+    this.bestExplanation = null;
+  }
+
+  // Generate candidate hypotheses for a set of observations
+  generateHypotheses(observations, kg) {
+    const hypotheses = [];
+    if (!observations.length) return hypotheses;
+
+    // Hypothesis 1: Common cause — find a node that causes many observations
+    const causes = new Map();
+    observations.forEach(obs => {
+      const subj = (obs.s || '').toLowerCase();
+      // Find what's related to this entity in the KG
+      const relatedFacts = kg.triples.filter(t => t.o === subj || t.s === obs.o);
+      relatedFacts.forEach(f => {
+        const cause = f.s;
+        causes.set(cause, (causes.get(cause) || 0) + 1);
+      });
+    });
+    causes.forEach((count, cause) => {
+      if (count >= 2) {
+        hypotheses.push({
+          type: 'common_cause',
+          explanation: `"${cause}" is a common cause that explains ${count} of the observations`,
+          confidence: Math.min(0.9, 0.4 + count * 0.15),
+          entity: cause,
+          score: count,
+        });
+      }
+    });
+
+    // Hypothesis 2: Category membership — all observations share a type
+    const types = new Map();
+    observations.forEach(obs => {
+      const typeTriples = kg.triples.filter(t => t.s === obs.s && t.p === 'is_a');
+      typeTriples.forEach(t => types.set(t.o, (types.get(t.o)||0)+1));
+    });
+    types.forEach((count, type) => {
+      if (count >= 2) {
+        hypotheses.push({
+          type: 'category',
+          explanation: `All observations may be instances of "${type}"`,
+          confidence: Math.min(0.85, 0.3 + count * 0.2),
+          entity: type,
+          score: count * 1.2,
+        });
+      }
+    });
+
+    // Hypothesis 3: Temporal — a sequence explains the pattern
+    const timeFacts = observations.filter(f => f.p === 'released_in' || f.p === 'born_in' || f.p === 'died_in');
+    if (timeFacts.length >= 2) {
+      hypotheses.push({
+        type: 'temporal',
+        explanation: `These facts follow a temporal sequence — events unfolded over time`,
+        confidence: 0.6,
+        score: timeFacts.length,
+      });
+    }
+
+    // Sort by score
+    hypotheses.sort((a, b) => b.score - a.score);
+    this.hypotheses = hypotheses.slice(0, 5);
+    this.bestExplanation = this.hypotheses[0] || null;
+    return this.hypotheses;
+  }
+
+  // Format best explanation for output
+  explain(observations, kg) {
+    const hyps = this.generateHypotheses(observations, kg);
+    if (!hyps.length) return null;
+    const best = hyps[0];
+    return {
+      text: best.explanation,
+      confidence: best.confidence,
+      type: best.type,
+      alternatives: hyps.slice(1, 3).map(h => h.explanation),
+    };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  SYSTEM F: ABSTRACT CONCEPT FORMATION ENGINE
+//  Groups concrete facts into abstract principles.
+//  "Minecraft, Roblox, Fortnite are all video games" →
+//  Abstract concept: VIDEO_GAME = {has_gameplay, made_by_studio, sold_digitally}
+//
+//  This is how intelligence generalizes. Without abstraction,
+//  every new game requires relearning everything from scratch.
+// ──────────────────────────────────────────────────────────────────
+class AbstractConceptEngine {
+  constructor() {
+    this.concepts = new Map();   // concept_name → { members, properties, rules }
+    this.rules = [];             // learned generalizations: if X is Y and X has Z → all Y have Z
+    this.lastFormed = null;
+  }
+
+  // Scan KG and form abstract concepts from type clusters
+  formConcepts(kg) {
+    const formed = [];
+    // Group entities by type (is_a predicate)
+    const typeGroups = new Map();
+    kg.triples.filter(t => t.p === 'is_a' && t.alive !== false).forEach(t => {
+      const type = t.o.toLowerCase();
+      if (!typeGroups.has(type)) typeGroups.set(type, []);
+      typeGroups.get(type).push(t.s.toLowerCase());
+    });
+
+    typeGroups.forEach((members, type) => {
+      if (members.length < 2) return; // need ≥2 members to form a concept
+      // Find properties SHARED by all members
+      const sharedProps = new Map();
+      members.forEach(member => {
+        const memberFacts = kg.triples.filter(t => t.s === member && t.p !== 'is_a');
+        memberFacts.forEach(f => {
+          const key = f.p;
+          if (!sharedProps.has(key)) sharedProps.set(key, new Set());
+          sharedProps.get(key).add(f.o);
+        });
+      });
+
+      // Properties that appear in ≥ half the members
+      const threshold = Math.ceil(members.length / 2);
+      const prototypicalProps = [];
+      sharedProps.forEach((values, prop) => {
+        if (values.size >= threshold) {
+          prototypicalProps.push({ prop, values: [...values].slice(0,3) });
+        }
+      });
+
+      if (prototypicalProps.length > 0) {
+        const concept = { type, members: members.slice(0,10), properties: prototypicalProps, formed: Date.now() };
+        this.concepts.set(type, concept);
+        // Generate rules from properties
+        prototypicalProps.forEach(({ prop, values }) => {
+          this.rules.push({
+            condition: `is_a ${type}`,
+            conclusion: `likely_${prop} ${values[0]}`,
+            support: members.length,
+            confidence: Math.min(0.9, 0.5 + members.length * 0.08),
+          });
+        });
+        formed.push(concept);
+      }
+    });
+
+    if (formed.length) this.lastFormed = formed[0];
+    return formed;
+  }
+
+  // Answer "what do all X have in common?" queries
+  characterize(type) {
+    const concept = this.concepts.get(type.toLowerCase());
+    if (!concept) return null;
+    const props = concept.properties.slice(0,3).map(p => `${p.prop.replace(/_/g,' ')}: ${p.values[0]}`).join(', ');
+    return `All ${type} share: ${props}. Members include: ${concept.members.slice(0,4).join(', ')}.`;
+  }
+
+  // Apply abstract rules to predict unknown properties
+  predictProperty(entity, kg) {
+    const entityType = kg.triples.find(t => t.s === entity.toLowerCase() && t.p === 'is_a')?.o;
+    if (!entityType) return null;
+    const concept = this.concepts.get(entityType.toLowerCase());
+    if (!concept) return null;
+    const existingProps = new Set(kg.triples.filter(t => t.s === entity.toLowerCase()).map(t => t.p));
+    const predictions = concept.properties
+      .filter(p => !existingProps.has(p.prop))
+      .map(p => `${p.prop.replace(/_/g,' ')} = ${p.values[0]}`);
+    return predictions.length ? predictions : null;
+  }
+
+  snapshot() {
+    const concepts = [...this.concepts.values()].slice(0,10).map(c => ({
+      type: c.type,
+      memberCount: c.members.length,
+      propertyCount: c.properties.length,
+    }));
+    return { conceptCount: this.concepts.size, ruleCount: this.rules.length, concepts };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  AGI QUERY ROUTER
+//  Decides which AGI system(s) to engage for each query.
+//  Returns { system, priority, reason }
+// ──────────────────────────────────────────────────────────────────
+function agiRoute(query, intent) {
+  const q = query.toLowerCase();
+  const routes = [];
+
+  // System 2 math — always runs first if math detected
+  if (/[\d+\-*/^÷×√π%]/.test(q) && /(?:\d[\d\s]*[+\-*/^÷×]\s*\d|what\s+is\s+[\d]|calculat|comput|how\s+much\s+is|=\s*\?|solve|equals?)/i.test(q)) {
+    routes.push({ system:'system2_math', priority:10, reason:'math expression detected' });
+  }
+  // Causal "why" queries
+  if (/^why\b|\bwhy\s+did\b|\bwhy\s+does\b|\bwhy\s+is\b|\bwhat\s+caused\b|\bdue\s+to\b|\bbecause\s+of\b/i.test(q)) {
+    routes.push({ system:'causal', priority:9, reason:'causal query' });
+  }
+  // World model — physical simulation
+  if (/what\s+happens?\s+(if|when)\b|if\s+you\s+(heat|cool|burn|drop|mix|compress|cut|break|electr)/i.test(q)) {
+    routes.push({ system:'worldmodel', priority:8, reason:'physical simulation query' });
+  }
+  // World model — spatial
+  if (/\bwhere\s+is\b|\bwhat\s+is\s+inside\b|\bcontains?\b|\bspatial\b|\bnext\s+to\b|\babove\b|\bbelow\b/i.test(q)) {
+    routes.push({ system:'worldmodel_spatial', priority:7, reason:'spatial query' });
+  }
+  // Counterfactual
+  if (/what\s+if\s+.+(?:hadn.t|didn.t|never|without)\b|\bcounterfactual\b/i.test(q)) {
+    routes.push({ system:'causal_counterfactual', priority:8, reason:'counterfactual query' });
+  }
+  // Abductive "explain why these things are related"
+  if (/\bwhat\s+do\s+.+\s+have\s+in\s+common\b|\bwhy\s+are\s+these\s+related\b|\bexplain\s+the\s+pattern\b/i.test(q)) {
+    routes.push({ system:'abductive', priority:7, reason:'abductive/common-cause query' });
+  }
+  // Abstract concept — "what makes X an X?"
+  if (/\bwhat\s+makes\s+(?:a|an|all)\b|\bcharacteristics?\s+of\b|\bdefine\b|\bwhat\s+do\s+all\b/i.test(q)) {
+    routes.push({ system:'abstract', priority:6, reason:'concept characterization' });
+  }
+  // System 2 proof — complex factual chains
+  if (/\bprove\b|\bshow\s+that\b|\bdemonstrate\b|\bcan\s+you\s+verify\b|\bis\s+it\s+true\s+that\b/i.test(q)) {
+    routes.push({ system:'system2_proof', priority:8, reason:'proof/verification query' });
+  }
+  // Analogy
+  if (/\b(?:analogy|analogous|is\s+to\s+.+\s+as|similar\s+to|parallel\s+to)\b/i.test(q)) {
+    routes.push({ system:'system2_analogy', priority:7, reason:'analogy query' });
+  }
+
+  return routes.sort((a,b) => b.priority - a.priority);
+}
+
+class Engine {
+  constructor() {
+    this.ets = new EntityTypeSystem();
+    this.salience = new SalienceTracker();
+    this.typeStack = new TypedEntityStack();
+    this.bm25 = new BM25();
+    this.kg = new KnowledgeGraph(this.ets);
+    this.ctx = new Ctx(this.salience, this.typeStack, this.ets);
+    this.sm = new SM();
+    this.cache = new QueryCache();
+    this.feedback = new FeedbackStore();
+    this.semVec = new SemanticVectors();
+    this.wordProfiler = new WordProfiler();
+    this.synthesis = new SynthesisEngine();
+
+    // V9 cognitive subsystems
+    this.stateTracker = new LexicaStateTracker();
+    this.userCtx = new UserContextStack();
+    this.tomTracker = new UserKnowledgeTracker();
+    this.mood = new MoodEngine();
+
+    // V10 new subsystems
+    this.qualia = new QualiaEngine();
+    this.society = new SocietyOfMind();
+    this.godel = new GodelEngine(this.kg);
+    this.curiosity = new CuriosityEngine(this.kg, this.qualia, (text, nodeA, nodeB) => {
+      showInnerMonologue(text, nodeA, nodeB);
+    });
+
+    // V11 new subsystems
+    this.cfgParser = new CFGParser();
+    this.ingestion = new AutonomousIngestion(this);
+    this.ingestion.onStatus = (msg) => { addMsg('system', msg); updateUI(); };
+
+    // V12 new subsystems — initialized async after construction
+    this.nanoCortex = new NanoCortex(this.kg.synonyms);
+    this.neuralMouth = new NeuralMouth();
+    this._neuralReady = false; // true when at least nanoCortex OR neuralMouth is ready
+
+    // ── LEXICA 3.0: NEW COGNITIVE SYSTEMS ──
+    this.drives = new HomeostaticDriveSystem();
+    this.goalStack = new GoalStack();
+    this.selfModel = new SelfModel();
+    this.episodicMemory = new EpisodicMemory();
+    this.userModel = new UserModel();
+    this.preferenceEngine = new PreferenceEngine();
+    this.failureTracker = new FailureTracker();
+    this.socialAdapter = new SocialModelAdapter();
+
+    // ── AGI LAYER — Seven pillars of general intelligence ──
+    this.causalGraph    = new CausalGraph();           // WHY things happen
+    this.worldModel     = new WorldModel();            // HOW the physical world works
+    this.system2        = new System2Engine();         // DELIBERATE logic & math verification
+    this.predictive     = new PredictiveCodingEngine();// Hypothesis generation + surprise detection
+    this.abductive      = new AbductiveReasoner();     // Best-explanation inference
+    this.conceptEngine  = new AbstractConceptEngine(); // Abstract concept formation + rules
+    this._agiStats = { causalAnswers:0, worldAnswers:0, sys2Answers:0, predictiveTriggered:0, abductiveAnswers:0, abstractAnswers:0 };
+
+    // Wire drive actions to behavioral consequences
+    this.drives.onAction = (driveKey, action, level, reason) => {
+      if (action === 'EXPLORE' && this.trained) {
+        // Curiosity drive fires → push high-urgency topics to ingestion queue
+        const urgentGaps = this.failureTracker.getUrgentGaps(2);
+        if (urgentGaps.length > 0) {
+          urgentGaps.forEach(g => this.ingestion.enqueue(g.topic, g.urgency));
+          addMsg('system', `⚡ <strong>Curiosity Drive</strong> (level ${(level*100).toFixed(0)}%) → queued ${urgentGaps.length} knowledge gap(s) for ingestion: ${urgentGaps.map(g=>'"'+g.topic+'"').join(', ')}`);
+        } else {
+          // No known gaps — scan KG for structural opportunities
+          this.goalStack.generateFromKG(this.kg, this.preferenceEngine);
+          addMsg('system', `🔍 <strong>Curiosity Drive</strong> (level ${(level*100).toFixed(0)}%) → generating exploration goals from KG structure.`);
+        }
+      } else if (action === 'RESOLVE' && this.trained) {
+        // Discomfort drive fires → trigger Society of Mind debate
+        const conflicts = this.kg.triples.filter(t => t.alive && t.conflict).slice(0, 3);
+        if (conflicts.length > 0) {
+          addMsg('system', `😣 <strong>Discomfort Drive</strong> (level ${(level*100).toFixed(0)}%) → forced Society of Mind debate on ${conflicts.length} conflict(s).`);
+          // Mark goal progress
+          this.goalStack.advanceGoal('resolve', 'contradiction', 0.4);
+        }
+      } else if (action === 'SPEAK' && this.trained) {
+        // Expression drive fires → volunteer information if idle
+        const preferred = this.preferenceEngine.getPreferred(3);
+        if (preferred.length > 0) {
+          const pick = preferred[Math.floor(Math.random() * preferred.length)];
+          const facts = this.kg.query(pick.topic).slice(0, 3);
+          if (facts.length > 0) {
+            const text = this.synthesis.synthesize(`tell me about ${pick.topic}`, 'what', pick.topic, facts, [], [], this.semVec, this.wordProfiler, this.kg);
+            if (text) {
+              setTimeout(() => {
+                streamMsg(`[Unsolicited] ${text}`, {strategy:'expression', synthesized:true, conf:{l:'medium',lbl:'expression drive',cls:'conf-med'}, kgUsed:true, ctxUsed:false, conflict:null, cached:false, evidence:`preferred topic: ${pick.topic}`, src:null, srcTitle:'', intent:'expression'});
+              }, 1500);
+              this.goalStack.advanceGoal('express', pick.topic, 0.8);
+            }
+          }
+        }
+      }
+      updateDriveUI();
+      updateGoalUI();
+    };
+
+    // Directive memory
+    this.lastResult = null;
+    this.lastKgFacts = null;
+    this.lastQuery = null;
+    this.lastSubject = null;
+    this.recentTripleWindow = [];
+    this.trained = false;
+    this.synthesisCount = 0;
+
+    // Start curiosity loop + autonomous ingestion
+    this.curiosity.start();
+    // Start homeostatic drive system (wired to kg, goalStack)
+    this.drives.start(this.kg, this.goalStack, this.episodicMemory);
+    // Ingestion starts after first training session (don't start cold)
+  }
+
+  async addSourceAsync(text, title, url, onProgress) {
+    const tag = this.sm.mkTag(title);
+    onProgress('parse',0,0,0); await _yield();
+
+    // ── HIERARCHICAL CHUNKING ──
+    // Detect Wikipedia section headers (== Section == or === Subsection ===)
+    // and tag sentences with their section context. This makes "tell me about
+    // the gameplay section of Minecraft" answerable.
+    const lines = text.split('\n');
+    let currentSection = '';
+    let currentSubsection = '';
+    const annotatedSentences = [];
+    for (const line of lines) {
+      const h2 = line.match(/^==\s*([^=]+?)\s*==\s*$/);
+      const h3 = line.match(/^===\s*([^=]+?)\s*===\s*$/);
+      if (h2) { currentSection = h2[1].trim(); currentSubsection = ''; continue; }
+      if (h3) { currentSubsection = h3[1].trim(); continue; }
+      if (line.trim().length > 10) {
+        const sectionCtx = [currentSection, currentSubsection].filter(Boolean).join(' › ');
+        // Prefix key sentences with their section heading for better retrieval
+        const sentWithCtx = sectionCtx ? line.trim() : line.trim();
+        annotatedSentences.push({ text: sentWithCtx, section: sectionCtx });
+      }
+    }
+    // If no section structure was found, fall back to flat sentence splitting
+    const rawSentences = splitSentences(text);
+    // Use annotated if sections were found (>5% lines are section-prefixed), else raw
+    const ss = annotatedSentences.length > 10 && currentSection ?
+      annotatedSentences.map(a => a.section ? '[' + a.section + '] ' + splitSentences(a.text)[0] : a.text)
+        .flatMap(s => splitSentences(s)).filter(Boolean) :
+      rawSentences;
+
+    if (ss.length < 1) throw new Error('No text to train on.');
+    onProgress('parse',0.04,ss.length,0); await _yield();
+
+    const CHUNK = 20;
+    for (let i = 0; i < ss.length; i += CHUNK) {
+      this.bm25.addBatch(ss.slice(i,i+CHUNK), tag);
+      onProgress('index',0.04+(i+CHUNK)/ss.length*0.30,ss.length,0);
+      await _yield();
+    }
+    onProgress('index',0.34,ss.length,0);
+
+    const KG_CHUNK = 15;
+    for (let i = 0; i < ss.length; i += KG_CHUNK) {
+      ss.slice(i,i+KG_CHUNK).forEach(s => {
+        this.kg.learn(s, tag);
+        // ── AGI: feed same sentences to Causal + World Model ──
+        try { this.causalGraph.learnFromSentence(s, tag); } catch(_) {}
+        try { this.worldModel.learnFromSentence(s, tag); } catch(_) {}
+      });
+      onProgress('kg',0.34+(i+KG_CHUNK)/ss.length*0.22,ss.length,this.kg.count());
+      await _yield();
+    }
+    onProgress('kg',0.56,ss.length,this.kg.count());
+
+    onProgress('pmi',0.60,ss.length,this.kg.count()); await _yield();
+    await yieldToMain(); // yield 2: after BM25 flush, before retrieval
+    this.bm25.flush();
+    onProgress('pmi',0.65,ss.length,this.kg.count()); await _yield();
+
+    const SEM_CHUNK = 30;
+    for (let i = 0; i < ss.length; i += SEM_CHUNK) {
+      ss.slice(i,i+SEM_CHUNK).forEach(s => this.semVec.addSentence(s));
+      if (i%150===0) { onProgress('pmi',0.65+(i+SEM_CHUNK)/ss.length*0.20,ss.length,this.kg.count()); await _yield(); }
+    }
+    onProgress('pmi',0.85,ss.length,this.kg.count()); await _yield();
+    this.semVec.buildPMI();
+    onProgress('pmi',0.90,ss.length,this.kg.count()); await _yield();
+
+    const WP_CHUNK = 40;
+    for (let i = 0; i < ss.length; i += WP_CHUNK) {
+      this.wordProfiler.processAll(ss.slice(i,i+WP_CHUNK));
+      if (i%200===0) { onProgress('words',0.90+(i+WP_CHUNK)/ss.length*0.09,ss.length,this.kg.count()); await _yield(); }
+    }
+    onProgress('words',0.99,ss.length,this.kg.count()); await _yield();
+
+    this.sm.add(title, url, ss.length, tag);
+    this.trained = true;
+    this.cache.invalidate();
+    onProgress('complete',1.0,ss.length,this.kg.count());
+
+    // ── AGI: After ingestion, rebuild abstract concepts from the full KG ──
+    // This runs asynchronously so it never blocks the UI
+    setTimeout(() => {
+      try {
+        const formed = this.conceptEngine.formConcepts(this.kg);
+        if (formed.length > 0) {
+          console.log('[AGI AbstractConcepts] Formed', formed.length, 'concepts:', formed.map(c=>c.type).join(', '));
+        }
+      } catch(e) { console.warn('[AGI concepts]', e); }
+    }, 100);
+
+    // L3: SLM triple extraction — enrich KG with SLM-detected relationships
+    if (this.neuralMouth && this.neuralMouth.ready) {
+      const sampleSents = ss.slice(0, 12);
+      this.neuralMouth.extractTriples(sampleSents).then(slmTriples => {
+        slmTriples.forEach(t => {
+          if (t.s && t.p && t.o && t.s.length > 1 && t.o.length > 1) {
+            const raw = t.s + ' ' + t.p.replace(/_/g,' ') + ' ' + t.o + '.';
+            this.kg._add(t.s.toLowerCase(), t.p.toLowerCase().replace(/\s+/g,'_'), t.o.toLowerCase(), raw, tag, 0.7);
+          }
+        });
+        if (slmTriples.length) { this.kg.centrality.invalidate(); updateUI(); }
+      }).catch(()=>{});
+    }
+
+    // V12: NanoCortex — async coreference merging (non-blocking, runs in background)
+    if (this.nanoCortex.ready) {
+      // Extract unique entity strings from newly learned triples
+      const newTriples = this.kg.triples.filter(t => t.tag === tag).slice(0, 80);
+      const entities = [...new Set(
+        newTriples.flatMap(t => [
+          typeof t.s === 'string' ? t.s : null,
+          typeof t.o === 'string' && t.o.length > 2 && t.o.length < 40 ? t.o : null
+        ]).filter(Boolean)
+      )].slice(0, 40);
+
+      // Run merging async — don't await so training returns immediately
+      this.nanoCortex.mergeEntities(entities).then(merges => {
+        if (merges.length > 0) {
+          merges.forEach(m => {
+            addMsg('system', `🔗 <strong>NanoCortex Coref</strong>: merged "${m.a}" → "${m.canonical}" (cosine: ${m.sim})`);
+          });
+          this.cache.invalidate();
+          updateCorefUI();
+        }
+      }).catch(() => {});
+    }
+
+    // V11: Start autonomous ingestion after first training
+    if (!this.ingestion._active) {
+      this.ingestion.start();
+    }
+    // V11: Enqueue related topics for autonomous background ingestion
+    const topNodes = this.kg.centrality.topNodes(this.kg.triples, 5);
+    topNodes.slice(2,5).forEach(({node}) => {
+      if (node.length > 3 && !STOP_WORDS.has(node)) {
+        this.ingestion.enqueue(node, 0.5); // low priority
+      }
+    });
+
+    // Qualia: alignment — check how many new triples confirmed existing ones
+    const confirmedCount = this.kg.triples.filter(t => t.conf > 1.1).length;
+    this.qualia.onAlignment(confirmedCount);
+    updateQualiaUI();
+
+    // ── LEXICA 3.0: Post-training drive + goal updates ──
+    // Training satisfies curiosity, frustrates satiation (lots to process)
+    this.drives.satiate('curiosity', 0.3);
+    this.drives.frustrate('satiation', 0.4, `ingested ${ss.length} sentences from "${title}"`);
+    this.drives.frustrate('expression', 0.2, `learned about "${title}"`);
+
+    // Preference engine: learning about a new topic → mild positive valence
+    const mainTopic = title.toLowerCase().replace(/\s+/g,'_').slice(0, 30);
+    this.preferenceEngine.onSuccess(mainTopic, 0.3);
+
+    // Goal stack: scan KG for new structural opportunities
+    setTimeout(() => {
+      this.goalStack.generateFromKG(this.kg, this.preferenceEngine);
+      // Apply urgent failure gaps to ingestion queue with high priority
+      this.failureTracker.applyToIngestion(this.ingestion);
+      updateGoalUI();
+      updateDriveUI();
+      updatePreferenceUI();
+    }, 500);
+
+    // Gödel engine: attempt self-improvement after training
+    setTimeout(() => {
+      const proof = this.godel.attemptProof(ss);
+      if (proof) {
+        addMsg('system', `🧬 <strong>Gödelian Self-Modification v${proof.v}</strong> — ${proof.theorem.slice(0,100)}...`);
+        updateGodelUI();
+      }
+    }, 1200);
+
+    // ── AUTO-SAVE TO PERSISTENT MEMORY ──
+    // Teach it something now, it remembers forever (or until cleared).
+    setTimeout(() => {
+      if (this.saveToMemory()) {
+        console.log('[Lexica 4.0] Knowledge saved to persistent memory.');
+      }
+    }, 2000); // slight delay so UI updates first
+
+    // ── INNER MONOLOGUE: post-training reflection ──
+    setTimeout(() => {
+      if (typeof showInnerMonologue === 'function' && this.kg.count() > 5) {
+        const nm = window._neuralMouth;
+        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 12);
+        // Quality filter: only real entity names (proper nouns, not sentence fragments)
+        const nodeNames = topNodes
+          .map(n => n.node)
+          .filter(n => {
+            if (!n || n.length < 3 || n.length > 35) return false;
+            // Must start with a letter
+            if (!/^[a-zA-Z]/.test(n)) return false;
+            // Reject sentence fragments: >3 words AND all lowercase = fragment, not entity
+            const words = n.split(/\s+/);
+            if (words.length > 3 && words.every(w => /^[a-z]/.test(w))) return false;
+            // Reject stop-word-only strings
+            if (/^(the|a|an|in|on|of|is|are|was|were|it|its|this|that|and|or|but|for|to|from|with|by|at|as|be)\s/i.test(n)) return false;
+            return true;
+          })
+          .slice(0, 5);
+
+        const recentTriples = this.kg.triples.slice(-6)
+          .filter(t => t.s && t.o && t.s.length < 30 && t.o.length < 40)
+          .map(t=>`${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+
+        // Symbolic fallback (fires immediately if SLM not ready)
+        const symbolicThought = nodeNames.length >= 1
+          ? `Absorbed "${title}": ${this.kg.count()} triples. Key entities: ${nodeNames.slice(0,3).join(', ')}.`
+          : `Absorbed "${title}": ${this.kg.count()} triples learned.`;
+
+        if (nm?.ready && nodeNames.length >= 1) {
+          nm._generateMessages([
+            { role:'system', content:'You are the inner voice of Lexica, a curious AI. After learning, generate ONE short genuine thought (1 sentence). Be specific about what you learned, curious but concise.' },
+            { role:'user', content:`Just absorbed: "${title}". Key facts: ${recentTriples.slice(0,200)}. Notable entities: ${nodeNames.join(', ')}.` }
+          ], 60).then(thought => {
+            if (thought && thought.length > 10) showInnerMonologue(thought, nodeNames[0], nodeNames[1]||null);
+            else showInnerMonologue(symbolicThought, nodeNames[0]||title, nodeNames[1]||null);
+          }).catch(() => showInnerMonologue(symbolicThought, nodeNames[0]||title, nodeNames[1]||null));
+        } else {
+          showInnerMonologue(symbolicThought, nodeNames[0]||title, null);
+        }
+      }
+    }, 1500);
+
+    return { count:ss.length, tag };
+  }
+
+  rmSource(tag) {
+    this.bm25.rmTag(tag);
+    this.kg.rmByTag(tag);
+    this.sm.rm(tag);
+    this.trained = this.bm25.ss.length > 0;
+    this.cache.invalidate();
+    this.semVec = new SemanticVectors();
+    this.wordProfiler = new WordProfiler();
+    if (this.bm25.ss.length) {
+      this.bm25.ss.forEach(s => this.semVec.addSentence(s));
+      this.semVec.buildPMI();
+      this.wordProfiler.processAll(this.bm25.ss);
+    }
+  }
+
+  setTrust(tag, trusted) {
+    this.sm.setTrust(tag, trusted);
+    this.bm25.setSrcWeight(tag, trusted?1.6:0.6);
+    this.cache.invalidate();
+  }
+
+  async query(question, _retried=false) {
+    if (!_retried) {
+      this.mood.tick();
+      this.curiosity.resetTimer();
+    }
+
+    // V11: CFG Parser — deterministic pre-processing of structured inputs
+    const ast = this.cfgParser.parse(question);
+    if (ast.matched) {
+      // Handle ASSERT_FACT: user directly asserting knowledge (10x user multiplier)
+      if (ast.action === 'ASSERT_FACT') {
+        const {subject, predicate, object, tag} = ast.args;
+        this.kg._add(subject, predicate, object, question, 'user');
+        this.kg.centrality.invalidate();
+        const directive = `⚡ CFG: ${this.cfgParser.toDirective(ast)}`;
+        addMsg('system', directive);
+        return {
+          text: 'Recorded: "' + subject + ' ' + (predicate === 'is_a' ? 'is' : predicate) + ' ' + object + '" — 10× user authority weight applied.',
+          strategy: 'cfg-assert', synthesized: true, conf: {l:'high',lbl:'user assertion',cls:'conf-high'},
+          src: null, srcTitle: '', ctxUsed: false, kgUsed: true, conflict: null, cached: false, evidence: 'user assertion (10x weight)', intent: 'assert'
+        };
+      }
+      // Log CFG directive for transparent operation (except generic queries)
+      if (ast.action !== 'QUERY_GENERIC' && ast.action !== 'QUERY_DEFINITION') {
+        console.log('[V11 CFG]', this.cfgParser.toDirective(ast));
+      }
+    }
+
+    const directive = handleDirective(question, this);
+    if (directive) return directive;
+
+    // ── SELF-DIRECTED GATE: hard-to-classify self-reference questions ──
+    // Narrow: only catch questions that classifyIntent missed but clearly refer to Lexica itself
+    const isSelfDirected = /\b(you|your(self)?|lexica)\b/i.test(question) &&
+      /\b(stop|speed\s+up|faster|less\s+lag|stop\s+lag|fix\s+yourself|code\s+yourself|modify\s+yourself|improve\s+yourself)\b/i.test(question);
+    if (isSelfDirected) {
+      const intent0self = classifyIntent(question);
+      const sr0 = await Promise.resolve(handleSocialIntent(
+        SOCIAL_INTENTS.has(intent0self) ? intent0self : 'self_status', question, this));
+      if (sr0 && sr0.text) return sr0;
+    }
+
+    const metaSubjMatch = /\b(you|your|we|our|chat|conversation|us)\b/i.test(question);
+    if (metaSubjMatch) { const mc = handleMetaCognition(question,this); if(mc) return mc; }
+
+    const intent0 = classifyIntent(question);
+    if (SOCIAL_INTENTS.has(intent0)) {
+      if (intent0==='user_emotion') { const adj=extractUserState(question); if(adj)this.userCtx.push(adj); }
+      const sr = await Promise.resolve(handleSocialIntent(intent0, question, this));
+      if (sr) return sr;
+    }
+
+    if (isFillerInput(question)) {
+      // Pure social noise — no KG-grounded response possible. Stay silent.
+      return {strategy:'silent',src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,conf:{l:'high',lbl:'social',cls:'conf-high'},text:'',intent:'passive_ack'};
+    }
+
+    if (!this.trained) {
+      const fetchSubj = extractSubject(question);
+      if (fetchSubj&&!isGarbageSubject(fetchSubj)&&!_retried) {
+        try {
+          const results = await searchWiki(fetchSubj);
+          if (results.length) {
+            const art = await fetchWikiArt(results[0].title);
+            await this.addSourceAsync(art.text,art.title,art.url,()=>{});
+            const retryResult = await this.query(question,true);
+            return {...retryResult,_autoFetched:art.title};
+          }
+        } catch(e) {}
+      }
+      // SLM generates a natural "I don't know this yet" rather than a hardcoded template
+      const noKnowText = this.neuralMouth?.ready
+        ? await Promise.race([
+            this.neuralMouth._generate(
+              'Tell the user in one sentence that you need a Wikipedia source to answer their question.',
+              `Question: ${question.slice(0,60)}. Suggest fetching Wikipedia. Sentence:`,
+              60
+            ).catch(() => null),
+            new Promise(res => setTimeout(() => res(null), 2500))
+          ])
+        : null;
+      return {text: noKnowText || "No knowledge loaded for that topic yet — try fetching a Wikipedia article.",
+        strategy:'none',conf:null,src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:!!noKnowText,conflict:null,cached:false,evidence:null,intent:'none'};
+    }
+    this.bm25.flush();
+
+    if (isFrustrated(question)) {
+      if (this.lastSubject&&this.lastKgFacts&&this.lastKgFacts.length) {
+        const highConf = this.lastKgFacts.filter(f=>f.conf>=0.9);
+        if (highConf.length) {
+          const best = highConf[0];
+          return {text:`I stand by that. My Hypergraph has ${highConf.length} high-confidence fact${highConf.length!==1?'s':''} on this. For example: ${finalize(best.raw)} If you believe otherwise, try fetching a more recent Wikipedia source.`,strategy:'correction',conf:{l:'high',lbl:'defended',cls:'conf-high'},src:null,srcTitle:'',ctxUsed:false,kgUsed:true,synthesized:false,conflict:null,cached:false,evidence:`${highConf.length} high-confidence KG triples`,intent:'correction'};
+        }
+      }
+      const srcList = this.sm.s.map(s=>`"${s.title}"`).join(', ')||'none';
+      return {text:`Understood — I may have been wrong. My sources are: ${srcList}. Try rephrasing or fetching a different article.`,strategy:'correction',conf:{l:'medium',lbl:'correction',cls:'conf-med'},src:null,srcTitle:'',ctxUsed:false,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent:'correction'};
+    }
+
+    const ck = this.cache.key(question);
+    const cached = this.cache.get(ck);
+    if (cached) return {...cached,cached:true};
+
+    // ── AGI ROUTER: determine which systems should engage ──
+    const _agiRoutes = agiRoute(question, classifyIntent(question));
+    const _agiPrimary = _agiRoutes[0]?.system || null;
+
+    // ── SYSTEM 2 MATH INTERCEPT ── Pure deterministic — no SLM needed ──
+    if (_agiPrimary === 'system2_math') {
+      const mathExpr = question.replace(/[^0-9+\-*/^().%√π×÷\s]/g,'').trim();
+      if (mathExpr.length > 0) {
+        const mathResult = this.system2.evaluateMath(mathExpr);
+        if (!mathResult.error) {
+          this._agiStats.sys2Answers++;
+          updateAGIPanel(this);
+          const resultText = `${question.replace(/\s+/g,' ').trim()} = **${mathResult.result}**`;
+          return { text: String(mathResult.result), strategy:'system2', conf:{l:'high',lbl:'verified',cls:'conf-high'}, src:null, srcTitle:'', ctxUsed:false, kgUsed:false, synthesized:true, conflict:null, cached:false, evidence:`System 2 arithmetic: ${mathResult.steps.join(' → ')}`, intent:'math', _sys2:true, _sys2Type:'math' };
+        }
+      }
+    }
+
+    const {r,used} = this.ctx.resolve(question);
+    const rClean = r.replace(/^(okay|ok|yeah|alright|right|so|well|but|like|and|hmm+|uh+|um+)[,\s]+/gi,'').trim()||r;
+    const intent = classifyIntent(rClean);
+    await yieldToMain(); // yield 1: after intent classification, before subject extraction
+    const _extractedSubj = extractSubject(rClean)||extractSubject(r);
+    // Only fall back to lastSubj if no subject was extracted AND the query is referential
+    // (e.g., "tell me more", "why?", "what else?"). If the query has a clear new topic
+    // (like "bread"), do NOT bleed the previous topic into this query.
+    const _isReferentialQuery = !_extractedSubj && /\b(it|that|this|more|else|why|explain|continue|go on|again)\b/i.test(rClean);
+    let subject = _extractedSubj || (_isReferentialQuery ? this.ctx.lastSubj : null);
+    // UPGRADE 5: NanoCortex entity disambiguation — CONSERVATIVE mode
+    // Only fires for multi-word queries where subject might be a partial entity name
+    // e.g. "tell me about hello kitty" → subject="Hello" → disambiguate to "Hello Kitty"
+    // NEVER fires for unambiguous single-word subjects ("bread", "shark") — those just fail in KG
+    // and the system correctly returns no-match. The old aggressive mode was mapping
+    // "bread" → "roblox" because roblox had the highest embedding mass in the KG.
+    if (subject && this.nanoCortex?.ready && this.kg.triples.length > 5) {
+      const subjectWords = subject.toLowerCase().split(/\s+/);
+      const queryWords = rClean.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+      const kgNodeSet = new Set(this.kg.triples.filter(t=>t.alive!==false).map(t=>t.s.toLowerCase()));
+      // Only disambiguate if: subject is NOT already a KG node AND query has 4+ words (complex)
+      const subjectInKG = kgNodeSet.has(subject.toLowerCase());
+      const isComplexQuery = queryWords.length >= 4;
+      if (!subjectInKG && isComplexQuery) {
+        const kgNodes = [...new Set(this.kg.triples.filter(t=>t.alive!==false).map(t=>t.s))];
+        subject = await this.nanoCortex.disambiguateSubject(rClean, kgNodes, subject);
+      }
+    }
+    const ext = expandQuery(r);
+    const qStems = sWords(r);
+    const semExt = this.semVec.semanticExpand(qStems,4,0.22);
+    // L2: SLM semantic expansion — race with 500ms timeout so it never blocks retrieval
+    let slmTerms = [];
+    if (this.neuralMouth && this.neuralMouth.ready) {
+      try {
+        slmTerms = await Promise.race([
+          this.neuralMouth.semanticExpand(r, [...qStems, ...semExt]),
+          new Promise(res => setTimeout(() => res([]), 500))
+        ]);
+      } catch(e) { slmTerms = []; }
+    }
+    const allExt = [...new Set([...semExt, ...slmTerms])];
+
+    const refuted = tryRefute(r, this.kg, this.ets);
+    if (refuted) return {text:refuted,strategy:'refuted',conf:{l:'high',lbl:'verified refutation',cls:'conf-high'},src:null,srcTitle:'',ctxUsed:used,kgUsed:true,synthesized:true,conflict:null,cached:false,evidence:'logical deduction',intent};
+
+    const rel = this.bm25.query(r,[...ext,...allExt],16,subject);
+
+    // ── DENSE RETRIEVAL FUSION ──
+    // If NanoCortex is ready, re-rank BM25 results using cosine similarity.
+    // Fuse scores: final = 0.6 * bm25_norm + 0.4 * cosine_sim
+    // This fixes the keyword mismatch problem (e.g. "let" vs "can"/"allows").
+    if (rel.length > 0 && this.nanoCortex && this.nanoCortex.ready) {
+      try {
+        const reranked = await this.nanoCortex.semanticRerank(r, rel.slice(0, 12));
+        if (reranked && reranked.length > 0) {
+          const maxBm25 = Math.max(...reranked.map(x => x.score || 0)) || 1;
+          reranked.forEach(item => {
+            const normBm25 = (item.score || 0) / maxBm25;
+            item._fusedScore = 0.55 * normBm25 + 0.45 * (item.semanticScore || 0);
+          });
+          reranked.sort((a, b) => (b._fusedScore || 0) - (a._fusedScore || 0));
+          // Replace rel with re-ranked version (keep extra low-scoring BM25 results at end)
+          rel.splice(0, reranked.length, ...reranked);
+        }
+      } catch(e) { /* dense retrieval failed — use BM25 only */ }
+    }
+
+    if ((!rel.length||rel[0].score<0.3)&&!_retried) {
+      const fetchSubj = subject||extractSubject(question);
+      // V11: Levenshtein gate — don't fetch for slang/typos
+      const lvValidation = fetchSubj ? validateSubjectAgainstKG(fetchSubj, this.kg) : false;
+      if (fetchSubj&&!isGarbageSubject(fetchSubj)&&lvValidation!==false) {
+        if (lvValidation === 'typo') {
+          const closest = findClosestNode(fetchSubj, this.kg, 2);
+          if (closest) return {text:`Did you mean "${closest.node}"? I found a close match in my knowledge graph (Levenshtein distance: ${closest.distance}). Try rephrasing.`,strategy:'levenshtein-suggest',conf:{l:'medium',lbl:'typo suggestion',cls:'conf-med'},src:null,srcTitle:'',ctxUsed:used,kgUsed:true,synthesized:false,conflict:null,cached:false,evidence:`closest node: "${closest.node}"`,intent};
+        }
+        try {
+          const results = await searchWiki(fetchSubj);
+          if (results.length) {
+            const art = await fetchWikiArt(results[0].title);
+            await this.addSourceAsync(art.text,art.title,art.url,()=>{});
+            const retryResult = await this.query(question,true);
+            return {...retryResult,_autoFetched:art.title};
+          }
+        } catch(e) {}
+      }
+    }
+
+    if (!rel.length||rel[0].score<0.3) {
+      const srcList = this.sm.s.map(s=>`"${s.title}"`).join(', ')||'none';
+      const activeState = this.userCtx.activeState();
+      const randomSubject = this.kg.triples.find(t=>t.p==='is_a')?.s;
+      this.qualia.onLowConfidence(); updateQualiaUI();
+      // SLM generates natural "can't find it" message when available
+      if (this.neuralMouth?.ready) {
+        const fallbackCtx = `Sources I know: ${srcList}. User asked: "${question.slice(0,80)}"`;
+        const slmFallback = await Promise.race([
+          this.neuralMouth._generateMessages([
+            { role:'system', content:`You are Lexica, a knowledge assistant. Your loaded sources: ${srcList}. You have no information about the user's question. Be honest and helpful. 1-2 sentences.` },
+            { role:'user', content: question.slice(0, 150) }
+          ], 80).catch(() => null),
+          new Promise(res => setTimeout(() => res(null), 5000))
+        ]);
+        if (slmFallback) {
+          return {text:slmFallback,strategy:'fallback',conf:{l:'low',lbl:'no match',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:true,conflict:null,cached:false,evidence:null,intent};
+        }
+      }
+      if (activeState&&this.userCtx.valence(activeState.adj)==='negative') {
+        return {text:`Still learning about that. I know about ${randomSubject||this.sm.s[0]?.title||'the loaded topics'}.`,strategy:'semantic-fallback',conf:{l:'low',lbl:'semantic fallback',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent};
+      }
+      // Last resort — use SLM conversationally rather than a template string
+      const lastResort = this.neuralMouth?.ready ? await Promise.race([
+        this.neuralMouth._generateMessages([
+          { role:'system', content:`You are Lexica. You have loaded: ${srcList}. Answer honestly if you can't help.` },
+          { role:'user', content: question.slice(0,120) }
+        ], 60).catch(()=>null),
+        new Promise(res=>setTimeout(()=>res(null),4000))
+      ]) : null;
+      return {text: lastResort || ``, strategy:'fallback',conf:{l:'low',lbl:'no match',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:!!lastResort,conflict:null,cached:false,evidence:null,intent};
+    }
+
+    // KG retrieval — for comparative queries gather both subjects
+    let kgFacts = subject ? this.kg.query(subject.toLowerCase()) : [];
+    const kgDerived = subject ? this.kg.getAllDerivedFacts(subject) : [];
+
+    // ── UPGRADE 8: MULTI-HOP CROSS-DOCUMENT REASONING WITH SOURCE ATTRIBUTION ──
+    // "Who owns Minecraft?" → Minecraft→created_by→Mojang (source A) → Mojang→acquired_by→Microsoft (source B)
+    // Track which sources contributed to each hop for transparency in answer attribution.
+    let _crossDocSources = new Set();
+    if (subject && kgFacts.length < 6) {
+      const multiHopFacts = this.kg.multiHopQuery(subject, 3); // increased from 2 to 3 hops
+      const newFacts = multiHopFacts.filter(f => !kgFacts.some(k => k.s === f.s && k.p === f.p && k.o === f.o));
+      if (newFacts.length > 0) {
+        kgFacts = [...kgFacts, ...newFacts.slice(0, 8)];
+        // Track cross-document sources for attribution
+        newFacts.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
+        kgFacts.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
+        // Emit inner monologue about the chain reasoning
+        if (newFacts.some(f => f._depth > 0)) {
+          const chainDesc = newFacts.filter(f => f._depth > 0).slice(0,3).map(f => {
+            const srcTitle = this.sm.get(f.tag)?.title || '';
+            return f.s + ' → ' + f.o + (srcTitle ? ' ['+srcTitle+']' : '');
+          }).join('; ');
+          showInnerMonologue('Multi-hop: chaining from "' + subject + '" through: ' + chainDesc, subject, null);
+        }
+      }
+      // Check inference ownership chains specifically
+      if (/who owns|who made|who created|who developed|created by|made by/i.test(r)) {
+        const ownerChain = this.kg.inferOwnership(subject);
+        if (ownerChain.length > 0) {
+          ownerChain.forEach(f => { if (f.tag) _crossDocSources.add(f.tag); });
+          kgFacts = [...ownerChain, ...kgFacts.filter(f => !ownerChain.some(o => o.s === f.s && o.p === f.p))].slice(0, 14);
+        }
+      }
+    }
+    const _isCrossDoc = _crossDocSources.size > 1; // answer synthesized from multiple sources
+
+    // Comparative: extract second subject and merge facts
+    if (intent === 'comparative' || /\b(vs|versus|compare|compared to|difference between|better than|similar to)\b/i.test(r)) {
+      const allProper = (r.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[]).filter(n=>n.length>2);
+      const otherSubjects = allProper.filter(n => n.toLowerCase() !== (subject||'').toLowerCase());
+      if (otherSubjects.length) {
+        const otherFacts = this.kg.query(otherSubjects[0].toLowerCase()).slice(0,3);
+        kgFacts = [...kgFacts.slice(0,3), ...otherFacts];
+      }
+    }
+    const evidenceSentences = rel.map(r=>r.s).filter(isValid);
+
+    let tomPrefix = '';
+    // NOTE: Removed "As I mentioned before" prefix — it was firing incorrectly
+    // and felt like a prebaked template. If needed, SLM will handle continuity naturally.
+
+    this.stateTracker.set('synthesizing');
+    this.lastKgFacts = kgFacts.slice();
+    this.lastSubject = subject;
+    this.lastQuery = r;
+
+    // ── AGI SYSTEMS: attempt to answer BEFORE SLM ──
+    // Each system returns a text string or null.
+    // If an AGI system answers, SLM still runs to VERIFY and enrich.
+    let _agiAnswer = null;
+    let _agiSystem = null;
+    let _agiEvidence = null;
+
+    // CAUSAL GRAPH: "why" questions
+    if (_agiPrimary === 'causal' || intent === 'causal') {
+      const causalAns = this.causalGraph.answerWhy(r);
+      if (causalAns) {
+        _agiAnswer = causalAns;
+        _agiSystem = 'causal';
+        _agiEvidence = `Causal chain: ${(this.causalGraph.lastCausalChain||[]).join(' → ')}`;
+        this._agiStats.causalAnswers++;
+      }
+      // Also inject causal triples from causalGraph into kgFacts for SLM grounding
+      const causalEdges = [];
+      this.causalGraph.edges.forEach((effects, cause) => {
+        if (subject && cause.includes(subject.toLowerCase())) {
+          effects.forEach(e => causalEdges.push({ s:cause, p:'causes', o:e.effect, conf:e.strength, tag:'causal', raw:`${cause} causes ${e.effect}` }));
+        }
+      });
+      if (causalEdges.length) kgFacts = [...causalEdges.slice(0,4), ...kgFacts].slice(0,14);
+    }
+
+    // WORLD MODEL: physical simulation queries
+    if (_agiPrimary === 'worldmodel' || _agiPrimary === 'worldmodel_spatial') {
+      const worldAns = this.worldModel.spatialQuery(r);
+      if (worldAns && worldAns.description) {
+        _agiAnswer = worldAns.description;
+        _agiSystem = 'worldmodel';
+        _agiEvidence = `World model simulation (${this.worldModel.simCount} total)`;
+        this._agiStats.worldAnswers++;
+      }
+      if (this.worldModel.lastSimulation) {
+        const sim = this.worldModel.lastSimulation;
+        updateWorldModelPanel(sim);
+      }
+    }
+
+    // COUNTERFACTUAL
+    if (_agiPrimary === 'causal_counterfactual') {
+      const subjectForCF = subject || extractSubject(r);
+      if (subjectForCF) {
+        const cf = this.causalGraph.counterfactual(subjectForCF, '');
+        if (cf.effects.length) {
+          _agiAnswer = cf.text;
+          _agiSystem = 'causal_counterfactual';
+          _agiEvidence = `Counterfactual: removed "${subjectForCF}" from causal graph`;
+          this._agiStats.causalAnswers++;
+          updateCounterfactualPanel(cf.text);
+        }
+      }
+    }
+
+    // ABDUCTIVE: "what do these have in common?"
+    if (_agiPrimary === 'abductive' && kgFacts.length >= 3) {
+      const explanation = this.abductive.explain(kgFacts, this.kg);
+      if (explanation) {
+        _agiAnswer = explanation.text + (explanation.alternatives.length ? ` Alternative explanation: ${explanation.alternatives[0]}` : '');
+        _agiSystem = 'abductive';
+        _agiEvidence = `Abductive inference (confidence: ${(explanation.confidence*100).toFixed(0)}%)`;
+        this._agiStats.abductiveAnswers++;
+      }
+    }
+
+    // ABSTRACT CONCEPTS: "what do all X have in common?"
+    if (_agiPrimary === 'abstract' && subject) {
+      const characterization = this.conceptEngine.characterize(subject);
+      if (characterization) {
+        _agiAnswer = characterization;
+        _agiSystem = 'abstract';
+        _agiEvidence = `Abstract concept: ${this.conceptEngine.concepts.size} concepts formed`;
+        this._agiStats.abstractAnswers++;
+      }
+      // Also try property prediction
+      if (!_agiAnswer) {
+        const predicted = this.conceptEngine.predictProperty(subject, this.kg);
+        if (predicted) {
+          _agiAnswer = `Based on abstract concept rules, ${subject} likely has: ${predicted.slice(0,3).join(', ')}.`;
+          _agiSystem = 'abstract_predict';
+          this._agiStats.abstractAnswers++;
+        }
+      }
+    }
+
+    // SYSTEM 2 PROOF: "prove that / is it true that"
+    if (_agiPrimary === 'system2_proof' && kgFacts.length >= 2) {
+      const proof = this.system2.buildProof(r, kgFacts, this.ctx.h.slice(-3));
+      if (proof.conclusion) {
+        _agiAnswer = proof.conclusion;
+        _agiSystem = 'system2_proof';
+        _agiEvidence = `System 2 proof (${proof.steps.length} steps, conf ${(proof.confidence*100).toFixed(0)}%)`;
+        this._agiStats.sys2Answers++;
+        updateSys2Panel(this.system2);
+      }
+    }
+
+    // SYSTEM 2 ANALOGY: "A is to B as C is to ?"
+    if (_agiPrimary === 'system2_analogy') {
+      const analogyMatch = r.match(/(\w+)\s+is\s+to\s+(\w+)\s+as\s+(\w+)\s+is\s+to/i);
+      if (analogyMatch) {
+        const [, a, b, c] = analogyMatch;
+        const result = this.system2.solveAnalogy(a, b, c, this.kg);
+        if (result.answer) {
+          _agiAnswer = `${a} is to ${b} as ${c} is to "${result.answer}". ${result.path}`;
+          _agiSystem = 'system2_analogy';
+          _agiEvidence = result.path;
+          this._agiStats.sys2Answers++;
+        }
+      }
+    }
+
+    // PREDICTIVE CODING: measure surprise, update priors
+    const surpriseScore = this.predictive.getSurpriseScore(r, subject, kgFacts);
+    if (surpriseScore > 0.7) {
+      this._agiStats.predictiveTriggered++;
+      // High surprise = push to curiosity engine for future learning
+      showInnerMonologue(`High prediction error (${(surpriseScore*100).toFixed(0)}% surprise) on "${subject||r.slice(0,30)}" — marking for deeper learning.`, subject, null);
+    }
+    updateAGIPanel(this);
+
+    // ── INNER MONOLOGUE DURING SYNTHESIS ── purely symbolic, no SLM call during query
+    if (kgFacts.length > 3 && subject && typeof showInnerMonologue === 'function') {
+      setTimeout(() => {
+        const facts = kgFacts.slice(0,3).map(f => f.p.replace(/_/g,' ') + ': ' + f.o).join(' · ');
+        showInnerMonologue('Synthesising "' + r.slice(0,50) + '" — ' + facts, subject, null);
+      }, 0);
+    }
+
+    if ((intent==='causal'||/\bwhy\b/.test(r.toLowerCase()))&&this.kg.causal.length===0) {
+      const causalEvidence = evidenceSentences.filter(s=>/\bbecause\b|\bdue to\b|\bsince\b|\bas a result\b|\btherefore\b|\bowing to\b/i.test(s));
+      if (causalEvidence.length) evidenceSentences.unshift(...causalEvidence.filter(s=>!evidenceSentences.slice(0,2).includes(s)).slice(0,2));
+    }
+
+    // ── SLM PRIMARY SYNTHESIS ── 
+    // SmolLM2 decoder: try ensemble (3 parallel role-prompts, best wins) for rich queries
+    // Flan-T5 fallback: single graphRAG call (seq2seq can't do parallel chat roles well)
+    let ansText = null;
+    let societyWinner = null;
+    let usedSociety = false;
+    let usedGraphRAG = false;
+    let usedSLM = false;
+
+    if (this.neuralMouth.ready) {
+      try {
+        // Timeout: 14s for decoder models (2-pass think-then-speak), 3.5s for seq2seq
+        const slmTimeout = this.neuralMouth._isDecoder ? 14000 : 3500;
+        const ragText = await Promise.race([
+          // Decoder: try ensemble (3 parallel roles, best wins)
+          // Seq2seq: single graphRAG call
+          this.neuralMouth._isDecoder
+            ? this.neuralMouth.ensembleGraphRAG(kgFacts, r, intent, evidenceSentences.slice(0,6), this.ctx.h.slice(-5)).then(e => e?.text || null)
+            : this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,6), this.ctx.h.slice(-5)),
+          new Promise(res => setTimeout(() => res(null), slmTimeout))
+        ]);
+        // Quality gate: must be > 15 chars and not be pure verbatim echo (identical copy)
+        // NOTE: Do NOT reject answers that share phrases with source — that's correct grounding.
+        // Only reject if output is character-for-character identical to a source sentence (not natural language).
+        const isGoodOutput = ragText && ragText.length > 15 && (() => {
+          if (ragText.length < 15) return false;
+          const rl = ragText.toLowerCase().replace(/\s+/g,' ').trim();
+          // Only reject if output IS essentially an exact copy of a source sentence (>85 char match)
+          for (const sent of evidenceSentences.slice(0,3)) {
+            if (!sent || sent.length < 60) continue;
+            const sl = sent.toLowerCase().replace(/\s+/g,' ').trim();
+            // Reject only if ragText is >90% the same as a single source sentence
+            if (sl.length > 80 && rl === sl) return false;
+            if (sl.length > 80 && rl.includes(sl.slice(0, Math.min(sl.length, 90)))) return false;
+          }
+          return true;
+        })();
+        if (isGoodOutput) {
+          ansText = ragText;
+          usedGraphRAG = true;
+          usedSLM = true;
+          if (this.neuralMouth?.lastEnsemble) {
+            setTimeout(() => updateEnsemblePanel(this.neuralMouth.lastEnsemble), 0);
+          }
+          if (kgFacts.length >= 4) {
+            this.neuralMouth.thinkThenAnswer(r, kgFacts, evidenceSentences.slice(0,3), intent)
+              .then(cot => { if (cot?.trace) window._lastReasoningTrace = cot.trace; })
+              .catch(() => {});
+          }
+        } else if (ragText) {
+          console.log('[SLM echo-rejected]', ragText.slice(0, 80));
+        }
+      } catch(e) { console.warn('[L5 SLM]', e); }
+    }
+
+    // ── AGI PRE-ANSWER: inject AGI evidence into SLM context rather than raw output ──
+    // If SLM failed AND we have an AGI symbolic answer, run one more SLM pass using the AGI insight as grounding.
+    // This prevents "Causal chain: you not reply." style raw symbolic outputs.
+    if (_agiAnswer && !ansText && this.neuralMouth?.ready) {
+      try {
+        const agiContext = `[Symbolic reasoning found: ${_agiAnswer.slice(0,200)}]`;
+        const agiKgFacts = _agiEvidence ? [{ s: subject || 'context', p: 'relates_to', o: _agiEvidence.slice(0,100), raw: _agiEvidence, conf: 0.7 }] : [];
+        const augFacts = [...agiKgFacts, ...kgFacts.slice(0,5)];
+        const augEvidence = [agiContext, ...evidenceSentences.slice(0,2)];
+        const agiSLM = await Promise.race([
+          this.neuralMouth._isDecoder
+            ? this.neuralMouth.ensembleGraphRAG(augFacts, r, intent, augEvidence, this.ctx.h.slice(-3))
+            : this.neuralMouth.graphRAG(augFacts, r, intent, augEvidence, this.ctx.h.slice(-3)),
+          new Promise(res => setTimeout(() => res(null), 10000))
+        ]);
+        if (agiSLM?.text && agiSLM.text.length > 15) {
+          ansText = agiSLM.text;
+          usedSLM = true;
+        } else {
+          // SLM still failed — only then use raw symbolic output, preferring evidence sentences to raw causal fragments
+          ansText = _agiAnswer.startsWith('Causal chain:') || _agiAnswer.startsWith('leads to:')
+            ? (evidenceSentences[0] || _agiAnswer)  // prefer a real sentence
+            : _agiAnswer;
+        }
+      } catch(e) { ansText = _agiAnswer; }
+    } else if (_agiAnswer && !ansText) {
+      // SLM not ready — use raw AGI output but prefer real sentences over causal fragments
+      ansText = _agiAnswer.startsWith('Causal chain:') && evidenceSentences.length
+        ? evidenceSentences[0]
+        : _agiAnswer;
+    }
+
+    // ── SYSTEM 2 VERIFICATION: verify SLM output against KG ──
+    // Runs asynchronously — doesn't block, but flags quality issues in next turn
+    if (ansText && kgFacts.length >= 2 && this.system2) {
+      const verifyResult = this.system2.verifySLMOutput(ansText, kgFacts, r);
+      if (!verifyResult.approved && verifyResult.issues.length > 0) {
+        // Log but don't override — just flag for user awareness
+        console.log('[System2 Verify] Issues:', verifyResult.issues);
+        this._lastVerification = verifyResult;
+      }
+      setTimeout(() => updateSys2Panel(this.system2), 0);
+    }
+
+    // ── SOCIETY OF MIND ── Complex queries (symbolic fallback or supplement)
+    if (!ansText) {
+      try {
+        if (this.society.isComplex(r, kgFacts)) {
+          const winner = this.society.debate(r, intent, subject, kgFacts, kgDerived, evidenceSentences, this.semVec, this.wordProfiler, this.kg, this.recentTripleWindow);
+          if (winner && winner.text) {
+            ansText = winner.text;
+            societyWinner = winner;
+            usedSociety = true;
+            this.qualia.onConsensus();
+            updateQualiaUI();
+            updateDebateUI();
+          }
+        }
+      } catch(e) { console.warn('Society of Mind error:', e); }
+    }
+
+    // ── SYMBOLIC SYNTHESIS ── Fallback when SLM produced nothing
+    try {
+      if (!ansText) {
+        ansText = this.synthesis.synthesize(r, intent, subject, kgFacts, kgDerived, evidenceSentences, this.semVec, this.wordProfiler, this.kg, this.mood.current(), this.recentTripleWindow);
+      }
+    } catch(e) { console.warn('Synthesis error:', e); }
+
+    // ── SLM CONVERSATIONAL FALLBACK ── When symbolic has nothing or produces garbage
+    // If ansText is still empty OR looks like a raw symbolic fragment, run SLM with just the question
+    const _looksSymbolic = (t) => !t || t.length < 12 ||
+      /^Causal chain:|^leads to:|^".*" is not in the world model|^No relevant match|^Nothing to shorten/i.test(t) ||
+      (t.split(' ').length <= 4 && !/[.!?]/.test(t));  // < 4 words with no punctuation = fragment
+
+    if (_looksSymbolic(ansText) && this.neuralMouth?.ready) {
+      try {
+        const sources = this.sm.s.map(s=>s.title).join(', ') || 'none';
+        const ctxFacts = kgFacts.slice(0,5).map(f=>`${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ') || '';
+        const ctxSents = evidenceSentences.slice(0,2).join(' ') || '';
+        const sysMsg = `You are Lexica, a knowledge assistant. Your training sources: ${sources}. Be conversational and direct. 1-3 sentences max. If you don't know, say what you DO know from your sources.`;
+        const userMsg = ctxFacts || ctxSents
+          ? `Context: ${(ctxFacts+' '+ctxSents).slice(0,300)}\n\nQuestion: ${r.slice(0,150)}`
+          : r.slice(0,200);
+        const fallbackMsgs = [
+          { role:'system', content:sysMsg },
+          ...(this.ctx.h||[]).slice(-2).flatMap(t=>[
+            {role:'user', content:t.q.slice(0,80)},
+            {role:'assistant', content:t.a.slice(0,100)},
+          ]),
+          { role:'user', content:userMsg },
+        ];
+        const fallbackAns = await Promise.race([
+          this.neuralMouth._generateMessages(fallbackMsgs, 120),
+          new Promise(res=>setTimeout(()=>res(null), 12000))
+        ]);
+        if (fallbackAns && fallbackAns.length > 10) {
+          ansText = fallbackAns;
+          usedSLM = true;
+        }
+      } catch(e) { console.warn('[SLM conversational fallback]', e); }
+    }
+
+    this.stateTracker.set('idle');
+
+    if (kgFacts.length) {
+      const turnKeys = new Set(kgFacts.map(f=>`${f.s}|${f.p}|${f.o}`));
+      this.recentTripleWindow.push(turnKeys);
+      if (this.recentTripleWindow.length > 3) this.recentTripleWindow.shift();
+    }
+
+    const synthesized = !!ansText && ansText.length > 10;
+    // Don't use finalize() template — prefer SLM conversational fallback or silence
+    if (!ansText || ansText.length < 15) ansText = '';
+
+    // TOM context: user emotional state (kept but prefix removed)
+    const activeState = this.userCtx.activeState();
+    // Don't prepend anything — let the SLM handle empathetic framing naturally
+
+    this.tomTracker.record(kgFacts);
+
+    // Record meta-causal hyperedge: [[user asked X] caused [lexica responded Y]]
+    if (synthesized && question.length < 200 && ansText.length < 400) {
+      this.kg.addMetaCausal(question.slice(0,80), ansText.slice(0,80), `intent:${intent}`, 'interaction');
+    }
+
+    const kgUsed = kgFacts.length > 0;
+    const score = rel[0].score;
+    let conf;
+    if (score > 8 || kgUsed) conf = {l:'high',lbl:'high confidence',cls:'conf-high'};
+    else if (score > 3)      conf = {l:'medium',lbl:'medium confidence',cls:'conf-med'};
+    else                     conf = {l:'low',lbl:'low confidence',cls:'conf-low'};
+
+    if (conf.l === 'low') { this.qualia.onLowConfidence(); updateQualiaUI(); }
+
+    let conflict = null;
+    if (subject) {
+      const cs = this.kg.contradictions(subject);
+      if (cs.length > 0) {
+        const c = cs[0];
+        conflict = {predicate:c.predicate, values:c.values.map(v=>'"'+v.o+'"('+(this.sm.get(v.tag)?.title||v.tag)+')').join(' vs ')};
+        // L4: SLM evaluates the contradiction and may update ansText
+        if (this.neuralMouth.ready && ansText) {
+          const factA = c.values[0]?.o || '';
+          const factB = c.values[1]?.o || '';
+          this.neuralMouth.evalContradiction(factA, factB, subject).then(evalTxt => {
+            // Store for future context — can't modify current response asynchronously
+            if (evalTxt) console.log('[L4 SLM Contradiction]', subject, ':', evalTxt);
+          }).catch(()=>{});
+        }
+      }
+    }
+
+    const topTag = rel[0].tag;
+    const srcTitle = this.sm.get(topTag)?.title||'';
+    const evidence = kgFacts.length>0 ? `${kgFacts.length} KG triples + ${rel.length} evidence sentences` : null;
+
+    this.ctx.add(question, ansText, subject, conf.l);
+    const ents = (ansText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g)||[]);
+    ents.forEach(e => {
+      const type = this.ets.get(e);
+      if (type&&type!=='unknown') this.typeStack.push(e,type);
+      this.typeStack.mention(e,0.3);
+      this.salience.mention(e,0.3);
+    });
+
+    if (synthesized) this.synthesisCount++;
+
+    const result = {
+      text:ansText,
+      strategy: _agiSystem ? _agiSystem : (usedGraphRAG ? 'graphrag' : (usedSLM ? 'slm' : (usedSociety ? 'society' : (synthesized?'synthesis':intent)))),
+      conf, src:rel[0].s, srcTitle, ctxUsed:used, kgUsed, synthesized, conflict,
+      cached:false, evidence, intent,
+      _societyWinner: societyWinner?.name || null,
+      _graphRAG: usedGraphRAG,
+      _slm: usedSLM,
+      _srcTag: rel[0].tag || null,
+      _crossDoc: _isCrossDoc,
+      _crossDocSrcs: _isCrossDoc ? [..._crossDocSources].map(tag => this.sm.get(tag)?.title || tag).filter(Boolean) : null,
+      _agiSystem,
+      _agiEvidence,
+      _sys2: !!this._lastVerification,
+      _sys2Score: this._lastVerification?.score || null,
+    };
+    this.cache.set(ck, result);
+    this.lastResult = result;
+
+    // ── LEXICA 3.0: Post-query cognitive updates ──
+    const wasSuccessful = !!ansText && ansText.length > 10 && conf.l !== 'low';
+    const confLevel = conf.l || 'medium';
+
+    // 1. Self-Model: reflect on what just happened
+    this.selfModel.reflect(question, subject, result.strategy, confLevel, wasSuccessful, kgFacts);
+
+    // 2. Episodic Memory: log this turn
+    this.episodicMemory.addTurn(question, ansText, { wasSuccessful, strategy: result.strategy, subject, confidence: confLevel });
+
+    // 3. Preference Engine: accumulate topic valence from outcome
+    if (subject) {
+      if (wasSuccessful) {
+        const quality = conf.l === 'high' ? 0.8 : 0.4;
+        this.preferenceEngine.onSuccess(subject, quality);
+      } else {
+        this.preferenceEngine.onFailure(subject, result.strategy);
+      }
+    }
+
+    // 4. Failure Tracker: log failures, close gaps on success
+    if (!wasSuccessful && subject) {
+      this.failureTracker.recordFailure(question, subject, result.strategy, confLevel);
+      this.failureTracker.applyToIngestion(this.ingestion); // urgency → ingestion queue
+    } else if (wasSuccessful && subject) {
+      this.failureTracker.closeGap(subject);
+    }
+
+    // 5. Drive updates from query outcome
+    if (wasSuccessful) {
+      this.drives.satiate('curiosity', 0.2);
+      this.drives.satiate('expression', 0.4);
+      this.drives.frustrate('satiation', 0.25, 'successful synthesis');
+    } else {
+      this.drives.frustrate('discomfort', 0.15, `failed query: ${question.slice(0,30)}`);
+      this.drives.frustrate('curiosity', 0.12, subject || 'unknown gap');
+    }
+
+    // 6. Update all new system UIs
+    updateDriveUI();
+    updateGoalUI();
+    updateSelfModelUI();
+    updateUserModelUI();
+    updatePreferenceUI();
+    updateEpisodicUI();
+    updateFailureLogUI();
+
+    return result;
+  }
+
+  export() {
+    const data = {version:'lexica-4.0',exportedAt:new Date().toISOString(),sources:this.sm.s,sentences:this.bm25.ss.map((s,i)=>({t:s,tag:this.bm25.tags[i]})),kg:this.kg.toJSON()};
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'lexica-v14.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async import(file) {
+    const data = await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{res(JSON.parse(e.target.result));}catch(er){rej(er);}};r.onerror=rej;r.readAsText(file);});
+    if (!data.version?.includes('lexica') && !data.version?.includes('lexica')) throw new Error('Not a LEXICA export file.');
+    this.bm25=new BM25(); this.kg=new KnowledgeGraph(this.ets); this.sm=new SM();
+    const byTag=new Map();
+    (data.sentences||[]).forEach(({t,tag})=>{if(!byTag.has(tag))byTag.set(tag,[]);byTag.get(tag).push(t);});
+    byTag.forEach((ss,tag)=>this.bm25.addBatch(ss,tag));
+    this.bm25.flush();
+    if (data.kg) this.kg.fromJSON(data.kg);
+    (data.sources||[]).forEach(s=>this.sm.s.push(s));
+    this.trained = this.bm25.ss.length>0;
+    return data;
+  }
+
+  // ── PERSISTENT MEMORY ──
+  // UPGRADE 4: Growing session memory with fingerprint-based triple deduplication.
+  // KG grows across sessions — new triples are merged in, duplicates skipped.
+  // Version: lexica-4.1-mem (bump from 4.0 to pick up new triple fingerprint field)
+  saveToMemory() {
+    try {
+      // Compute triple fingerprints for deduplication on next load
+      const triples = this.kg.toJSON();
+      if (triples?.triples) {
+        triples.triples = triples.triples.map(t => ({
+          ...t,
+          _fp: (t.s + '|' + t.p + '|' + String(t.o)).toLowerCase()
+        }));
+      }
+      const data = {
+        version: 'lexica-4.1-mem',
+        savedAt: new Date().toISOString(),
+        sources: this.sm.s,
+        sentences: this.bm25.ss.map((s,i) => ({ t: s, tag: this.bm25.tags[i] })),
+        kg: triples,
+        semVecVocab: this.semVec.vocabSize,
+        failureLog: this.failureTracker ? this.failureTracker.getSnapshot() : null,
+        episodicSnapshot: this.episodicMemory ? {
+          established: [...(this.episodicMemory.established?.entries?.() || [])].slice(0,50),
+        } : null
+      };
+      const json = JSON.stringify(data);
+      if (json.length < 4500000) {
+        localStorage.setItem('lexica_engine_state_v4', json);
+        console.log('[Persistent Memory] Saved:', data.sources.length, 'sources,', this.kg.count(), 'triples');
+        return true;
+      } else {
+        const trimmed = { ...data, sentences: data.sentences.slice(-Math.floor(data.sentences.length * 0.6)) };
+        localStorage.setItem('lexica_engine_state_v4', JSON.stringify(trimmed));
+        console.log('[Persistent Memory] Saved (trimmed)');
+        return true;
+      }
+    } catch(e) {
+      console.warn('[Persistent Memory] Save failed:', e);
+      return false;
+    }
+  }
+
+  loadFromMemory() {
+    try {
+      const raw = localStorage.getItem('lexica_engine_state_v4');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data.version?.includes('lexica')) return false;
+      // Restore BM25 index
+      this.bm25 = new BM25();
+      const byTag = new Map();
+      (data.sentences || []).forEach(({ t, tag }) => {
+        if (!byTag.has(tag)) byTag.set(tag, []);
+        byTag.get(tag).push(t);
+      });
+      byTag.forEach((ss, tag) => this.bm25.addBatch(ss, tag));
+      this.bm25.flush();
+      // Restore KG with fingerprint-based deduplication
+      this.kg = new KnowledgeGraph(this.ets);
+      if (data.kg) {
+        this.kg.fromJSON(data.kg);
+        // Deduplicate by fingerprint — removes exact duplicates from repeated saves
+        const seen = new Set();
+        this.kg.triples = this.kg.triples.filter(t => {
+          const fp = t._fp || (t.s + '|' + t.p + '|' + String(t.o)).toLowerCase();
+          if (seen.has(fp)) return false;
+          seen.add(fp);
+          return true;
+        });
+        console.log('[Persistent Memory] KG deduplicated:', this.kg.triples.length, 'unique triples');
+      }
+      // Restore sources list
+      this.sm = new SM();
+      (data.sources || []).forEach(s => this.sm.s.push(s));
+      // Rebuild semantic vectors
+      this.semVec = new SemanticVectors();
+      this.wordProfiler = new WordProfiler();
+      if (this.bm25.ss.length > 0) {
+        this.bm25.ss.forEach(s => this.semVec.addSentence(s));
+        this.semVec.buildPMI();
+        this.wordProfiler.processAll(this.bm25.ss);
+      }
+      this.trained = this.bm25.ss.length > 0;
+      this.cache.invalidate();
+      console.log('[Persistent Memory] Loaded:', this.sm.s.length, 'sources,', this.kg.count(), 'triples');
+      return { sources: this.sm.s.length, triples: this.kg.count(), sentences: this.bm25.ss.length };
+    } catch(e) {
+      console.warn('[Persistent Memory] Load failed:', e);
+      return false;
+    }
+  }
+
+  clearMemory() {
+    try { localStorage.removeItem('lexica_engine_state_v4'); return true; } catch(e) { return false; }
+  }
+}
+
+const PHASE_IDX={parse:0,index:1,kg:2,pmi:3,words:4,complete:5};
+const PHASE_LABELS=['Parsing sentences','Building BM25 index','Extracting knowledge graph','Computing PMI semantic vectors','Profiling every word','Complete'];
+
+function showTrainOverlay(title){
+  document.getElementById('trainTitle').textContent=title;
+  document.getElementById('trainSubtitle').textContent='Initializing knowledge pipeline...';
+  document.getElementById('pFill').style.width='0%';
+  document.getElementById('cSent').textContent='0';document.getElementById('cTrip').textContent='0';
+  document.getElementById('cVoc').textContent='0';document.getElementById('cWords').textContent='0';
+  document.getElementById('trainLog').textContent='Starting...';
+  document.querySelectorAll('.phase-item').forEach(p=>p.classList.remove('active','done'));
+  document.getElementById('trainOverlay').classList.add('visible');
+}
+function updateTrainOverlay(phase,pct,sentences,triples){
+  const idx=PHASE_IDX[phase]??0;
+  document.querySelectorAll('.phase-item').forEach((p,i)=>{p.classList.remove('active','done');if(i<idx)p.classList.add('done');else if(i===idx)p.classList.add('active');});
+  document.getElementById('pFill').style.width=Math.round(pct*100)+'%';
+  document.getElementById('cSent').textContent=sentences;
+  document.getElementById('cTrip').textContent=triples;
+  const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
+  document.getElementById('cWords').textContent=engine.wordProfiler.size;
+  document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 4.0 ready.';}
+}
+function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
+
+// ─────────────────────────────────────────────────────
+// KG VIEWER
+// ─────────────────────────────────────────────────────
+function openKgModal(tag){
+  const src=engine.sm.get(tag);
+  document.getElementById('kgModalTitle').textContent=`KG — ${src?.title||tag}`;
+  const triples=engine.kg.triples.filter(t=>t.tag===tag);
+  document.getElementById('kgModalBody').innerHTML=triples.length
+    ?triples.slice(0,200).map(t=>`<div class="triple-row"><span class="triple-s">${t.s}</span><span class="triple-p">${t.p}</span><span class="triple-o">${t.o}</span><span class="triple-conf">${t.conflict?'⚠ conflict':'✓ '+t.conf.toFixed(1)}</span></div>`).join('')
+    :'<div style="color:var(--text-dim);font-family:\'DM Mono\',monospace;font-size:10.5px;padding:20px;text-align:center">No triples extracted.</div>';
+  document.getElementById('kgModal').classList.add('visible');
+}
+function closeKgModal(){document.getElementById('kgModal').classList.remove('visible');}
+
+// ─────────────────────────────────────────────────────
+// WIKIPEDIA
+// ─────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────
+// V10 UI FUNCTIONS
+// ─────────────────────────────────────────────────────
+
+// ── QUALIA UI ──
+function updateQualiaUI() {
+  const q = engine.qualia;
+  const badge = document.getElementById('qualiaBadge');
+  if (!badge) return;
+  badge.textContent = q.state;
+  badge.className = `qualia-badge ${q.cssClass}`;
+
+  // Cognition tab display
+  const display = document.getElementById('qualiaStateDisplay');
+  if (display) {
+    const m = q.metrics;
+    display.innerHTML = `<span style="font-size:16px">${q.state}</span>
+      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:7px;padding:7px 9px">
+          <div style="font-size:7.5px;letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;margin-bottom:3px">Joy</div>
+          <div style="height:4px;background:rgba(255,255,255,.04);border-radius:2px"><div style="height:100%;width:${Math.round(m.joy*100)}%;background:var(--gold);border-radius:2px;transition:width .4s"></div></div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:7px;padding:7px 9px">
+          <div style="font-size:7.5px;letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;margin-bottom:3px">Pain</div>
+          <div style="height:4px;background:rgba(255,255,255,.04);border-radius:2px"><div style="height:100%;width:${Math.round(m.pain*100)}%;background:var(--red);border-radius:2px;transition:width .4s"></div></div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:7px;padding:7px 9px">
+          <div style="font-size:7.5px;letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;margin-bottom:3px">Curiosity</div>
+          <div style="height:4px;background:rgba(255,255,255,.04);border-radius:2px"><div style="height:100%;width:${Math.round(m.curiosity*100)}%;background:var(--cyan);border-radius:2px;transition:width .4s"></div></div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:7px;padding:7px 9px">
+          <div style="font-size:7.5px;letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;margin-bottom:3px">Confusion</div>
+          <div style="height:4px;background:rgba(255,255,255,.04);border-radius:2px"><div style="height:100%;width:${Math.round(m.confusion*100)}%;background:var(--purple);border-radius:2px;transition:width .4s"></div></div>
+        </div>
+      </div>`;
+  }
+}
+
+// ── GLOBAL ENGINE INSTANCE ──
+const engine = new Engine();
+
+// ═══════════════════════════════════════════════════════════
+// LEXICA V0 — UI UPDATE FUNCTIONS FOR NEW SYSTEMS
+// ═══════════════════════════════════════════════════════════
+
+function updateDriveUI() {
+  if (!engine.drives) return;
+  const snap = engine.drives.getSnapshot();
+  snap.forEach(d => {
+    const keyMap = {curiosity:'Curiosity', discomfort:'Discomfort', expression:'Expression', satiation:'Satiation'};
+    const cssKey = d.key;
+    const barEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1));
+    const valEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1).replace('y','') + 'Val')
+                || document.getElementById('dr' + cssKey.charAt(0).toUpperCase() + cssKey.slice(1,3) + 'Val');
+    const badgeEl = document.getElementById('dr' + d.key.charAt(0).toUpperCase() + d.key.slice(1,3) + 'Badge');
+    // manually resolve IDs
+    const fillId = {curiosity:'drCuriosity', discomfort:'drDiscomfort', expression:'drExpression', satiation:'drSatiation'}[d.key];
+    const valId = {curiosity:'drCurVal', discomfort:'drDisVal', expression:'drExpVal', satiation:'drSatVal'}[d.key];
+    const badgeId = {curiosity:'drCurBadge', discomfort:'drDisBadge', expression:'drExpBadge', satiation:'drSatBadge'}[d.key];
+    const fill = document.getElementById(fillId);
+    const val = document.getElementById(valId);
+    const badge = document.getElementById(badgeId);
+    if (fill) fill.style.width = Math.round(d.level * 100) + '%';
+    if (val) val.textContent = Math.round(d.level * 100);
+    if (badge) {
+      const isTriggered = d.level >= d.threshold;
+      badge.textContent = isTriggered ? '⚡ ' + d.action.toLowerCase() : (d.level > d.threshold * 0.5 ? 'building' : 'idle');
+      badge.className = 'drive-action-badge ' + (isTriggered ? 'triggered' : 'active');
+    }
+  });
+}
+
+function updateGoalUI() {
+  const panel = document.getElementById('goalStack');
+  if (!panel || !engine.goalStack) return;
+  const goals = engine.goalStack.goals.filter(g => !g.resolved);
+  if (!goals.length) {
+    panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No active goals. Drives will generate them.</div>';
+    return;
+  }
+  panel.innerHTML = goals.slice(0, 5).map(g => `
+    <div class="goal-item ${g.type}">
+      <div class="goal-type">${g.type} · <span class="goal-origin">from ${g.driveKey} drive</span></div>
+      <div class="goal-desc">${g.desc}</div>
+      <div class="goal-utility">utility <span>${(g.utility*100).toFixed(0)}%</span></div>
+      <div class="goal-progress"><div class="goal-progress-fill" style="width:${(g.progress*100).toFixed(0)}%"></div></div>
+    </div>`).join('');
+}
+
+function updateSelfModelUI() {
+  const panel = document.getElementById('selfModelPanel');
+  if (!panel || !engine.selfModel) return;
+  const snap = engine.selfModel.getSnapshot();
+  if (snap.totalQueries === 0) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Ask questions to build self-model.</div>'; return; }
+  const strongHtml = snap.strongestTopics.slice(0,3).map(t=>`<span style="color:var(--green);font-size:8px">${t.topic}(${(t.successRate*100).toFixed(0)}%)</span>`).join(' ');
+  const weakHtml = snap.weakestTopics.slice(0,3).map(t=>`<span style="color:var(--orange);font-size:8px">${t.topic}(${(t.successRate*100).toFixed(0)}%)</span>`).join(' ');
+  const sim = snap.lastSimulation;
+  panel.innerHTML = `
+    <div class="self-model-item"><span class="sm-key">Queries</span><span class="sm-val">${snap.totalQueries}</span></div>
+    <div class="self-model-item"><span class="sm-key">Success Rate</span><span class="sm-val">${(snap.successRate*100).toFixed(1)}%</span></div>
+    <div class="self-model-item"><span class="sm-key">Avg Confidence</span><span class="sm-val">${(snap.averageConfidence*100).toFixed(0)}%</span></div>
+    <div class="self-model-item"><span class="sm-key">Known Topics</span><span class="sm-val">${snap.knownTopics}</span></div>
+    ${strongHtml ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">STRONGEST</div><div>${strongHtml}</div>` : ''}
+    ${weakHtml ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">WEAKEST</div><div>${weakHtml}</div>` : ''}
+    ${sim ? `<div style="margin:5px 0 2px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted)">LAST SIMULATION</div><div class="self-model-item"><span class="sm-key">can answer</span><span class="sm-val" style="color:${sim.canAnswer?'var(--green)':'var(--red)'}">${sim.canAnswer?'yes':'no'} (${sim.kgHits||0} KG hits)</span></div>` : ''}
+  `;
+}
+
+function updateUserModelUI() {
+  const panel = document.getElementById('userModelPanel');
+  if (!panel || !engine.userModel) return;
+  const snap = engine.userModel.getSnapshot();
+  if (snap.queryCount === 0) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Modeling begins after first message.</div>'; return; }
+  const interestHtml = snap.topInterests.slice(0,5).map(i=>`<span style="font-size:8px;color:var(--cyan)">${i.topic}(${i.score})</span>`).join(' ');
+  panel.innerHTML = `
+    <div class="user-model-row"><span class="um-label">Level</span><span class="um-value">${snap.levelDesc}</span></div>
+    <div class="user-model-row"><span class="um-label">Style</span><span class="um-value">${snap.style}</span></div>
+    <div class="user-model-row"><span class="um-label">Queries</span><span class="um-value">${snap.queryCount} · avg ${snap.avgQueryLength} words</span></div>
+    <div class="user-model-row"><span class="um-label">Corrections</span><span class="um-value" style="color:${snap.corrections>0?'var(--orange)':'var(--text-dim)'}">${snap.corrections}</span></div>
+    ${snap.topInterests.length ? `<div class="user-model-row"><span class="um-label">Interests</span><span class="um-value">${interestHtml}</span></div>` : ''}
+    ${snap.technicalTermsUsed.length ? `<div class="user-model-row"><span class="um-label">Tech vocab</span><span class="um-value" style="font-size:7.5px">${snap.technicalTermsUsed.slice(0,5).join(', ')}</span></div>` : ''}
+  `;
+}
+
+function updatePreferenceUI() {
+  const panel = document.getElementById('preferencePanel');
+  if (!panel || !engine.preferenceEngine) return;
+  const snap = engine.preferenceEngine.getSnapshot();
+  if (!snap.totalTopics) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Preferences form through use.</div>'; return; }
+  const prefHtml = snap.preferred.slice(0,8).map(p=>
+    `<span class="pref-tag positive">${p.topic}<span class="pref-score">${(p.valence*100).toFixed(0)}</span></span>`
+  ).join('');
+  const avoidHtml = snap.avoided.slice(0,4).map(p=>
+    `<span class="pref-tag negative">${p.topic}<span class="pref-score">${(Math.abs(p.valence)*100).toFixed(0)}</span></span>`
+  ).join('');
+  panel.innerHTML = (prefHtml||avoidHtml)
+    ? `<div>${prefHtml}</div>${avoidHtml?`<div style="margin-top:5px">${avoidHtml}</div>`:''}`
+    : '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Asking more questions will form preferences.</div>';
+}
+
+function updateEpisodicUI() {
+  const panel = document.getElementById('episodicPanel');
+  if (!panel || !engine.episodicMemory) return;
+  const snap = engine.episodicMemory.getSnapshot();
+  if (!snap.turnCount) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">Conversation arc builds as you talk.</div>'; return; }
+  const eps = snap.recentEpisodes.slice(0,4).map(e=>
+    `<div class="episode-item">
+      <div class="ep-turn">Turn ${e.turn} · ${e.strategy||'?'} · ${e.wasSuccessful?'✓':'✗'}</div>
+      <div class="ep-content">${e.userInput.slice(0,55)}${e.userInput.length>55?'…':''}</div>
+      ${e.subject?`<div class="ep-unresolved">subject: ${e.subject}</div>`:''}
+    </div>`
+  ).join('');
+  const unresHtml = snap.unresolved.map(u=>`<div class="ep-unresolved">• ${u.question}</div>`).join('');
+  panel.innerHTML = eps + (unresHtml ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--orange)">UNRESOLVED</div>${unresHtml}` : '');
+}
+
+function updateFailureLogUI() {
+  const panel = document.getElementById('failureLog');
+  if (!panel || !engine.failureTracker) return;
+  const snap = engine.failureTracker.getSnapshot();
+  if (!snap.totalFailures) { panel.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);padding:8px 0">No failures recorded yet.</div>'; return; }
+  const failHtml = snap.recentFailures.slice(0,5).map(f=>
+    `<div class="fail-item">
+      <div class="fail-query">${f.query.slice(0,60)}${f.query.length>60?'…':''}</div>
+      <div class="fail-reason">${f.reason||'low confidence'} · attempt ${f.attempts}</div>
+    </div>`
+  ).join('');
+  const urgentHtml = snap.urgentGaps.length
+    ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--orange)">URGENT GAPS (queued for learning)</div>` +
+      snap.urgentGaps.map(g=>`<div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--red);padding:2px 0">"${g.topic}" · urgency ${(g.urgency*100).toFixed(0)}%</div>`).join('')
+    : '';
+  panel.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);margin-bottom:6px">${snap.totalFailures} total · ${snap.closedGaps} closed · ${snap.openGaps} open</div>${failHtml}${urgentHtml}`;
+}
+
+
+
+// ── BOOT UI HELPERS ──
+function updateBootBar(pct, msg) {
+  const bar = document.getElementById('bootBar');
+  const status = document.getElementById('bootStatus');
+  if (bar) bar.style.width = Math.round(pct * 100) + '%';
+  if (status && msg) status.textContent = msg;
+}
+function setBootPhase(idx, done) {
+  const el = document.getElementById('bphase' + idx);
+  if (!el) return;
+  el.classList.toggle('active', true);
+  el.classList.toggle('done', done);
+  if (done) el.style.opacity = '1';
+}
+function hideBootOverlay() {
+  const el = document.getElementById('bootOverlay');
+  if (!el) return;
+  el.style.opacity = '0';
+  el.style.transition = 'opacity .5s';
+  setTimeout(() => { el.style.display = 'none'; }, 550);
+}
+function skipBoot() {
+  hideBootOverlay();
+}
+
+// ── SLM STATUS BAR ──
+function updateSLMStatusUI(state, label, model) {
+  const dot   = document.getElementById('slmDot');
+  const lbl   = document.getElementById('slmLabel');
+  const mname = document.getElementById('slmModelName');
+  const retry = document.getElementById('slmRetryBtn');
+  if (dot) {
+    dot.className = 'slm-dot';
+    if (state === 'ready')   dot.classList.add('ready');
+    else if (state === 'error') dot.classList.add('error');
+    else                     dot.classList.add('loading');
+  }
+  if (lbl   && label) lbl.textContent   = label;
+  if (mname && model) mname.textContent = model;
+  // Show retry button only when NeuralMouth has failed (not just NanoCortex)
+  if (retry) retry.style.display = (state === 'error' && !engine.neuralMouth?.ready) ? 'block' : 'none';
+}
+
+// Retry NeuralMouth init from the cognition tab
+window._retryNeuralInit = async function() {
+  if (engine.neuralMouth?.ready) return;
+  const retry = document.getElementById('slmRetryBtn');
+  if (retry) retry.style.display = 'none';
+  updateSLMStatusUI('loading', 'Retrying NeuralMouth...', engine.neuralMouth?.modelId || '—');
+  try {
+    engine.neuralMouth = new NeuralMouth();
+    const ok = await engine.neuralMouth.init((msg) => {
+      updateSLMStatusUI('loading', msg, engine.neuralMouth.modelId);
+    });
+    window._neuralMouth = engine.neuralMouth;
+    if (ok) {
+      engine._neuralReady = true;
+      updateSLMStatusUI('ready', 'NeuralMouth ready (Transformers.js)', engine.neuralMouth.modelId);
+    } else {
+      updateSLMStatusUI('error', engine.neuralMouth.error || 'Load failed', engine.neuralMouth.modelId || '—');
+    }
+  } catch(e) {
+    updateSLMStatusUI('error', 'Retry failed: ' + (e.message||e).slice(0,40), '—');
+  }
+};
+
+// ── COREF LOG UI ──
+function updateCorefUI() {
+  const el = document.getElementById('corefLog');
+  if (!el || !engine?.nanoCortex) return;
+  const merges = engine.nanoCortex.mergeLog || [];
+  if (!merges.length) return;
+  el.innerHTML = merges.slice(-20).reverse().map(m =>
+    '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-dim);padding:5px 8px;border-bottom:1px solid var(--border)">' +
+    '<span style="color:var(--cyan)">' + (m.a||'') + '</span> → <span style="color:var(--green)">' + (m.b||'') + '</span>' +
+    (m.sim ? ' <span style="color:var(--text-muted);font-size:8px">sim:' + m.sim.toFixed(2) + '</span>' : '') +
+    '</div>'
+  ).join('');
+}
+
+// ── WORD BROWSE UI ──
+function updateWordBrowse() {
+  const section = document.getElementById('wordBrowseSection');
+  const tags    = document.getElementById('wordBrowseTags');
+  if (!section || !tags || !engine?.wordProfiler?.size) return;
+  const top = [];
+  if (engine.wordProfiler.profiles) {
+    engine.wordProfiler.profiles.forEach((prof, word) => {
+      if (prof && word.length > 2) top.push({ word, score: prof.freq || 0 });
+    });
+  }
+  top.sort((a,b) => b.score - a.score);
+  const shown = top.slice(0, 40);
+  if (!shown.length) return;
+  section.style.display = 'block';
+  tags.innerHTML = shown.map(({word}) =>
+    '<span class="word-browse-tag" onclick="lookupWord(\'' + word.replace(/'/g,"\\'") + '\')">' + word + '</span>'
+  ).join('');
+}
+
+// ── GÖDEL LOG UI ──
+function updateGodelUI() {
+  const el = document.getElementById('godelLog');
+  if (!el) return;
+  const log = engine.godel.log;
+  if (!log.length) { el.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>'; return; }
+  el.innerHTML = log.map(e => `
+    <div class="godel-entry">
+      <div class="godel-version">v${e.v} · ${new Date(e.ts).toLocaleTimeString()} · pattern: "${e.pattern}" → predicate: ${e.predicate}</div>
+      <div class="godel-theorem">${e.theorem}</div>
+      ${e.samples ? '<div style="margin-top:5px;font-size:8.5px;color:var(--cyan)">Sample extractions: ' + e.samples.join(' | ') + '</div>' : ''}
+    </div>`).join('');
+}
+
+// ── SOCIETY OF MIND DEBATE UI ──
+function updateDebateUI() {
+  const el = document.getElementById('debateLog');
+  if (!el) return;
+  const debate = engine.society.lastDebate;
+  if (!debate || !debate.length) { el.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>'; return; }
+  const colorMap = { Skeptic:'var(--red)', Literal:'var(--green)', Dreamer:'var(--gold)' };
+  el.innerHTML = debate.map((agent, i) => `
+    <div class="debate-entry${i===0?' debate-winner':''}">
+      <div class="debate-agent" style="color:${colorMap[agent.name]||'var(--text-dim)'}">
+        ${i===0?'👑 ':''}${agent.name} ${i===0?'(WINNER)':''} · ${agent.description}
+      </div>
+      <div style="font-size:10.5px;color:var(--text-dim);line-height:1.6;margin-bottom:4px">${agent.text||'(no output)'}</div>
+      <div class="debate-score">Score: ${agent.score.toFixed(2)}</div>
+    </div>`).join('');
+}
+
+// ── INNER MONOLOGUE UI ──
+let _monologueLog = [];
+let _monologueThinkInterval = null;
+
+// ── Continuous SLM thought loop ──
+// Every 8s (when SLM is ready and idle), generate a genuine thought about the KG state.
+// This is the inner monologue running at all times, not just on curiosity triggers.
+function _startMonologueLoop() {
+  if (_monologueThinkInterval) return; // already running
+  _monologueThinkInterval = setInterval(async () => {
+    const nm = window._neuralMouth;
+    if (!nm?.ready || !engine?.kg?.count()) return;
+    if (nm._pendingRequests?.size > 0) return; // SLM is busy — skip this tick
+
+    // Pick a random triple from KG to think about
+    const alive = engine.kg.triples.filter(t => t.alive !== false && t.raw && t.raw.length > 20);
+    if (!alive.length) return;
+    const pick = alive[Math.floor(Math.random() * Math.min(alive.length, 20))];
+    const related = alive.filter(t => t.s === pick.s || t.o === pick.s).slice(0,4)
+      .map(t => `${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+
+    // Also mix in goal stack / drive state for richer monologue
+    const drives = engine.drives ? Object.entries(engine.drives.levels||{})
+      .sort((a,b)=>b[1]-a[1]).slice(0,2)
+      .map(([k,v])=>`${k}:${(v*100).toFixed(0)}%`).join(', ') : '';
+    const goals = engine.goalStack?.peek ? engine.goalStack.peek(2).map(g=>g.topic||g.type).join(', ') : '';
+
+    try {
+      const thought = await nm._generateMessages([
+        { role:'system', content:'You are the inner voice of Lexica, an AI knowledge engine. Generate ONE short, genuine observation (1 sentence) about your knowledge state. Think about patterns, gaps, or connections you notice. Be curious and specific. No fluff.' },
+        { role:'user', content:`Current focus: "${pick.s} ${pick.p.replace(/_/g,' ')} ${pick.o}". Related: ${related.slice(0,120)}. Active drives: ${drives}. Goals: ${goals}. What do you notice?` },
+      ], 60);
+      if (thought && thought.length > 10) {
+        showInnerMonologue(thought, pick.s, pick.o);
+      }
+    } catch(e) {}
+  }, 8000);
+}
+
+// Start loop once engine is ready
+window.addEventListener('lexicaReady', _startMonologueLoop);
+
+function showInnerMonologue(text, nodeA, nodeB) {
+  // Use requestIdleCallback to defer ALL DOM work to idle time — prevents lag spikes
+  const doWork = () => {
+    const panel = document.getElementById('innerMonologue');
+    const textEl = document.getElementById('imText');
+    const nodesEl = document.getElementById('imNodes');
+    if (textEl) textEl.textContent = text;
+    if (nodesEl) nodesEl.innerHTML = [nodeA, nodeB].filter(Boolean).map(n => '<span class="im-node">'+n+'</span>').join('');
+    if (panel) {
+      panel.classList.add('visible');
+      clearTimeout(panel._hideTimer);
+      panel._hideTimer = setTimeout(() => panel.classList.remove('visible'), 12000);
+    }
+    _monologueLog.unshift({text, nodeA, nodeB, ts: Date.now()});
+    if (_monologueLog.length > 10) _monologueLog.pop();
+
+    // Update log tab (batched — only if tab is visible)
+    const logEl = document.getElementById('monologueLog');
+    if (logEl && document.getElementById('tab-cognition')?.classList.contains('active')) {
+      logEl.innerHTML = _monologueLog.map(m =>
+        '<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:9px;padding:8px 11px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">' +
+        '<div style="font-size:7.5px;color:var(--gold);margin-bottom:4px">' + new Date(m.ts).toLocaleTimeString() + ' · nodes: ' + m.nodeA + ' ↔ ' + m.nodeB + '</div>' +
+        '<div style="font-size:9.5px;color:var(--text-dim);line-height:1.65;font-style:italic">' + m.text + '</div>' +
+        '</div>').join('');
+    }
+
+    // Chat system message: throttled (max 1 every 15s) to prevent spam but keep it lively
+    const now = Date.now();
+    if (!window._lastMonologueChatMsg || now - window._lastMonologueChatMsg > 15000) {
+      window._lastMonologueChatMsg = now;
+      addMsg('system', '🔍 <em>Inner Monologue:</em> ' + text.slice(0, 120) + (text.length > 120 ? '...' : ''));
+    }
+  };
+
+  if (window.requestIdleCallback) {
+    requestIdleCallback(doWork, { timeout: 3000 });
+  } else {
+    setTimeout(doWork, 0); // fallback: still async, just yield to event loop
+  }
+}
+function closeMonologue() { const p=document.getElementById('innerMonologue'); if(p)p.classList.remove('visible'); }
+function resetIdleTimer() { if(typeof engine!=='undefined'&&engine&&engine.curiosity)engine.curiosity.resetTimer(); }
+
+// V11: UPDATE CENTRALITY PANEL
+function updateCentralityUI() {
+  const panel = document.getElementById('centralityPanel');
+  if (!panel || !engine?.trained) return;
+  const top = engine.kg.centrality.topNodes(engine.kg.triples, 12);
+  if (!top.length) return;
+  const maxScore = top[0].score || 1;
+  panel.innerHTML = top.map(({node, score}) => {
+    const pct = Math.round((score / maxScore) * 100);
+    const isUser = engine.kg.triples.some(t => t.s === node && t.tag === 'user');
+    const isUserClass = isUser ? ' centrality-user' : '';
+    const icon = isUser ? '👤 ' : '';
+    const ontPath = engine.kg.ontology.describe(node);
+    return `<div class="centrality-bar-row${isUserClass}">
+      <span class="centrality-label" title="${node}">${icon}${node}</span>
+      <div class="centrality-bar-bg"><div class="centrality-bar-fill" style="width:${pct}%"></div></div>
+      <span class="centrality-score">${score.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+}
+
+// V11: UPDATE ONTOLOGY PANEL
+function updateOntologyUI() {
+  const panel = document.getElementById('ontologyPanel');
+  if (!panel || !engine?.trained) return;
+  // Show top 10 most recently added triples' ontological classification
+  const recent = engine.kg.triples.filter(t => t.alive !== false && typeof t.s === 'string').slice(-20);
+  const seen = new Set();
+  const unique = recent.filter(t => { if(seen.has(t.s)) return false; seen.add(t.s); return true; }).slice(-8);
+  if (!unique.length) return;
+  panel.innerHTML = unique.reverse().map(t => {
+    const typehint = t.p === 'is_a' ? t.o : '';
+    const path = engine.kg.ontology.classify(t.s, typehint);
+    const desc = engine.kg.ontology.describe(t.s, typehint);
+    const parts = path.split('.');
+    return `<div class="ont-entry">
+      <div>
+        <div class="ont-node">${t.s}</div>
+        <div class="ont-path">${parts.slice(1).join(' › ')||'General'}</div>
+        <span class="ont-category">${parts[parts.length-1]||'Entity'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// V11: UPDATE INGESTION PANEL
+function updateIngestionUI() {
+  const panel = document.getElementById('ingestionPanel');
+  if (!panel || !engine?.ingestion) return;
+  const {queue, processed, rejected} = engine.ingestion;
+  const items = [
+    ...processed.slice(-4).reverse().map(p => ({...p, status:'done'})),
+    ...rejected.slice(-2).reverse().map(r => ({...r, status:'rejected'})),
+    ...queue.slice(0,4).map(q => ({...q, title:q.topic, status:'pending'}))
+  ];
+  if (!items.length) return;
+  panel.innerHTML = items.map(item => {
+    const dot = `<div class="ingestion-dot ${item.status}"></div>`;
+    const label = item.status === 'done' ? item.title : (item.status === 'rejected' ? `✗ ${item.topic} — ${item.reason||'rejected'}` : `⏳ ${item.topic}`);
+    const cls = item.status === 'done' ? 'ingestion-done' : (item.status === 'rejected' ? 'ingestion-rejected' : 'ingestion-pending');
+    return `<div class="ingestion-item">${dot}<span class="${cls}">${label}</span></div>`;
+  }).join('') + (queue.length === 0 ? '<div style="font-family:\'DM Mono\',monospace;font-size:8.5px;color:var(--text-muted);padding:4px 9px">Queue empty — ingestion will enqueue new topics after training.</div>' : '');
+}
+
+// KG VIEWER
+function openKgModal(tag) {
+  const src = engine.sm.get(tag);
+  document.getElementById('kgModalTitle').textContent = `Hypergraph — ${src?.title||tag}`;
+  const triples = engine.kg.triples.filter(t => t.tag === tag && t.alive !== false);
+  const hyperEdges = engine.kg.hyperEdges.filter(t => t.tag === tag);
+  let html = '';
+  if (triples.length) {
+    html += triples.slice(0,200).map(t =>
+      `<div class="triple-row">
+        <span class="triple-s">${t.subjectStr ? t.subjectStr() : t.s}</span>
+        <span class="triple-p">${t.p}</span>
+        <span class="triple-o">${t.objectStr ? t.objectStr() : t.o}${t.isNested && t.isNested()?'<span class="hyper-badge">hyper</span>':''}</span>
+        <span class="triple-conf">${t.conflict?'⚠ conflict':'✓ '+t.conf.toFixed(1)}</span>
+      </div>`).join('');
+  }
+  if (hyperEdges.length) {
+    html += `<div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--cyan);padding:6px 0;letter-spacing:.1em;border-top:1px solid var(--border);margin-top:8px">N-ARY HYPEREDGES (${hyperEdges.length})</div>`;
+    html += hyperEdges.map(h => `<div class="triple-row"><span class="triple-s" style="flex:3">${h.toFlat()}</span></div>`).join('');
+  }
+  if (!html) html = '<div style="color:var(--text-dim);font-family:\'DM Mono\',monospace;font-size:10.5px;padding:20px;text-align:center">No triples extracted.</div>';
+  document.getElementById('kgModalBody').innerHTML = html;
+  document.getElementById('kgModal').classList.add('visible');
+}
+function closeKgModal() { document.getElementById('kgModal').classList.remove('visible'); }
+
+// WIKIPEDIA
+async function searchWiki(q){const r=await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=6&format=json&origin=*`);const[,t,d,u]=await r.json();return t.map((ti,i)=>({title:ti,desc:d[i]||'',url:u[i]}));}
+async function fetchWikiArt(title){const r=await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=extracts&explaintext=1&format=json&origin=*`);const data=await r.json();const p=Object.values(data.query.pages)[0];if(p.missing!==undefined)throw new Error('Article not found');return{title:p.title,text:p.extract||'',url:`https://en.wikipedia.org/wiki/${encodeURIComponent(p.title)}`};}
+let _wt=null;
+function onWikiInput(v){clearTimeout(_wt);if(!v.trim()||v.length<2){hideSug();return;}_wt=setTimeout(()=>searchWiki(v).then(showSug).catch(()=>{}),300);}
+function showSug(res){const el=document.getElementById('wikiSuggestions');if(!res.length){el.style.display='none';return;}el.innerHTML=res.map(r=>`<div class="wiki-sug" onclick="fetchTrain('${r.title.replace(/'/g,"\\'")}','${(r.url||'').replace(/'/g,"\\'")}')"><div class="s-title">${r.title}</div><div class="s-desc">${r.desc||''}</div></div>`).join('');el.style.display='block';}
+function hideSug(){document.getElementById('wikiSuggestions').style.display='none';}
+async function doWikiSearch(){const q=document.getElementById('wikiSearch').value.trim();if(!q)return;const st=document.getElementById('wikiStatus');st.textContent='Searching...';try{const r=await searchWiki(q);if(!r.length){st.textContent='No results.';return;}showSug(r);st.textContent=`${r.length} results`;}catch(e){st.textContent='Search failed.';}}
+
+async function fetchTrain(title,url){
+  hideSug();const st=document.getElementById('wikiStatus');
+  st.textContent=`Fetching "${title}"...`;setStatus(false,'fetching...');
+  addMsg('system',`Fetching Wikipedia: <em>${title}</em>...`);
+  try{
+    const art=await fetchWikiArt(title);
+    showTrainOverlay(art.title);
+    await engine.addSourceAsync(art.text,art.title,art.url,(phase,pct,cnt,triples)=>{updateTrainOverlay(phase,pct,cnt,triples);});
+    updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);
+    st.textContent=`✓ "${art.title}"`;
+    document.getElementById('wikiSearch').value='';
+    addMsg('system',`Trained: <strong>${art.title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences · ${engine.kg.count()} triples · ${engine.semVec.vocabSize} PMI vectors · ${engine.kg.hyperCount()} hyperedges`);
+    hideTrainOverlay();switchTab('sources');
+  }catch(e){hideTrainOverlay();st.textContent=`Error: ${e.message}`;setStatus(false,'error');addMsg('system',`Failed: ${e.message}`);}
+}
+function quickFetch(t){document.getElementById('wikiSearch').value=t;fetchTrain(t,'');}
+
+async function trainFromPaste(){
+  const text=document.getElementById('trainText').value.trim();if(!text){addMsg('system','No text found.');return;}
+  const title=document.getElementById('pasteTitle').value.trim()||`Pasted ${new Date().toLocaleTimeString()}`;
+  setStatus(false,'training...');showTrainOverlay(title);
+  try{
+    await engine.addSourceAsync(text,title,'',(phase,pct,cnt,triples)=>{updateTrainOverlay(phase,pct,cnt,triples);});
+    updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);
+    addMsg('system',`Trained: <strong>${title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences · ${engine.kg.count()} KG triples.`);
+    document.getElementById('trainText').value='';document.getElementById('pasteTitle').value='';
+    document.getElementById('charCount').textContent='';
+    hideTrainOverlay();switchTab('sources');
+  }catch(e){hideTrainOverlay();addMsg('system',`Error: ${e.message}`);setStatus(false,'error');}
+}
+
+function exportData(){if(!engine.trained){addMsg('system','Nothing to export.');return;}engine.export();addMsg('system','Exported lexica-v14.json');}
+function resetAll(){
+  if(!confirm('Clear ALL training data and reset cognitive state?'))return;
+  engine.curiosity.stop();
+  engine.drives.stop();
+  engine.bm25=new BM25();engine.kg=new KnowledgeGraph(engine.ets);engine.sm=new SM();
+  engine.trained=false;engine.synthesisCount=0;engine.cache.invalidate();
+  engine.salience.clear();engine.typeStack.clear();engine.semVec=new SemanticVectors();
+  engine.wordProfiler=new WordProfiler();engine.tomTracker=new UserKnowledgeTracker();
+  engine.stateTracker=new LexicaStateTracker();engine.mood=new MoodEngine();
+  engine.qualia=new QualiaEngine();engine.society=new SocietyOfMind();
+  engine.godel=new GodelEngine(engine.kg);
+  engine.curiosity=new CuriosityEngine(engine.kg,engine.qualia,(text,a,b)=>showInnerMonologue(text,a,b),engine);
+  engine.curiosity.start();
+  // LEXICA 3.0: Reset new cognitive systems
+  engine.drives=new HomeostaticDriveSystem();
+  engine.goalStack=new GoalStack();
+  engine.selfModel=new SelfModel();
+  engine.episodicMemory=new EpisodicMemory();
+  engine.userModel=new UserModel();
+  engine.preferenceEngine=new PreferenceEngine();
+  engine.failureTracker=new FailureTracker();
+  engine.drives.start(engine.kg,engine.goalStack,engine.episodicMemory);
+  engine.lastResult=null;engine.lastKgFacts=null;engine.lastQuery=null;engine.lastSubject=null;engine.recentTripleWindow=[];
+  updateUI();setStatus(false,'awaiting training');updateQualiaUI();
+  updateDriveUI();updateGoalUI();updateSelfModelUI();updateUserModelUI();updatePreferenceUI();updateEpisodicUI();updateFailureLogUI();
+  document.getElementById('godelLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No self-modifications yet.</div>';
+  document.getElementById('debateLog').innerHTML='<div style="font-family:\'JetBrains Mono\',monospace;font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">No debates yet.</div>';
+  addMsg('system','All training data cleared. Cognitive state reset. Lexica V0 homeostatic systems reinitialized.');
+}
+
+
+
+// ─────────────────────────────────────────────────────
+// "+" ATTACHMENT POPOVER
+// ─────────────────────────────────────────────────────
+function toggleAttachPopover() {
+  const pop = document.getElementById('attachPopover');
+  pop.classList.toggle('open');
+}
+function closeAttachPopover() {
+  document.getElementById('attachPopover')?.classList.remove('open');
+}
+function attachPickPDF() {
+  closeAttachPopover();
+  document.getElementById('pdfFileUpHidden').click();
+}
+// Close popover on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('attachBtn')?.contains(e.target)) closeAttachPopover();
+}, true);
+
+
+// ─────────────────────────────────────────────────────
+// ENSEMBLE PANEL UI — shows the 3-role debate in cognition tab
+// ─────────────────────────────────────────────────────
+function updateEnsemblePanel(ensemble) {
+  if (!ensemble || !ensemble.length) return;
+  const panel = document.getElementById('slmEnsemblePanel');
+  const roles = document.getElementById('slmEnsembleRoles');
+  if (!panel || !roles) return;
+  panel.style.display = 'block';
+  roles.innerHTML = ensemble.map((r, i) => `
+    <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:7px;${i===0?'opacity:1':'opacity:0.55'}">
+      <div style="min-width:18px;text-align:center;margin-top:1px">${r.emoji}</div>
+      <div style="flex:1">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:${i===0?'var(--gold)':'var(--text-muted)'};letter-spacing:.05em;margin-bottom:2px">
+          ${r.name.toUpperCase()}${i===0?' ✓ selected':''} <span style="color:var(--text-muted)">(score: ${r.score?.toFixed(2)||'—'})</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);line-height:1.5">"${(r.text||'').slice(0,120)}${(r.text||'').length>120?'...':''}"</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// UPGRADE 2: PDF INGESTION
+// Uses PDF.js to extract text client-side — no server.
+// ─────────────────────────────────────────────────────
+let _pdfText = null;
+
+// PDF.js loaded on-demand via dynamic import — works in sandboxed iframes
+// avoids the "Cannot load script at pdf.worker.min.js" / "fake worker failed" errors
+let _pdfjsLib = null;
+async function getPDFJS() {
+  if (_pdfjsLib) return _pdfjsLib;
+  // Use the legacy UMD build of pdfjs 2.x — most reliable fake-worker support.
+  // Load as a classic script via dynamic <script> injection, then grab window.pdfjsLib.
+  await new Promise((resolve, reject) => {
+    if (window.pdfjsLib) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  _pdfjsLib = window.pdfjsLib;
+  // Disable the web worker — run PDF parsing on the main thread.
+  // pdf.js calls this "fake worker" but it's a real synchronous fallback.
+  _pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  return _pdfjsLib;
+}
+
+async function extractPDFText(file) {
+  const pdfjs = await getPDFJS();
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Preserve spacing between items
+    let prev = null;
+    for (const item of content.items) {
+      if (prev && Math.abs(item.transform[5] - prev.transform[5]) > 5) fullText += '\n';
+      else if (prev && item.transform[4] - (prev.transform[4] + prev.width) > 5) fullText += ' ';
+      fullText += item.str;
+      prev = item;
+    }
+    fullText += '\n';
+  }
+  return { text: fullText.replace(/ {3,}/g, ' '), pages: pdf.numPages };
+}
+
+function onPdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdfDrop').style.borderColor = '';
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type === 'application/pdf') loadPDFFile(file);
+}
+
+function onPdfFileSelect(input) {
+  const file = input.files?.[0];
+  if (file) loadPDFFile(file);
+}
+
+async function loadPDFFile(file) {
+  const title = file.name.replace(/\.pdf$/i, '');
+  addMsg('system', `📄 Reading <strong>${title}</strong>...`);
+  setStatus(false, 'reading pdf...');
+  try {
+    const { text, pages } = await extractPDFText(file);
+    _pdfText = text;
+    // Update hidden tab fields too
+    const titleInput = document.getElementById('pdfTitle');
+    const status = document.getElementById('pdfStatus');
+    if (titleInput && !titleInput.value) titleInput.value = title;
+    if (status) status.textContent = `✓ ${pages} pages · ${text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length} chars`;
+    const preview = document.getElementById('pdfPreview');
+    if (preview) { preview.textContent = text.slice(0, 300) + '...'; preview.style.display = 'block'; }
+    const trainBtn = document.getElementById('pdfTrainBtn');
+    if (trainBtn) { trainBtn.style.opacity = '1'; trainBtn.style.pointerEvents = ''; }
+    // Show confirmation with auto-train button in chat
+    const confId = 'pdfconf-' + Date.now();
+    addMsg('system', `📄 <strong>${title}</strong> extracted — ${pages} pages · ${text.length > 999 ? (text.length/1000).toFixed(1)+'k' : text.length} chars<br><button id="${confId}" onclick="trainFromPDFImmediate('${title.replace(/'/g,"\'")}','${confId}')" style="margin-top:8px;padding:5px 14px;background:rgba(110,168,255,.15);border:1px solid rgba(110,168,255,.3);border-radius:8px;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer">⚡ Train on this PDF</button>`);
+    setStatus(true, 'pdf ready');
+  } catch(e) {
+    addMsg('system', 'PDF error: ' + (e.message || 'Could not read PDF'));
+    setStatus(false, 'error');
+    console.error('[PDF]', e);
+  }
+}
+
+async function trainFromPDFImmediate(title, btnId) {
+  if (!_pdfText) { addMsg('system', 'No PDF text loaded.'); return; }
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Training...'; }
+  setStatus(false, 'training...');
+  try {
+    showTrainOverlay(title);
+    await engine.addSourceAsync(_pdfText, title, '', (phase, pct, cnt, triples) => {
+      updateTrainOverlay(phase, pct, cnt, triples);
+    });
+    hideTrainOverlay();
+    updateUI();
+    setStatus(true, `synthesis ready · ${engine.bm25.ss.length} sentences`);
+    addMsg('system', `✓ Trained on <strong>${title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences`);
+    _pdfText = null;
+    if (btn) btn.parentElement?.removeChild(btn);
+    switchTab('sources');
+  } catch(e) {
+    hideTrainOverlay();
+    addMsg('system', 'PDF training error: ' + e.message);
+    setStatus(false, 'error');
+  }
+}
+
+async function trainFromPDF() {
+  if (!_pdfText) { addMsg('system', 'No PDF loaded.'); return; }
+  const title = document.getElementById('pdfTitle').value.trim() || 'PDF Document';
+  setStatus(false, 'training...');
+  showTrainOverlay(title);
+  try {
+    await engine.addSourceAsync(_pdfText, title, '', (phase, pct, cnt, triples) => {
+      updateTrainOverlay(phase, pct, cnt, triples);
+    });
+    updateUI();
+    setStatus(true, `synthesis ready · ${engine.bm25.ss.length} sentences`);
+    addMsg('system', `Trained on PDF: <strong>${title}</strong> — ${engine.sm.s[engine.sm.s.length-1]?.count||0} sentences`);
+    _pdfText = null;
+    document.getElementById('pdfStatus').textContent = '';
+    document.getElementById('pdfPreview').style.display = 'none';
+    document.getElementById('pdfTitle').value = '';
+    document.getElementById('pdfPages').textContent = '—';
+    document.getElementById('pdfChars').textContent = '—';
+    document.getElementById('pdfTrainBtn').style.opacity = '0.5';
+    document.getElementById('pdfTrainBtn').style.pointerEvents = 'none';
+    hideTrainOverlay();
+    switchTab('sources');
+  } catch(e) {
+    hideTrainOverlay();
+    addMsg('system', 'PDF training error: ' + e.message);
+    setStatus(false, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// UPGRADE 7: KG TRIPLE EDITOR
+// Browse, search, delete, edit triples.
+// ─────────────────────────────────────────────────────
+function kgEditSearch(query) {
+  const list = document.getElementById('kgEditList');
+  const countEl = document.getElementById('kgEditCount');
+  if (!engine.kg) return;
+  const all = engine.kg.triples.filter(t => t.alive !== false);
+  countEl.textContent = all.length + ' triples';
+  const q = (query || '').toLowerCase().trim();
+  const filtered = q
+    ? all.filter(t =>
+        t.s.toLowerCase().includes(q) ||
+        t.p.toLowerCase().includes(q) ||
+        String(t.o).toLowerCase().includes(q)
+      )
+    : all.slice(0, 200);
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:9.5px;color:var(--text-muted);padding:12px;text-align:center">' + (q ? 'No matching triples.' : 'No triples yet.') + '</div>';
+    return;
+  }
+  list.innerHTML = filtered.slice(0, 300).map((t, i) => {
+    const idx = engine.kg.triples.indexOf(t);
+    const sourceTitle = engine.sm.get(t.tag)?.title || t.tag || '';
+    return `<div class="coref-entry" style="margin-bottom:5px" id="kgrow-${idx}">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="coref-node" style="cursor:pointer" onclick="kgEditSetSubj('${t.s.replace(/'/g,"\'")}')" title="Click to search">${t.s}</span>
+        <span style="color:var(--gold);font-size:9px;font-family:'JetBrains Mono',monospace">${t.p.replace(/_/g,' ')}</span>
+        <span class="coref-node" style="cursor:pointer" onclick="kgEditSetSubj('${String(t.o).replace(/'/g,"\'")}')" title="Click to search">${String(t.o).slice(0,60)}</span>
+        <span style="flex:1"></span>
+        <span style="font-size:8.5px;color:var(--text-muted)">${sourceTitle}</span>
+        <button onclick="kgDeleteTriple(${idx})" style="background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.3);border-radius:5px;padding:2px 7px;color:rgba(255,120,120,.9);font-size:9px;cursor:pointer">✕</button>
+      </div>
+      ${t.conf !== undefined ? `<div style="font-size:8px;color:var(--text-muted);margin-top:2px">conf: ${(t.conf||0).toFixed(2)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function kgEditSetSubj(s) {
+  const input = document.getElementById('kgSearchInput');
+  if (input) { input.value = s; kgEditSearch(s); }
+}
+
+function kgDeleteTriple(idx) {
+  const t = engine.kg.triples[idx];
+  if (!t) return;
+  t.alive = false;
+  engine.cache.invalidate();
+  kgEditSearch(document.getElementById('kgSearchInput')?.value || '');
+  document.getElementById('kgEditCount').textContent = engine.kg.triples.filter(t=>t.alive!==false).length + ' triples';
+  addMsg('system', `Deleted triple: ${t.s} → ${t.p} → ${t.o}`);
+}
+
+function switchTab(n){
+  const names=['wiki','paste','sources','data','words','cognition','graph','kgedit'];
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===n));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  const pane=document.getElementById('tab-'+n);
+  if(pane)pane.classList.add('active');
+  if(n==='graph'&&typeof hgRefresh==='function'){setTimeout(()=>{if(typeof resizeHgCanvas==='function')resizeHgCanvas();hgRefresh();},60);}
+  if(n==='kgedit'){kgEditSearch(document.getElementById('kgSearchInput')?.value||'');}
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  AGI PANEL UPDATE FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+function updateAGIPanel(eng) {
+  if (!eng) return;
+  try {
+    // ── Causal edges panel ──
+    const causalEl = document.getElementById('causalEdgeLog');
+    if (causalEl && eng.causalGraph.edgeCount > 0) {
+      const edges = [];
+      eng.causalGraph.edges.forEach((effects, cause) => {
+        effects.slice(0,2).forEach(e => {
+          const sign = e.strength < 0 ? '🚫' : '→';
+          const strength = Math.abs(e.strength);
+          edges.push(`<div style="padding:2px 0;font-family:'JetBrains Mono',monospace;font-size:9px"><span style="color:var(--cyan)">${cause}</span> <span style="color:var(--text-muted)">${sign}</span> <span style="color:var(--text)">${e.effect}</span> <span style="color:var(--text-muted);font-size:8px">[${(strength*100).toFixed(0)}%]</span></div>`);
+        });
+      });
+      causalEl.innerHTML = edges.slice(0,15).join('') || '<div style="font-size:9px;color:var(--text-muted)">No causal edges yet.</div>';
+    }
+
+    // ── World model objects panel ──
+    const worldEl = document.getElementById('worldObjectLog');
+    if (worldEl) {
+      const snap = eng.worldModel.snapshot();
+      if (snap.learnedObjects.length) {
+        const items = snap.learnedObjects.slice(0,10).map(o => {
+          const stateColor = o.state === 'unknown' ? 'var(--text-muted)' : 'var(--gold)';
+          return `<div style="padding:2px 0;font-family:'JetBrains Mono',monospace;font-size:9px"><span style="color:var(--green)">${o.name}</span> <span style="color:${stateColor}">[${o.state||'?'}]</span></div>`;
+        });
+        worldEl.innerHTML = items.join('') + `<div style="font-size:8px;color:var(--text-muted);margin-top:3px">${snap.objectCount} objects · ${snap.simCount} simulations</div>`;
+      }
+    }
+
+    // ── System 2 stats ──
+    const s2v = document.getElementById('sys2Verified');
+    const s2r = document.getElementById('sys2Refuted');
+    const s2m = document.getElementById('sys2MathCalls');
+    const s2Snap = eng.system2.snapshot();
+    if (s2v) s2v.textContent = s2Snap.verifiedCount;
+    if (s2r) s2r.textContent = s2Snap.refutedCount;
+    if (s2m) s2m.textContent = s2Snap.mathCallCount;
+
+  } catch(e) { console.warn('[AGI panel]', e); }
+}
+
+function updateSys2Panel(sys2) {
+  const el = document.getElementById('sys2ProofLog');
+  if (!el || !sys2) return;
+  const snap = sys2.snapshot();
+  if (!snap.proofLog.length) return;
+  el.innerHTML = snap.proofLog.slice(0,6).map(p => {
+    const icon = p.type === 'math' ? '🧮' : p.type === 'verify' ? (p.approved ? '✓' : '✗') : '📋';
+    const color = p.type === 'math' ? 'var(--gold)' : p.approved !== false ? 'var(--green)' : 'var(--red)';
+    const content = p.type === 'math'
+      ? `${p.input} = ${p.result}`
+      : p.type === 'verify'
+      ? `Score: ${(p.score*100).toFixed(0)}% ${p.issues?.length ? '⚠ '+p.issues[0] : '✓ clean'}`
+      : `${p.query?.slice(0,40)} → ${p.conclusion?.slice(0,40)}`;
+    return `<div style="padding:2px 0 2px 0;font-family:'JetBrains Mono',monospace;font-size:8.5px"><span style="color:${color}">${icon}</span> <span style="color:var(--text)">${content}</span></div>`;
+  }).join('');
+}
+
+function updateCounterfactualPanel(text) {
+  const el = document.getElementById('counterfactualLog');
+  if (el && text) el.textContent = text;
+}
+
+function updateWorldModelPanel(sim) {
+  const el = document.getElementById('worldSimLog');
+  if (el && sim?.description) el.textContent = sim.description;
+}
+
+function updateUI(){
+  const n=engine.bm25.ss.length;
+  document.getElementById('stSent').textContent=n;
+  document.getElementById('stTrip').textContent=engine.kg.count();
+  const v=engine.bm25.ti.size;document.getElementById('stVoc').textContent=v>999?(v/1000).toFixed(1)+'k':v;
+  document.getElementById('stWord').textContent=engine.wordProfiler.size;
+  document.getElementById('stSynth').textContent=engine.synthesisCount;
+  const hyEl = document.getElementById('stHyper');
+  if (hyEl) hyEl.textContent = engine.kg.hyperCount();
+  if(n>0)document.getElementById('statsSection').style.display='block';
+  document.getElementById('srcCount').textContent=engine.sm.s.length;
+  const sl=document.getElementById('srcList');
+  if(!engine.sm.s.length){sl.innerHTML='<div class="no-sources">No sources yet.</div>';}
+  else{sl.innerHTML=engine.sm.s.map(s=>`<div class="source-item"><div class="source-icon">${s.trusted?'⭐':'📄'}</div><div class="source-info"><div class="source-title">${s.title}</div><div class="source-meta">${s.count} sentences · ${new Date(s.at).toLocaleDateString()}</div></div><div class="source-actions"><button class="kg-view-btn" onclick="openKgModal('${s.id}')">KG</button><button class="trust-btn ${s.trusted?'trusted':''}" onclick="toggleTrust('${s.id}')">${s.trusted?'trusted':'trust'}</button><button class="source-remove" onclick="rmSrc('${s.id}')">✕</button></div></div>`).join('');}
+  const kws=engine.bm25.topKW(20);
+  if(kws.length){document.getElementById('topicSection').style.display='block';document.getElementById('topicCloud').innerHTML=kws.map(({word,score})=>{const sz=Math.min(13,9+Math.round(score/6));return`<span class="topic-tag" style="font-size:${sz}px">${word}</span>`;}).join('');}
+  updateWordBrowse();
+  updateQualiaUI();
+  // V11 panels
+  updateCentralityUI();
+  updateOntologyUI();
+  updateIngestionUI();
+  window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
+  // AGI panels
+  updateAGIPanel(engine);
+  updateSys2Panel(engine.system2);
+}
+function toggleTrust(tag){const s=engine.sm.get(tag);if(!s)return;const nt=!s.trusted;engine.setTrust(tag,nt);updateUI();addMsg('system',`"${s.title}" ${nt?'trusted (1.6× weight)':'untrusted (0.6× weight)'}`);}
+function rmSrc(tag){const s=engine.sm.get(tag);if(!s)return;if(!confirm(`Remove "${s.title}"?`))return;engine.rmSource(tag);updateUI();if(!engine.trained)setStatus(false,'awaiting training');addMsg('system',`Removed "${s.title}"`);}
+function setStatus(active,text){const el=document.getElementById('modelStatus');el.className=`model-status ${active?'active':''}`;document.getElementById('statusTxt').textContent=text;}
+
+function streamMsg(text, meta) {
+  const msgs=document.getElementById('messages');const row=document.createElement('div');row.className='msg-row ai';
+  const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  const synthBadge=meta.synthesized?'<span class="badge synth">⚗ synthesized</span>':'';
+  // V12: no nested backticks — explicit string concat
+  const _agiStratMap={'causal':'⚗ Causal','causal_counterfactual':'⚗ Counterfactual','worldmodel':'🌍 World','worldmodel_spatial':'🌍 Spatial','system2':'🧮 System 2','system2_math':'🧮 Math','system2_proof':'🧮 Proof','system2_analogy':'🧮 Analogy','abductive':'🔬 Abductive','abstract':'💡 Abstract','abstract_predict':'💡 Predict'};
+  const _stratLbl=_agiStratMap[meta.strategy]||(meta.strategy==='social'?'💬 social':meta.strategy==='society'?('🧠 '+(meta._societyWinner||'Society')):meta.strategy==='graphrag'?'📊 Graph-RAG':meta.strategy==='slm'?'🧬 SLM':meta.strategy==='expert'?'⚡ Expert Ensemble':meta.strategy);
+  const _isAGIStrat=!!_agiStratMap[meta.strategy];
+  const _stratCls=_isAGIStrat?'kg':meta.strategy==='social'?'social':meta.strategy==='society'?'society':meta.strategy==='graphrag'?'graphrag':meta.strategy==='slm'?'slm':meta.strategy==='refuted'?'refuted':meta.strategy==='expert'?'graphrag':'fallback';
+  const stratBadge=meta.strategy&&meta.strategy!=='none'&&meta.strategy!=='synthesis'?('<span class="badge '+_stratCls+'" style="'+(_isAGIStrat?'background:rgba(100,200,255,.15);border-color:rgba(100,200,255,.3);color:#64c8ff':'')+'">'+_stratLbl+'</span>'):'';
+  const sys2Badge=meta._sys2?('<span class="badge" style="background:rgba(176,148,255,.12);border:1px solid rgba(176,148,255,.25);color:var(--purple);font-size:8px">🧮 verified</span>'):'';
+  const kgBadge=meta.kgUsed?'<span class="badge kg">KG</span>':'';
+  const autoFetchBadge=meta._autoFetched?'<span class="badge auto">⚡ auto-learned</span>':'';
+  const confBadge=meta.conf?('<span class="badge '+meta.conf.cls+'">'+meta.conf.lbl+'</span>'):'';
+  const ctxBadge=meta.ctxUsed?'<span class="badge ctx">↺ ctx</span>':'';
+  const cacheBadge=meta.cached?'<span class="badge cached">⚡ cached</span>':'';
+  const conflBadge=meta.conflict?'<span class="badge conflict">⚠ conflict</span>':'';
+  const tmsBadge=meta.intent==='tms_cascade'?'<span class="badge tms">⛓ TMS</span>':'';
+  const graphragBadge=(meta._graphRAG&&meta.strategy!=='graphrag')?'<span class="badge graphrag">📊 Graph-RAG</span>':'';
+  const crossDocBadge=meta._crossDoc?'<span class="badge" style="background:rgba(147,112,219,.15);border:1px solid rgba(147,112,219,.3);color:#b39ddb" title="'+(meta._crossDocSrcs||[]).join(' + ')+'">🔗 cross-doc</span>':'';
+  const slmBadge=meta._slm?'<span class="badge slm">🧬 SLM</span>':'';
+  const srcBtn=meta.src?'<button class="src-btn" onclick="toggleSrcReveal(this)">⟨ source ⟩</button>':'';
+  const _srcTitle=meta.srcTitle?('<div class="source-title-line">📄 '+meta.srcTitle+'</div>'):'';
+  const _srcEvid=meta.evidence?('<div class="evidence-line">🔗 '+meta.evidence+'</div>'):'';
+  const srcReveal=meta.src?('<div class="source-reveal" style="display:none">'+_srcTitle+meta.src+_srcEvid+'</div>'):'';
+  const fbId='fb-'+Date.now();
+  const fbHtml='<div class="feedback-row" id="'+fbId+'"><button class="fb-btn good" onclick="voteFb(this,\''+fbId+'\',true)">👍</button><button class="fb-btn bad" onclick="voteFb(this,\''+fbId+'\',false)">👎</button></div>';
+  const bubId='bub-'+Date.now();
+  row.innerHTML='<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap" style="min-width:0"><div class="msg-bubble ai'+(meta.synthesized?' synthesized':'')+'" id="'+bubId+'" data-src="'+(meta.src?meta.src.replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'')+'" ></div><div class="msg-meta">'+time+synthBadge+stratBadge+graphragBadge+crossDocBadge+slmBadge+kgBadge+sys2Badge+confBadge+ctxBadge+cacheBadge+conflBadge+autoFetchBadge+tmsBadge+srcBtn+'</div>'+srcReveal+fbHtml+'</div>';
+  msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;
+  const bubble=row.querySelector('.msg-bubble.ai');
+  const speed=Math.max(5,Math.min(20,1600/text.length));let i=0;
+  function ty(){if(i<text.length){i++;bubble.innerHTML=text.slice(0,i)+'<span class="cursor">▋</span>';msgs.scrollTop=msgs.scrollHeight;setTimeout(ty,speed);}else{bubble.innerHTML=text;if(window._orbStreamDone)window._orbStreamDone();if(window.ConvoManager)window.ConvoManager.captureMessage('assistant',text,'<div>'+row.outerHTML+'</div>');}}
+  bubble.addEventListener('click',()=>{bubble.innerHTML=text;i=text.length+1;},{once:true});
+  setTimeout(ty,speed);
+}
+function toggleSrcReveal(btn){const el=btn.closest('.msg-row').querySelector('.source-reveal');if(!el)return;const show=el.style.display!=='none';el.style.display=show?'none':'block';btn.textContent=show?'⟨ source ⟩':'⟨ hide ⟩';}
+function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();
+// LEXICA 4.0: Feed vote signal into preference engine + retrieval weight adjustment
+if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);// Positive feedback → boost BM25 source weight for the tag
+const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.min(1.8,cur+0.1));}}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');// Negative feedback → lower source weight, increase curiosity about this gap
+const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.max(0.3,cur-0.15));}engine.failureTracker&&engine.failureTracker.recordFailure(engine.lastQuery||'',engine.lastSubject,'user thumbs-down','low');engine.drives.frustrate('curiosity',0.15,'thumbs-down on '+engine.lastSubject);}updatePreferenceUI();updateDriveUI();}// Auto-save updated weights to persistent memory
+setTimeout(()=>engine.saveToMemory&&engine.saveToMemory(),1000);}
+function addMsg(role,content){const msgs=document.getElementById('messages');const row=document.createElement('div');if(role==='system'){row.className='msg-row';row.innerHTML=`<div class="msg-bubble system">— ${content} —</div>`;}else if(role==='user'){row.className='msg-row user';row.innerHTML=`<div class="msg-avatar user">U</div><div class="msg-bubble-wrap"><div class="msg-bubble user">${content}</div></div>`;}else{row.className='msg-row ai';row.innerHTML=`<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">${content}</div></div>`;}msgs.appendChild(row);msgs.scrollTop=msgs.scrollHeight;}
+function showThinking(){
+  window._lastReasoningTrace = null; // reset trace for this query
+  const msgs=document.getElementById('messages');const d=document.createElement('div');d.id='think';d.className='msg-row ai';
+  d.innerHTML=`<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking" id="thinkBubble" style="cursor:pointer;user-select:none" title="Click to see reasoning trace when available">synthesizing answer<div class="dots"><span></span><span></span><span></span></div></div></div></div>`;
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+  // Clicking the thinking bubble shows the current reasoning trace (if any)
+  const thinkBubble = d.querySelector('#thinkBubble');
+  if (thinkBubble) {
+    thinkBubble.addEventListener('click', () => {
+      const trace = window._lastReasoningTrace;
+      const modal = document.getElementById('thinkTraceModal');
+      if (!modal) {
+        // Create modal on first use
+        const m = document.createElement('div');
+        m.id = 'thinkTraceModal';
+        m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);z-index:2000;display:flex;align-items:center;justify-content:center';
+        m.innerHTML = `<div style="background:rgba(13,13,26,.95);border:1px solid rgba(212,160,23,.3);border-radius:14px;padding:20px 22px;max-width:480px;width:90%;max-height:60vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.22em;color:rgba(212,160,23,.6);text-transform:uppercase;margin-bottom:10px">⚙ Chain-of-Thought Scratchpad</div>
+          <div id="thinkTraceContent" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.75;font-style:italic"></div>
+          <div style="margin-top:14px;font-size:8px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">This is Lexica's internal reasoning — not shown in final answer</div>
+          <button onclick="document.getElementById('thinkTraceModal').remove()" style="margin-top:12px;background:none;border:1px solid rgba(255,255,255,.1);color:var(--text-dim);border-radius:7px;padding:5px 14px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer">Close</button>
+        </div>`;
+        document.body.appendChild(m);
+        m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+      }
+      const content = document.getElementById('thinkTraceContent');
+      if (content) {
+        if (trace && trace.length > 5) {
+          content.textContent = trace;
+          document.getElementById('thinkTraceModal').style.display = 'flex';
+        } else {
+          content.innerHTML = '<em style="color:var(--text-muted)">Reasoning trace not yet available — chain-of-thought activates for complex multi-fact queries when NeuralMouth is online. Keep watching... 🔍</em>';
+          document.getElementById('thinkTraceModal').style.display = 'flex';
+        }
+      }
+    });
+  }
+}
+
+// Update thinking bubble label during synthesis stages
+function updateThinkingStage(stage) {
+  const bubble = document.getElementById('thinkBubble');
+  if (!bubble) return;
+  const stages = {
+    'bm25': 'scanning corpus',
+    'dense': 'dense retrieval (semantic)',
+    'multihop': 'multi-hop reasoning',
+    'slm': 'neural synthesis',
+    'cot': 'chain-of-thought'
+  };
+  const label = stages[stage] || stage;
+  bubble.innerHTML = label + '<div class="dots"><span></span><span></span><span></span></div>';
+}
+function rmThink(){const e=document.getElementById('think');if(e)e.remove();}
+
+
+// ═══════════════════════════════════════════════════════════
+//  EXPERT MODE — Ensemble Reasoning System
+//  Four synthetic agents collaborate live before every answer:
+//
+//  Analyst   — extracts what the KG actually knows about the subject
+//  Reasoner  — chains multi-hop logic, finds implicit connections
+//  Critic    — challenges weak inferences, flags gaps & conflicts
+//  Synthesizer — integrates all three into a final grounded answer
+//
+//  All four run sequentially (single SLM, different system prompts).
+//  Agents see each other's output — Reasoner reads Analyst,
+//  Critic reads both, Synthesizer reads all three.
+// ═══════════════════════════════════════════════════════════
+
+let _queryMode = 'normal'; // 'normal' | 'expert'
+
+function setQueryMode(mode) {
+  _queryMode = mode;
+  document.getElementById('modeNormal').classList.toggle('active', mode === 'normal');
+  document.getElementById('modeExpert').classList.toggle('active', mode === 'expert');
+  const panel = document.getElementById('expertPanel');
+  if (mode === 'expert') {
+    panel.classList.add('visible');
+    _expertReset();
+  } else {
+    panel.classList.remove('visible');
+  }
+}
+
+function _expertReset(label='idle') {
+  const agents = ['Analyst','Reasoner','Critic'];
+  agents.forEach(name => {
+    const dot = document.getElementById('dot-' + name);
+    const out = document.getElementById('out-' + name);
+    if (dot) { dot.classList.remove('thinking','done'); }
+    if (out) { out.textContent = 'Waiting for query...'; out.className = 'expert-agent-output pending'; }
+  });
+  const synth = document.getElementById('out-Synthesizer');
+  if (synth) { synth.textContent = '—'; }
+  const lbl = document.getElementById('expertStatusLbl');
+  if (lbl) lbl.textContent = label;
+}
+
+function _expertSetThinking(name) {
+  const dot = document.getElementById('dot-' + name);
+  const out = document.getElementById('out-' + name);
+  const lbl = document.getElementById('expertStatusLbl');
+  if (dot) { dot.classList.remove('done'); dot.classList.add('thinking'); }
+  if (out) { out.textContent = '▋'; out.className = 'expert-agent-output'; }
+  if (lbl) lbl.textContent = name + ' thinking...';
+}
+
+function _expertSetDone(name, text) {
+  const dot = document.getElementById('dot-' + name);
+  const out = document.getElementById('out-' + name);
+  if (dot) { dot.classList.remove('thinking'); dot.classList.add('done'); }
+  if (out) { out.textContent = text || '(no output)'; out.className = 'expert-agent-output'; }
+}
+
+function _expertSetSynthesis(text) {
+  const synth = document.getElementById('out-Synthesizer');
+  const lbl = document.getElementById('expertStatusLbl');
+  if (synth) synth.textContent = text || '—';
+  if (lbl) lbl.textContent = 'complete ✓';
+}
+
+// ── Core ensemble call ──
+// Runs four sequential SLM calls with agent-specific prompts.
+// Each agent receives the previous agent's output as context.
+// Returns the Synthesizer's final answer string.
+// ═══════════════════════════════════════════════════════
+//  EXPERT ENSEMBLE — Real collaborative debate
+//  Each agent reads the previous and explicitly challenges, builds on,
+//  or contradicts them. The panel shows genuine disagreement.
+// ═══════════════════════════════════════════════════════
+async function expertEnsembleQuery(question, kgFacts, evidenceSentences, conversationHistory) {
+  const nm = engine.neuralMouth;
+  if (!nm?.ready) { _expertReset('SLM not ready'); return null; }
+
+  // Build high-quality context — filter garbage triples first
+  const goodFacts = kgFacts.filter(f => NeuralMouth._tripleQuality(f)).slice(0, 8);
+  const factsStr = goodFacts.map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ');
+  const evStr = evidenceSentences
+    .filter(s => s && s.length > 25 && s.length < 200 && /[.!?]$/.test(s.trim()))
+    .slice(0, 3).join(' ');
+  const context = [factsStr, evStr].filter(Boolean).join(' | ').slice(0, 380);
+  if (!context.trim()) { _expertReset('no KG data'); return null; }
+
+  const timeout = ms => new Promise(r => setTimeout(() => r(null), ms));
+  const safe = async (promise, fallback='') => { try { return await promise || fallback; } catch(e) { return fallback; } };
+  await yieldToMain();
+
+  // ── ANALYST ── Reads raw facts, states only what the KG actually knows
+  _expertSetThinking('Analyst');
+  await yieldToMain();
+  const analystOut = await safe(Promise.race([
+    nm._generate(
+      'State the key facts from the given data that directly answer the question. Only mention what is explicitly in the facts. Do not infer.',
+      `Facts: ${context}\nQuestion: ${question.slice(0,100)}\nKnown facts:`,
+      85
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Analyst', analystOut || '(no output)');
+  await yieldToMain();
+
+  // ── REASONER ── Reads Analyst, builds on it OR challenges if Analyst missed something
+  _expertSetThinking('Reasoner');
+  await yieldToMain();
+  const reasonerPrompt = analystOut && analystOut.length > 10
+    ? `Analyst stated: "${analystOut.slice(0,140)}"\n\nDo you agree? Build on this or correct it. Trace the logical chain. What does it imply about the question?`
+    : `No analyst output. Use the facts directly to reason about the question.`;
+  const reasonerOut = await safe(Promise.race([
+    nm._generate(
+      'You are the Reasoner. Engage with the Analyst. Build on correct points or challenge wrong ones. Show your reasoning chain.',
+      `${reasonerPrompt}\nFacts: ${context.slice(0,200)}\nQuestion: ${question.slice(0,80)}\nReasoning:`,
+      100
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Reasoner', reasonerOut || '(no output)');
+  await yieldToMain();
+
+  // ── CRITIC ── Reads both, explicitly contradicts or approves, flags gaps
+  _expertSetThinking('Critic');
+  await yieldToMain();
+  const criticContent = [
+    analystOut ? `Analyst: "${analystOut.slice(0,110)}"` : '',
+    reasonerOut ? `Reasoner: "${reasonerOut.slice(0,110)}"` : '',
+    `Question: ${question.slice(0,80)}`,
+    `Available facts: ${context.slice(0,150)}`,
+    'Do you see any unsupported claims above? What is missing or wrong? Be specific.',
+  ].filter(Boolean).join('\n');
+  const criticOut = await safe(Promise.race([
+    nm._generate(
+      'You are the Critic. Point out what the other agents got wrong or unsupported. Mention which agent specifically. Be direct.',
+      criticContent,
+      80
+    ),
+    timeout(9000)
+  ]));
+  _expertSetDone('Critic', criticOut || '(no objections)');
+  await yieldToMain();
+
+  // ── SYNTHESIZER ── Arbitrates the debate into a final grounded answer
+  const lbl = document.getElementById('expertStatusLbl');
+  if (lbl) lbl.textContent = 'Synthesizer arbitrating...';
+  await yieldToMain();
+
+  const debateSummary = [
+    analystOut ? `Analyst found: ${analystOut.slice(0,100)}` : '',
+    reasonerOut ? `Reasoner argued: ${reasonerOut.slice(0,100)}` : '',
+    criticOut ? `Critic flagged: ${criticOut.slice(0,80)}` : '',
+  ].filter(Boolean).join(' | ');
+
+  let finalAnswer = '';
+  try {
+    if (nm._isDecoder) {
+      const msgs = [
+        { role:'system', content:'You are Lexica. After reading a three-agent debate, write one clear, grounded answer. Incorporate valid points, dismiss unsupported ones. No disclaimers. No lists.' },
+        ...(conversationHistory||[]).slice(-2).flatMap(t => [
+          { role:'user', content:t.q.slice(0,80) },
+          { role:'assistant', content:t.a.slice(0,100) },
+        ]),
+        { role:'user', content:`Debate: ${debateSummary}\n\nQuestion: ${question.slice(0,100)}\n\nFinal answer:` },
+      ];
+      finalAnswer = await safe(Promise.race([nm._generateMessages(msgs, 140), timeout(12000)]));
+    } else {
+      finalAnswer = await safe(Promise.race([
+        nm._generate(
+          'Write one clear answer. Incorporate the best points from the debate. Dismiss unsupported claims.',
+          `Debate: ${debateSummary}\nQuestion: ${question.slice(0,80)}\nAnswer:`,
+          110
+        ),
+        timeout(10000)
+      ]));
+    }
+    finalAnswer = (finalAnswer||'')
+      .replace(/^(Answer:|Final answer:|Sure[,!]\s*|Lexica:\s*)/i,'')
+      .replace(/\n/g,' ').trim();
+  } catch(e) { finalAnswer = ''; }
+
+  _expertSetSynthesis(finalAnswer || '(synthesis failed — check console)');
+  return finalAnswer || null;
+}
+async function sendQ(){
+  const inp=document.getElementById('qInput');const q=inp.value.trim();if(!q)return;
+  window._lastQ = q; // captured for fallback replies
+  window._addMsgReal('user',q);inp.value='';
+  engine.curiosity.resetTimer();
+
+  // LEXICA 3.0: Update user model on every input
+  const _sendSubject = extractSubject(q);
+  engine.userModel.update(q, _sendSubject);
+  // Reset expression drive when user talks to us (we're being heard)
+  engine.drives.satiate('expression', 0.3);
+  updateUserModelUI();
+
+  // ── Self-modify disabled (intercepts user queries incorrectly) ──
+  // if (window.SelfModify && window.SelfModify.isCodeIntent(q)) { ... }
+
+  showThinking();
+  await yieldToMain();
+
+  let r;
+  try {
+    r = await engine.query(q);
+  } catch(err) {
+    rmThink();
+    window._addMsgReal('system',`⚠ Engine error: ${err.message||err}`);
+    console.error('Lexica query error:',err);
+    return;
+  }
+
+  // ── EXPERT MODE: override final answer with ensemble reasoning ──
+  if (_queryMode === 'expert' && engine.trained && engine.neuralMouth?.ready) {
+    try {
+      // Get the KG facts that the engine just used (available on engine after query)
+      const expertFacts = engine.lastKgFacts || [];
+      const expertEvidence = r.src ? [r.src] : [];
+      const expertHistory = engine.ctx.h.slice(-3);
+      const ensembleAnswer = await expertEnsembleQuery(q, expertFacts, expertEvidence, expertHistory);
+      if (ensembleAnswer && ensembleAnswer.length > 10) {
+        r = { ...r, text: ensembleAnswer, strategy: 'expert', _expert: true, synthesized: true };
+      }
+    } catch(e) {
+      console.warn('[Expert Mode]', e);
+    }
+  } else if (_queryMode === 'expert') {
+    // Expert mode on but SLM not ready or no data — reset panel
+    _expertReset(engine.neuralMouth?.ready ? 'no KG data' : 'SLM loading...');
+  }
+
+  if(r._autoFetched){window._addMsgReal('system',`Auto-learned: <strong>${r._autoFetched}</strong>`);updateUI();setStatus(true,`synthesis ready · ${engine.bm25.ss.length} sentences`);}
+  rmThink();
+
+  // ── NEVER GO SILENT ──
+  // If the query produced no text, Lexica must still say something.
+  // Priority: (1) SLM social reply  (2) KG curiosity gap  (3) ask user to load knowledge
+  if (!r.text || r.text.trim() === '') {
+    const q = (window._lastQ || '').trim();
+    const n = engine.bm25.ss.length;
+    const nm = engine.neuralMouth;
+
+    if (nm?.ready && q) {
+      // Ask the SLM to respond directly — it might have enough context
+      const ctx = engine.sm.s.slice(0,4).map(s=>s.title).filter(Boolean).join(', ');
+      const fallbackPromise = nm._generate(
+        'You are Lexica. The user said something you have no knowledge about. Acknowledge what they said and ask a specific follow-up to learn more or clarify.',
+        `User said: "${q.slice(0,120)}"\nLoaded topics: ${ctx || 'none'}\nReply:`,
+        80
+      );
+      fallbackPromise.then(slmText => {
+        if (slmText && slmText.length > 4) {
+          streamMsg(slmText, {...r, text:slmText, synthesized:true, strategy:'slm'});
+        } else {
+          // SLM also returned nothing — surface the knowledge gap explicitly
+          const gapReply = n > 0
+            ? `I don't have anything on "${q.slice(0,40)}" — my knowledge covers ${engine.sm.s.slice(0,3).map(s=>s.title).join(', ')}. Want me to look it up?`
+            : `I have no knowledge loaded yet. Fetch a Wikipedia article or paste text above to teach me something.`;
+          streamMsg(gapReply, {...r, text:gapReply, synthesized:false, strategy:'fallback'});
+        }
+        updateUI(); updateQualiaUI();
+        window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
+      }).catch(() => {
+        const gapReply = n > 0
+          ? `Nothing in my knowledge about "${q.slice(0,40)}". Load a source on it and ask again.`
+          : `No knowledge loaded. Add a source first.`;
+        streamMsg(gapReply, {...r, text:gapReply, synthesized:false, strategy:'fallback'});
+        updateUI(); updateQualiaUI();
+      });
+      return; // async path handles the rest
+    }
+
+    // SLM not ready — generate a gap reply from knowledge state
+    const gapReply = n > 0
+      ? `Nothing in my knowledge about "${q.slice(0,40)}". I know about ${engine.sm.s.slice(0,3).map(s=>s.title).join(', ')} — want to ask something about those?`
+      : `No knowledge loaded yet. Use the Sources tab to fetch a Wikipedia article or paste text.`;
+    r = {...r, text:gapReply, synthesized:false, strategy:'fallback'};
+  }
+  streamMsg(r.text,r);updateUI();
+  updateQualiaUI();
+  window.ConvoManager && window.ConvoManager.updateKnowledgeBadge();
+}
+function clearChat(){if(confirm('Clear chat? Training stays.')){document.getElementById('messages').innerHTML='';const _ac=window.ConvoManager&&window.ConvoManager.getActive();if(_ac){_ac.messages=[];window.ConvoManager.save&&window.ConvoManager.save();window.ConvoManager.render&&window.ConvoManager.render();}window._addMsgReal('system','Chat cleared.');}}
+function clearCtx(){engine.ctx.clear();addMsg('system','Conversation context cleared.');}
+
+
+window.ConvoManager = (function() {
+  let _convos = [];
+  let _activeId = null;
+  // Capture full HTML of each message row for restore
+  const _origAddMsg       = window.addMsg        || null;
+  const _origStreamMsg    = window.streamMsg     || null;
+
+  function save() {
+    try {
+      // Store up to 60 messages per convo, cap value at ~2MB total
+      const toSave = _convos.map(c => ({
+        id: c.id, name: c.name, createdAt: c.createdAt,
+        messages: c.messages.slice(-60)
+      }));
+      localStorage.setItem('lexica_convos_v2', JSON.stringify(toSave));
+    } catch(e) {}
+  }
+
+  function getActive() {
+    return _convos.find(c => c.id === _activeId) || null;
+  }
+
+  function render() {
+    const list = document.getElementById('convoList');
+    if (!list) return;
+    list.innerHTML = _convos.map(c => {
+      const active  = c.id === _activeId;
+      const preview = (c.messages.filter(m => m.role==='user').slice(-1)[0]?.content||'').slice(0,45);
+      const date    = new Date(c.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      return `<div class="convo-item${active?' active':''}" onclick="window.ConvoManager.switchTo('${c.id}')">` +
+        `<div class="convo-name">${escHtml(c.name)}</div>` +
+        (preview?`<div class="convo-preview">${escHtml(preview)}</div>`:'') +
+        `<div class="convo-date">${date}</div>` +
+        `<button class="convo-del" onclick="event.stopPropagation();window.ConvoManager.del('${c.id}')" title="Delete">✕</button>` +
+        `</div>`;
+    }).join('');
+    // Update knowledge badge
+    const kbEl = document.getElementById('kbCount');
+    if (kbEl) kbEl.textContent = engine.bm25.ss.length + ' sentences';
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function createNew(silent) {
+    const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    const c = { id, name: 'New conversation', messages: [], createdAt: Date.now() };
+    _convos.unshift(c);
+    _activeId = id;
+    save();
+    render();
+    document.getElementById('messages').innerHTML = '';
+    if (!silent) _showIntro();
+  }
+
+  function _showIntro() {
+    const n    = typeof engine !== 'undefined' && engine && engine.bm25 ? engine.bm25.ss.length : 0;
+    const srcs = typeof engine !== 'undefined' && engine && engine.sm   ? engine.sm.s.length   : 0;
+    const msgs = document.getElementById('messages');
+    if (!msgs) return;
+    const row = document.createElement('div');
+    row.className = 'msg-row ai intro-msg';
+    // Show bare status line — no prose templates. SLM replaces it once ready.
+    const statusHtml = n > 0
+      ? `${n} sentence${n!==1?'s':''} · ${srcs} source${srcs!==1?'s':''} indexed.`
+      : '<span style="opacity:0.35">—</span>';
+    row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai" style="font-size:12px;line-height:1.7">' + statusHtml + '</div></div>';
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+    // SLM replaces status with a natural greeting once loaded
+    const trySlmIntro = (attempt) => {
+      const nm2 = window._neuralMouth;
+      if (nm2 && nm2.ready) {
+        const ctx = n > 0
+          ? `${n} sentences from ${srcs} source${srcs!==1?'s':''} indexed: ${engine.sm.s.slice(0,3).map(s=>s.title).join(', ')}.`
+          : 'No knowledge sources loaded.';
+        nm2._generate(
+          'Write a 1-2 sentence greeting as an AI knowledge assistant describing your current state.',
+          `State: ${ctx}. Greeting:`,
+          80
+        ).then(txt => {
+          if (txt && txt.length > 10) {
+            const bubble = row.querySelector('.msg-bubble');
+            if (bubble) bubble.innerHTML = txt;
+          }
+        }).catch(() => {});
+      } else if (attempt < 24) {
+        setTimeout(() => trySlmIntro(attempt + 1), 500);
+      }
+    };
+    trySlmIntro(0);
+  }
+
+  async function nameFromPrompt(text) {
+    const c = getActive();
+    if (!c || c.name !== 'New conversation') return;
+    // Quick title from first message text
+    const cleaned = text.replace(/[<>&"]/g,'').trim();
+    c.name = cleaned.slice(0,36) + (cleaned.length > 36 ? '…' : '') || 'Conversation';
+    save(); render();
+    // Try to get a better name from the SLM
+    const nm = window._neuralMouth;
+    if (nm && nm.ready) {
+      try {
+        const name = await nm._generate(
+          'Generate a 2-5 word title for a chat conversation. Output only the title.',
+          'Message: "' + text.slice(0, 80) + '"\nTitle:',
+          14
+        );
+        const cleaned2 = (name||'').replace(/^["']+|["']+$/g,'').trim().split('\n')[0];
+        if (cleaned2 && cleaned2.length >= 3 && cleaned2.length <= 50) {
+          c.name = cleaned2; save(); render();
+        }
+      } catch(e) {}
+    }
+  }
+
+  function captureMessage(role, content, rowHtml) {
+    const c = getActive();
+    if (!c) return;
+    c.messages.push({ role, content: String(content).slice(0,1500), html: rowHtml, ts: Date.now() });
+    save();
+    if (role === 'user') nameFromPrompt(content);
+  }
+
+  function switchTo(id) {
+    if (id === _activeId) return;
+    const c = _convos.find(c => c.id === id);
+    if (!c) return;
+    _activeId = id;
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = '';
+    c.messages.forEach(m => {
+      if (!m.html) return;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = m.html;
+      const row = tmp.firstElementChild;
+      if (row) msgs.appendChild(row);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+    save(); render();
+  }
+
+  function del(id) {
+    if (_convos.length === 1) { createNew(true); }
+    _convos = _convos.filter(c => c.id !== id);
+    if (_activeId === id) {
+      _activeId = _convos[0]?.id || null;
+      const msgs = document.getElementById('messages');
+      if (msgs) msgs.innerHTML = '';
+      if (_activeId) switchTo(_activeId);
+    }
+    save(); render();
+  }
+
+  function init() {
+    try {
+      const saved = localStorage.getItem('lexica_convos_v2');
+      if (saved) {
+        _convos = JSON.parse(saved);
+        _activeId = _convos[0]?.id || null;
+      }
+    } catch(e) { _convos = []; }
+    if (!_convos.length || !_activeId) createNew(true);
+    // Restore most recent conversation messages
+    const c = getActive();
+    if (c && c.messages.length > 0) {
+      const msgs = document.getElementById('messages');
+      if (msgs) {
+        msgs.innerHTML = '';
+        c.messages.forEach(m => {
+          if (!m.html) return;
+          const tmp = document.createElement('div');
+          tmp.innerHTML = m.html;
+          const row = tmp.firstElementChild;
+          if (row) msgs.appendChild(row);
+        });
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+    render();
+  }
+
+  // Expose knowledge badge update to updateUI
+  function updateKnowledgeBadge() {
+    const kbEl = document.getElementById('kbCount');
+    if (kbEl) kbEl.textContent = engine.bm25.ss.length + ' sentences';
+  }
+
+  return { createNew, switchTo, del, captureMessage, nameFromPrompt, init, render, updateKnowledgeBadge, getActive };
+})();
+
+// ─── Intercept addMsg to capture into active conversation ───
+window._addMsgReal = function(role, content) {
+  const msgs = document.getElementById('messages');
+  const row  = document.createElement('div');
+  if (role==='system') {
+    row.className='msg-row';
+    row.innerHTML=`<div class="msg-bubble system">— ${content} —</div>`;
+  } else if (role==='user') {
+    row.className='msg-row user';
+    row.innerHTML=`<div class="msg-avatar user">U</div><div class="msg-bubble-wrap"><div class="msg-bubble user">${content}</div></div>`;
+  } else {
+    row.className='msg-row ai';
+    row.innerHTML=`<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">${content}</div></div>`;
+  }
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (role !== 'system') window.ConvoManager.captureMessage(role, content, `<div>${row.outerHTML}</div>`);
+};
+// Override global addMsg
+window.addMsg = window._addMsgReal;
+
+
+// ═══════════════════════════════════════════════════════════════
+//  SELF-MODIFY ENGINE
+//  Lexica can read and modify its own source code using Claude API.
+//  Intent detection → source fetch → Claude patch generation → apply + download
+// ═══════════════════════════════════════════════════════════════
+window.SelfModify = (function() {
+
+  // Coding rules embedded into every self-modify prompt
+  const CODING_RULES = `
+LEXICA CODEBASE RULES:
+1. SINGLE FILE: One HTML file. All JS, CSS, HTML inline. No imports except CDN.
+2. NO NESTED TEMPLATE LITERALS: Use string concatenation for HTML inside JS.
+3. STRUCTURE: <style> for CSS, last <script> for all JS.
+4. LAYOUT (3 columns): #convosSidebar (left, conversations) | .chat-area (center) | #sidebar (right, tools). CSS: .convos-sidebar, .sidebar, .chat-area.
+5. ARCHITECTURE LAYERS: L1=Lexical, L2=BM25, L3=KG, L4=NER, L5=Synthesis, L6=Society, L7=Qualia, L8=Godel, L9=CFG, L10=NanoCortex, L11=NeuralMouth.
+6. GLOBALS: engine (Engine instance), window.ConvoManager (conversation manager), window.SelfModify (self-mod engine), window._neuralMouth (SLM), window._nanoCortex (embeddings).
+7. MESSAGES: window._addMsgReal(role, content) — adds+captures. streamMsg(text, meta) — animated AI reply with badges.
+8. CSS VARIABLES: --bg, --bg2, --bg3, --text, --text-dim, --text-muted, --border, --gold, --blue, --purple, --green, --red, --cyan, --orange, --glass-bg, --glass-border.
+9. PERFORMANCE: Heavy ops (BM25._rebuild, KG extraction) should use Web Workers with postMessage. Don't block the main thread.
+10. N3 BRIDGE: CuriosityEngine has _queriedPairs (Set) and _bridgeInFlight (bool). Never call N3 bridge in a tight loop. Min 3min cooldown between bridge queries.
+11. CONVERSATIONS: window.ConvoManager.captureMessage(role, content, rowHtml) captures messages. Don't use localStorage directly for messages.
+12. CSS CLASSES: Only add CSS near similar elements. Use existing color variables. Never hardcode colors.
+`;
+
+  // Detect if a user query is asking Lexica to modify its own code
+  function isCodeIntent(query) {
+    const q = query.toLowerCase();
+    const codeVerbs = ['add','create','build','implement','make','fix','change','update','modify','remove','delete','refactor','optimize','improve','rewrite','install','enable','disable'];
+    const codeNouns = ['worker','thread','sidebar','button','feature','function','animation','performance','lag','speed','color','style','font','layout','panel','tab','widget','dark mode','light mode','search','filter','export','import','modal','tooltip','shortcut','keyboard','cache','storage','api','endpoint','hook','event','listener'];
+    const hasSelfRef = /\b(yourself|your code|this app|this page|the app|lexica itself|self|you to|you can)\b/.test(q) || /\b(code|source|html|javascript|css|js)\b/.test(q);
+    const hasCodeVerb = codeVerbs.some(v => q.includes(v));
+    const hasCodeNoun = codeNouns.some(n => q.includes(n));
+    return (hasSelfRef && hasCodeVerb) || (hasCodeVerb && hasCodeNoun && q.length < 200);
+  }
+
+  // Fetch the current page source
+  async function getSource() {
+    try {
+      const resp = await fetch(location.href + '?_nocache=' + Date.now());
+      if (resp.ok) return await resp.text();
+    } catch(e) {}
+    // Fallback: use current DOM
+    return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  }
+
+  // Apply a list of patches to the source
+  function applyPatches(source, patches) {
+    let result = source;
+    let applied = 0;
+    for (const p of patches) {
+      if (!p.find || !p.replace && p.replace !== '') continue;
+      if (result.includes(p.find)) {
+        result = result.replace(p.find, p.replace);
+        applied++;
+      } else {
+        console.warn('[SelfModify] Patch not found:', p.find.slice(0,80));
+      }
+    }
+    return { result, applied, total: patches.length };
+  }
+
+  // Trigger download of the modified file
+  function downloadModified(html, desc) {
+    const blob   = new Blob([html], { type: 'text/html' });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement('a');
+    a.href       = url;
+    a.download   = 'lexica-v14-patched.html';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
+
+  // ── analyzeAndPlan: Lexica reads its own code and reasons about it ──
+  // No prebaked answers. Finds relevant source sections itself via keyword
+  // extraction, then uses its SLM to reason about what needs to change.
+  async function analyzeAndPlan(instruction, relevantSource) {
+    const nm = window._neuralMouth;
+    const sections = findRelevantCode(instruction, relevantSource);
+
+    if (nm && nm.ready) {
+      try {
+        const codeCtx = sections.map(function(s){ return s.snippet.slice(0,200); }).join('\n---\n');
+        const task = `Describe a code change as JSON: {"description":"what to change","patches":[{"find":"exact string to find","replace":"replacement string"}]}`;
+        const instruction_prompt = `Task: ${instruction}\n\nCode:\n${codeCtx.slice(0, 280)}\n\nJSON:`;
+        let raw = await nm._generate(task, instruction_prompt, 150);
+        raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+        const jStart = raw.indexOf('{'), jEnd = raw.lastIndexOf('}');
+        if (jStart !== -1 && jEnd !== -1) {
+          const parsed = JSON.parse(raw.slice(jStart, jEnd + 1));
+          if (parsed && Array.isArray(parsed.patches)) return parsed;
+        }
+      } catch(e) {
+        console.warn('[SelfModify] SLM reasoning failed:', e.message);
+      }
+    }
+    const found = sections.map(function(s){ return s.kw; }).join(', ');
+    return {
+      description: 'Found relevant code at: ' + (found || 'no matches') + '. NeuralMouth (Transformers.js) needed for autonomous patching.',
+      patches: [],
+      sections: sections
+    };
+  }
+
+  // Scan source for sections relevant to the instruction by extracting identifiers
+  // from the instruction itself and finding them in the actual source code.
+  function findRelevantCode(instruction, source) {
+    const found = [], seen = new Set();
+    const identifiers = (instruction.match(/\b([a-zA-Z_][a-zA-Z0-9_]{3,})\b/g) || []);
+    const unique = [...new Set(identifiers)].filter(function(id){ return source.indexOf(id) !== -1; }).slice(0, 8);
+    unique.forEach(function(kw) {
+      if (seen.has(kw)) return;
+      seen.add(kw);
+      const idx = source.indexOf(kw);
+      if (idx < 0) return;
+      let start = idx;
+      while (start > 0 && source[start] !== '\n') start--;
+      start = Math.max(0, start - 1);
+      found.push({ kw: kw, snippet: source.slice(start, Math.min(source.length, idx + 500)) });
+    });
+    return found;
+  }
+
+
+  // Main entry: perform the modification
+  async function modify(instruction) {
+    // Show a special thinking bubble
+    const msgs = document.getElementById('messages');
+    const thinking = document.createElement('div');
+    thinking.id = 'selfmod-thinking';
+    thinking.className = 'msg-row ai';
+    thinking.innerHTML = '<div class="msg-avatar ai">Lx</div><div><div class="msg-bubble ai"><div class="thinking">reading source code<div class="dots"><span></span><span></span><span></span></div></div></div></div>';
+    msgs.appendChild(thinking);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    let source;
+    try {
+      source = await getSource();
+    } catch(e) {
+      thinking.remove();
+      window._addMsgReal('system', '⚠ Could not read source: ' + e.message);
+      return;
+    }
+
+    // Extract just the relevant sections to stay within context limits
+    // We send: full CSS block + full JS block (skip the raw HTML body)
+    const styleMatch  = source.match(/<style>([\s\S]*?)<\/style>/);
+    const scriptMatch = source.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
+    const relevantSource = [
+      '/* === CSS === */',
+      styleMatch ? styleMatch[0].slice(0, 40000) : '/* CSS not extracted */',
+      '/* === JAVASCRIPT === */',
+      scriptMatch ? scriptMatch[0].slice(0, 80000) : '/* JS not extracted */'
+    ].join('\n\n');
+
+    thinking.querySelector('.thinking div').textContent = 'generating code patch';
+
+    // ── LOCAL ANALYSIS (no API call) ──
+    // Lexica reasons about its own code using its SLM + rule-based pattern matching
+    let patchJson;
+    try {
+      patchJson = await analyzeAndPlan(instruction, relevantSource);
+    } catch(e) {
+      thinking.remove();
+      window._addMsgReal('system', '⚠ Self-modify analysis failed: ' + e.message);
+      return;
+    }
+
+    thinking.remove();
+
+    const { patches, description } = patchJson;
+    if (!patches || !patches.length) {
+      // Show explanation bubble
+      const row = document.createElement('div');
+      row.className = 'msg-row ai';
+      row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">' +
+        '<div class="patch-preview"><div class="patch-title">⚙ Code Analysis</div><div class="patch-desc">' + escHtml(description) + '</div></div>' +
+        '</div></div>';
+      msgs.appendChild(row);
+      msgs.scrollTop = msgs.scrollHeight;
+      return;
+    }
+
+    // Apply patches to full source
+    const { result, applied, total } = applyPatches(source, patches);
+
+    // Render a patch preview with download button
+    const patchSummary = patches.slice(0,5).map(p =>
+      '• ' + escHtml(p.note || p.find.slice(0,60).trim())
+    ).join('\n');
+
+    const bubId = 'sm-' + Date.now();
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+
+    const approveBtn = applied > 0
+      ? '<button onclick="window.SelfModify._approve(\''+bubId+'\')" style="flex:1;padding:9px;background:rgba(54,239,178,.12);border:1px solid rgba(54,239,178,.3);border-radius:9px;color:var(--green);font-family:JetBrains Mono,monospace;font-size:10px;cursor:pointer">✓ Approve &amp; Download</button>'
+      : '<div style="color:var(--red);font-size:10px">⚠ No patches applicable.</div>';
+    const rejectBtn = '<button onclick="window.SelfModify._reject(\''+bubId+'\')" style="flex:1;padding:9px;background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.2);border-radius:9px;color:var(--red);font-family:JetBrains Mono,monospace;font-size:10px;cursor:pointer">✕ Reject</button>';
+
+    row.innerHTML = '<div class="msg-avatar ai">Lx</div><div class="msg-bubble-wrap"><div class="msg-bubble ai">' +
+      '<div class="patch-preview">' +
+        '<div class="patch-title">🔧 Self-Modification Proposal</div>' +
+        '<div class="patch-desc">' + escHtml(description) + '</div>' +
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-muted);white-space:pre-line;margin-bottom:8px">' + patchSummary + '</div>' +
+        '<div style="font-size:9px;color:var(--text-dim);margin-bottom:10px">' + applied + '/' + total + ' patches applicable · I will learn from your decision.</div>' +
+        '<div style="display:flex;gap:8px">' + approveBtn + (applied > 0 ? rejectBtn : '') + '</div>' +
+      '</div>' +
+    '</div></div>';
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    if (applied > 0) {
+      window._pendingPatches = window._pendingPatches || {};
+      window._pendingPatches[bubId] = { html: result, description, patches };
+    }
+    window._pendingDecisions = window._pendingDecisions || {};
+    window._pendingDecisions[bubId] = { description, patches };
+
+    window.ConvoManager.captureMessage('assistant',
+      'Self-mod proposal: ' + description + ' (' + applied + '/' + total + ' patches)',
+      '<div>' + row.outerHTML + '</div>'
+    );
+  }
+
+  function _approve(bubId) {
+    const p = (window._pendingPatches || {})[bubId];
+    if (!p) return;
+    downloadModified(p.html, p.description);
+    // Record approval
+    if (!window._selfModLog) window._selfModLog = [];
+    window._selfModLog.push({ verdict: 'approved', description: p.description, ts: Date.now() });
+    if (engine && engine.godel && typeof engine.godel.recordDecision === 'function') {
+      engine.godel.recordDecision('approved', p.description);
+    }
+    addMsg('system', '✓ Approved. Patched file downloading. Reload to apply.');
+    _markDecision(bubId, 'approved');
+  }
+
+  function _reject(bubId) {
+    const d = (window._pendingDecisions || {})[bubId];
+    if (!window._selfModLog) window._selfModLog = [];
+    window._selfModLog.push({ verdict: 'rejected', description: d?.description, ts: Date.now() });
+    if (engine && engine.godel && typeof engine.godel.recordDecision === 'function') {
+      engine.godel.recordDecision('rejected', d?.description);
+    }
+    addMsg('system', '✕ Rejected. I will note this and avoid similar proposals.');
+    _markDecision(bubId, 'rejected');
+  }
+
+  function _markDecision(bubId, verdict) {
+    // Find the card by scanning all msg-row elements for the button
+    const btns = document.querySelectorAll('[onclick*="' + bubId + '"]');
+    const card = btns.length ? btns[0].closest('.msg-bubble') : null;
+    if (card) {
+      const buttons = card.querySelectorAll('button');
+      buttons.forEach(b => b.remove());
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:8px;font-family:"JetBrains Mono",monospace;font-size:9px;color:' + (verdict === 'approved' ? 'var(--green)' : 'var(--text-muted)');
+      note.textContent = verdict === 'approved' ? '✓ Approved — learning from this.' : '✕ Rejected — learning from this.';
+      card.appendChild(note);
+    }
+  }
+
+  function _download(bubId) {
+    _approve(bubId); // Legacy alias
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  return { isCodeIntent, modify, _download };
+})();
+
+
+// ═══════════════════════════════════════════════════════════════
+//  HYPERGRAPH VISUALIZER — Force-directed canvas graph
+//  Renders the live KnowledgeGraph as an infinite scrollable canvas
+// ═══════════════════════════════════════════════════════════════
+(function initHypergraphViz() {
+  let canvas, ctx;
+  let nodes = [], edges = [];
+  let nodeMap = new Map();
+  let layoutMode = 'force';
+  let animFrame = null;
+  let pan = { x: 0, y: 0 };
+  let zoom = 1.0;
+  let dragging = false, dragStart = { x: 0, y: 0 }, panStart = { x: 0, y: 0 };
+  let selectedNode = null;
+  let tickCount = 0;
+  let simRunning = false;
+  let lastBuildTripleCount = -1;
+
+  window.hgSetLayout = function(mode) {
+    layoutMode = mode;
+    const fb = document.getElementById('hgBtnForce'), cb = document.getElementById('hgBtnCircle');
+    if (fb) fb.classList.toggle('active', mode==='force');
+    if (cb) cb.classList.toggle('active', mode==='circle');
+    if (mode==='circle') applyCircleLayout();
+    restartSim();
+  };
+  window.hgReset = function() { pan={x:0,y:0}; zoom=1.0; selectedNode=null; draw(); };
+  window.hgRefresh = function() { buildGraph(); restartSim(); };
+
+  function init() {
+    canvas = document.getElementById('hgCanvas');
+    if (!canvas) return;
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    bindEvents();
+    setInterval(tryRebuild, 4000);
+    tryRebuild();
+  }
+
+  function resizeCanvas() {
+    if (!canvas) return;
+  }
+  window.resizeHgCanvas = resizeCanvas;
+  function resizeCanvas_body() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement ? canvas.parentElement.clientWidth : 400;
+    canvas.width  = w * dpr;
+    canvas.height = 380 * dpr;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = '380px';
+    ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    draw();
+  }
+
+  function tryRebuild() {
+    if (typeof engine === 'undefined' || !engine || !engine.kg) return;
+    const tc = engine.kg.count();
+    if (tc === lastBuildTripleCount) return;
+    lastBuildTripleCount = tc;
+    buildGraph();
+    if (layoutMode === 'circle') applyCircleLayout();
+    restartSim();
+  }
+
+  function buildGraph() {
+    if (typeof engine === 'undefined' || !engine || !engine.kg) return;
+    const triples = engine.kg.triples.filter(t => t.alive !== false);
+    const emptyEl = document.getElementById('hgEmpty');
+    if (!triples.length) {
+      if (emptyEl) emptyEl.style.display = 'block';
+      nodes=[]; edges=[]; nodeMap.clear(); draw(); return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const newNodeMap = new Map();
+    triples.forEach(t => {
+      [t.s, t.o].forEach(label => {
+        if (typeof label !== 'string' || !label) return;
+        if (!newNodeMap.has(label)) {
+          const existing = nodeMap.get(label);
+          newNodeMap.set(label, {
+            id: label,
+            label: label.length > 18 ? label.slice(0,16)+'…' : label,
+            fullLabel: label,
+            x: existing ? existing.x : (Math.random()*500-250),
+            y: existing ? existing.y : (Math.random()*360-180),
+            vx: 0, vy: 0, degree: 0, r: 8, tag: t.tag
+          });
+        }
+      });
+    });
+    nodeMap = newNodeMap;
+    nodes = [...nodeMap.values()];
+
+    const edgeSeen = new Set();
+    edges = [];
+    triples.forEach(t => {
+      if (typeof t.s !== 'string' || typeof t.o !== 'string') return;
+      const key = t.s+'|'+t.p+'|'+t.o;
+      if (edgeSeen.has(key)) return;
+      edgeSeen.add(key);
+      edges.push({ source:t.s, target:t.o, label:String(t.p).replace(/_/g,' ').slice(0,16), isHyper:t.tag==='n3-bridge', tag:t.tag });
+    });
+
+    const deg = new Map();
+    edges.forEach(e => { deg.set(e.source,(deg.get(e.source)||0)+1); deg.set(e.target,(deg.get(e.target)||0)+1); });
+    nodes.forEach(n => { n.degree=deg.get(n.id)||0; n.r=Math.min(26,8+n.degree*2.2); });
+
+    const statsEl = document.getElementById('hgStats');
+    if (statsEl) statsEl.textContent = nodes.length+' nodes · '+edges.length+' edges';
+    const ncEl = document.getElementById('hgNodeCount');
+    if (ncEl) ncEl.textContent = '('+nodes.length+')';
+  }
+
+  function applyCircleLayout() {
+    const R = Math.min(180, 40+nodes.length*7);
+    nodes.forEach((n,i)=>{ const a=(i/nodes.length)*Math.PI*2-Math.PI/2; n.x=Math.cos(a)*R; n.y=Math.sin(a)*R; n.vx=0; n.vy=0; });
+  }
+
+  function restartSim() { tickCount=0; simRunning=true; if(!animFrame) animFrame=requestAnimationFrame(tick); }
+
+  function tick() {
+    animFrame=null;
+    if (simRunning && layoutMode==='force') {
+      runForce(); tickCount++;
+      if (tickCount<280) animFrame=requestAnimationFrame(tick); else simRunning=false;
+    }
+    draw();
+  }
+
+  function runForce() {
+    const alpha = Math.max(0.01, 0.5*Math.pow(0.97,tickCount));
+    const ideal = 80;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i],b=nodes[j]; const dx=b.x-a.x,dy=b.y-a.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||0.1; const f=(ideal*ideal)/dist*alpha*0.8;
+      const fx=(dx/dist)*f,fy=(dy/dist)*f; a.vx-=fx;a.vy-=fy;b.vx+=fx;b.vy+=fy;
+    }
+    edges.forEach(e=>{ const a=nodeMap.get(e.source),b=nodeMap.get(e.target); if(!a||!b)return;
+      const dx=b.x-a.x,dy=b.y-a.y; const dist=Math.sqrt(dx*dx+dy*dy)||0.1;
+      const f=(dist-ideal)/dist*alpha*0.4; a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f; });
+    nodes.forEach(n=>{ n.vx-=n.x*alpha*0.03;n.vy-=n.y*alpha*0.03; n.vx*=0.82;n.vy*=0.82; n.x+=n.vx;n.y+=n.vy; });
+  }
+
+  const TAG_COL = {
+    'user'      :{ fill:'rgba(232,184,75,.2)',  stroke:'rgba(232,184,75,.8)',  text:'#ffd166' },
+    'n3-bridge' :{ fill:'rgba(176,148,255,.2)', stroke:'rgba(176,148,255,.7)', text:'#b094ff' },
+    'wiki'      :{ fill:'rgba(54,239,178,.15)', stroke:'rgba(54,239,178,.6)',  text:'#36efb2' },
+    'self'      :{ fill:'rgba(110,168,255,.15)',stroke:'rgba(110,168,255,.6)', text:'#6ea8ff' },
+    'default'   :{ fill:'rgba(255,255,255,.05)',stroke:'rgba(255,255,255,.2)', text:'#8890a8' }
+  };
+  function nCol(n){ return n===selectedNode ? {fill:'rgba(255,144,82,.25)',stroke:'rgba(255,144,82,.9)',text:'#ff9052'} : (TAG_COL[n.tag]||TAG_COL.default); }
+
+  function draw() {
+    if (!canvas||!ctx) return;
+    const dpr = window.devicePixelRatio||1;
+    const W = canvas.width/dpr, H = canvas.height/dpr;
+    ctx.clearRect(0,0,W,H);
+    if (!nodes.length) return;
+    ctx.save();
+    ctx.translate(W/2+pan.x, H/2+pan.y);
+    ctx.scale(zoom,zoom);
+
+    // edges
+    edges.forEach(e=>{
+      const a=nodeMap.get(e.source),b=nodeMap.get(e.target); if(!a||!b)return;
+      const hi=selectedNode&&(e.source===selectedNode.id||e.target===selectedNode.id);
+      ctx.strokeStyle=e.isHyper?'rgba(176,148,255,'+(hi?'0.8':'0.3')+')':'rgba(110,168,255,'+(hi?'0.6':'0.12')+')';
+      ctx.lineWidth=hi?1.4:0.7; ctx.setLineDash(e.isHyper?[3,3]:[]);
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+      if ((zoom>0.8||hi)&&e.label) {
+        const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+        ctx.font='7px "JetBrains Mono",monospace'; ctx.fillStyle='rgba(80,90,130,'+(hi?'1':'0.7')+')'; ctx.textAlign='center';
+        ctx.fillText(e.label,mx,my-2);
+      }
+    });
+
+    // nodes
+    nodes.forEach(n=>{
+      const col=nCol(n); const r=n.r;
+      if (n===selectedNode) {
+        const grd=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*2.5);
+        grd.addColorStop(0,'rgba(255,144,82,0.2)'); grd.addColorStop(1,'rgba(255,144,82,0)');
+        ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(n.x,n.y,r*2.5,0,Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle=col.fill; ctx.strokeStyle=col.stroke; ctx.lineWidth=n===selectedNode?1.8:1;
+      ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      const fsz=Math.min(10,Math.max(7,7+n.degree*0.3));
+      ctx.font=(n.degree>2?'600 ':'')+fsz+'px "Syne",sans-serif';
+      ctx.fillStyle=col.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.label,n.x,n.y);
+    });
+    ctx.restore();
+
+    // selected info overlay
+    if (selectedNode) {
+      const iW=Math.min(W-20,240),iH=50;
+      ctx.fillStyle='rgba(3,3,10,0.85)'; ctx.strokeStyle='rgba(110,168,255,0.3)'; ctx.lineWidth=1;
+      ctx.beginPath(); if(ctx.roundRect)ctx.roundRect(10,10,iW,iH,8); else ctx.rect(10,10,iW,iH);
+      ctx.fill(); ctx.stroke();
+      ctx.font='600 10px "Syne",sans-serif'; ctx.fillStyle='#6ea8ff'; ctx.textAlign='left';
+      ctx.fillText(selectedNode.fullLabel.slice(0,34),20,28);
+      ctx.font='9px "JetBrains Mono",monospace'; ctx.fillStyle='#5a5d7a';
+      ctx.fillText('degree: '+selectedNode.degree+' · tag: '+(selectedNode.tag||'—'),20,46);
+    }
+  }
+
+  function bindEvents() {
+    if (!canvas) return;
+    canvas.addEventListener('mousedown',e=>{ dragging=true; dragStart={x:e.clientX,y:e.clientY}; panStart={x:pan.x,y:pan.y}; });
+    window.addEventListener('mouseup',()=>{ dragging=false; });
+    window.addEventListener('mousemove',e=>{ if(!dragging)return; pan.x=panStart.x+(e.clientX-dragStart.x); pan.y=panStart.y+(e.clientY-dragStart.y); if(!animFrame)animFrame=requestAnimationFrame(()=>{animFrame=null;draw();}); });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const wx = (mx - pan.x) / zoom;
+      const wy = (my - pan.y) / zoom;
+      zoom = Math.max(0.2, Math.min(4, zoom * (e.deltaY > 0 ? 0.88 : 1.14)));
+      pan.x = mx - wx * zoom;
+      pan.y = my - wy * zoom;
+      if (!animFrame) animFrame = requestAnimationFrame(() => { animFrame = null; draw(); });
+    }, { passive: false });
+    canvas.addEventListener('click',e=>{
+      const rect=canvas.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+      const W=canvas.width/dpr,H=canvas.height/dpr;
+      const mx=((e.clientX-rect.left)-W/2-pan.x)/zoom, my=((e.clientY-rect.top)-H/2-pan.y)/zoom;
+      let hit=null,minD=Infinity;
+      nodes.forEach(n=>{ const d=Math.sqrt((n.x-mx)**2+(n.y-my)**2); if(d<n.r+4&&d<minD){minD=d;hit=n;} });
+      selectedNode=(hit&&hit!==selectedNode)?hit:null; draw();
+    });
+    window.addEventListener('resize',resizeCanvas);
+  }
+
+  // Override switchTab to refresh HG when Mind tab opens
+  const origSwitchTab2 = window.switchTab;
+  window.switchTab = function(n) {
+    if (origSwitchTab2) origSwitchTab2(n);
+    if (n==='cognition') setTimeout(()=>{ if(!canvas)init(); else{resizeCanvas();tryRebuild();} },60);
+  };
+
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(init, 600));
+})();
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.ConvoManager) window.ConvoManager.init();
+  const ta=document.getElementById('trainText'),cc=document.getElementById('charCount');
+  ta.addEventListener('input',()=>{const n=ta.value.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';});
+  document.getElementById('fileUp').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;if(f.name.toLowerCase().endsWith('.pdf')){loadPDFFile(f);switchTab('pdf');return;}const r=new FileReader();r.onload=ev=>{ta.value=ev.target.result;const n=ev.target.result.length;cc.textContent=n>999?(n/1000).toFixed(1)+'k chars':n+' chars';addMsg('system','Loaded: '+f.name);};r.readAsText(f);});
+  document.getElementById('importFile').addEventListener('change',async function(e){
+    const f=e.target.files[0];if(!f)return;addMsg('system','Importing '+f.name+'...');setStatus(false,'importing...');
+    try{const data=await engine.import(f);updateUI();setStatus(true,'synthesis ready · '+engine.bm25.ss.length+' sentences');addMsg('system','Imported. '+engine.bm25.ss.length+' sentences · '+engine.kg.count()+' triples · '+(data.sources?.length||0)+' sources.');switchTab('sources');}
+    catch(err){addMsg('system','Import failed: '+err.message);setStatus(false,'error');}this.value='';
+  });
+  document.addEventListener('click',e=>{if(!e.target.closest('.wiki-input-wrap'))hideSug();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeKgModal();});
+
+  updateQualiaUI();
+  updateSLMStatusUI('loading', 'Initializing neural layers...', '—');
+
+  // ── ORB TYPING REACTIVITY ──
+  window.updateOrbTyping = function(val) {
+    const btn = document.getElementById('sendBtn');
+    if (!btn) return;
+    btn.classList.remove('typing-1','typing-2','typing-3');
+    const len = val.length;
+    if (len === 0) return;
+    if (len < 20) btn.classList.add('typing-1');
+    else if (len < 60) btn.classList.add('typing-2');
+    else btn.classList.add('typing-3');
+  };
+
+  // Clear orb state after send
+  const origSendQ = window.sendQ;
+  window.sendQ = function() {
+    const btn = document.getElementById('sendBtn');
+    if (btn) btn.classList.remove('typing-1','typing-2','typing-3');
+    window._lastCharCount = 0;
+    if (origSendQ) origSendQ();
+  };
+
+  // ── RANDOM WIKI TOPICS ──
+  const WIKI_POOL = [
+    ['Photosynthesis','Photosynthesis'],['Genghis Khan','Genghis Khan'],['The Internet','Internet'],
+    ['Black hole','Black hole'],['Stonehenge','Stonehenge'],['Fermentation','Fermentation'],
+    ['Marie Curie','Marie Curie'],['Jazz','Jazz'],['DNA','DNA'],['Solar System','Solar System'],
+    ['Byzantine Empire','Byzantine Empire'],['Quantum mechanics','Quantum mechanics'],
+    ['Great Wall of China','Great Wall of China'],['Nikola Tesla','Nikola Tesla'],
+    ['Plate tectonics','Plate tectonics'],['Renaissance','Renaissance'],['Coffee','Coffee'],
+    ['Fibonacci sequence','Fibonacci number'],['Volcanoes','Volcano'],['Dinosaurs','Dinosaur'],
+    ['Silk Road','Silk Road'],['Bees','Bee'],['Nuclear fusion','Nuclear fusion'],
+    ['Chess','Chess'],['The Moon','Moon'],['Origami','Origami'],['Tide','Tide'],
+    ['Morse code','Morse code'],['Fermat\'s Last Theorem','Fermat\'s Last Theorem'],
+    ['Mushrooms','Fungus'],['The Amazon rainforest','Amazon rainforest'],['Antibiotics','Antibiotic'],
+    ['Ancient Rome','Ancient Rome'],['Magnetism','Magnetism'],['Sushi','Sushi'],
+    ['The Renaissance','Italian Renaissance'],['Cryptography','Cryptography'],
+    ['Hurricanes','Tropical cyclone'],['The Eiffel Tower','Eiffel Tower'],['Mythology','Mythology'],
+    ['General relativity','General relativity'],['The Olympic Games','Olympic Games'],
+    ['Coral reefs','Coral reef'],['Feudal Japan','Feudal Japan'],['The Pyramids','Egyptian pyramids'],
+    ['Deep sea','Deep sea'],['The printing press','Printing press'],['Evolution','Evolution'],
+    ['Time zones','Time zone'],['The periodic table','Periodic table']
+  ];
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  window.refreshQuickTopics = function() {
+    const container = document.getElementById('quickBtns');
+    if (!container) return;
+    const picked = shuffle(WIKI_POOL).slice(0, 10);
+    container.innerHTML = '';
+    picked.forEach(([label, topic]) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn-sm';
+      btn.textContent = label;
+      btn.onclick = () => quickFetch(topic);
+      container.appendChild(btn);
+    });
+  };
+
+  window.refreshQuickTopics();
+
+  // ── CANVAS ORB — 3D Pringle Saddles (smooth contour rendering) ──
+  (function initOrb() {
+    const canvas = document.getElementById('orbCanvas');
+    if (!canvas) return;
+
+    // Render at 2× pixel density for crisp edges
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = 104 * DPR;
+    canvas.height = 104 * DPR;
+    canvas.style.width  = '52px';
+    canvas.style.height = '52px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(DPR, DPR);
+
+    const W = 104, H = 104, R = 52, cx = 52, cy = 52;
+    let speed       = 1.0;
+    let targetSpeed = 1.0;
+    let t = 0;
+    let orbAlpha = 1.0;
+
+    // Colors matching the reference: vivid teal, hot pink, blue-violet
+    const pringles = [
+      { rx:0.4,  ry:0.2,  rz:0.0,  dx: 0.000,  dy: 0.006,  dz: 0.010,  color:[0,   195, 195] },
+      { rx:1.2,  ry:1.8,  rz:0.7,  dx: 0.009,  dy: 0.000,  dz:-0.007,  color:[225,  45,  90] },
+      { rx:2.1,  ry:0.9,  rz:1.4,  dx:-0.007,  dy: 0.010,  dz: 0.000,  color:[ 90,  80, 230] },
+      { rx:3.5,  ry:2.3,  rz:2.1,  dx: 0.008,  dy:-0.009,  dz: 0.005,  color:[  0, 140, 160] },
+      { rx:4.8,  ry:3.7,  rz:3.6,  dx:-0.011,  dy: 0.000,  dz:-0.008,  color:[190,  30, 140] },
+    ];
+
+    const PR    = R * 0.74;
+    const DEPTH = 0.68; // deeper saddle = more opacity variation across surface
+    const STRIPS = 64;  // number of vertical slices per pringle
+
+    function rot(p, rx, ry, rz) {
+      let [x, y, z] = p;
+      let y2 = y*Math.cos(rx)-z*Math.sin(rx), z2 = y*Math.sin(rx)+z*Math.cos(rx);
+      y = y2; z = z2;
+      let x2 = x*Math.cos(ry)+z*Math.sin(ry), z3 = -x*Math.sin(ry)+z*Math.cos(ry);
+      x = x2; z = z3;
+      let x3 = x*Math.cos(rz)-y*Math.sin(rz), y3 = x*Math.sin(rz)+y*Math.cos(rz);
+      return [x3, y3, z];
+    }
+
+    function saddlePt(u, v, pr) {
+      const x = u*PR, yy = v*PR, z = DEPTH*PR*(u*u - v*v);
+      const rp = rot([x, yy, z], pr.rx, pr.ry, pr.rz);
+      return [cx+rp[0], cy+rp[1], rp[2]];
+    }
+
+    // Draw pringle as vertical strips — each strip's alpha modulated by normalZ at that u
+    // This gives thick-center, thin-edge opacity variation (the glassy Siri look)
+    function drawPringle(pr) {
+      const [r, g, b] = pr.color;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = 0; i < STRIPS; i++) {
+        const u0   = (i     / STRIPS) * 2 - 1;
+        const u1   = ((i+1) / STRIPS) * 2 - 1;
+        const umid = (u0 + u1) / 2;
+
+        const h0 = Math.sqrt(Math.max(0, 1 - u0*u0));
+        const h1 = Math.sqrt(Math.max(0, 1 - u1*u1));
+        if (h0 < 0.004 && h1 < 0.004) continue;
+
+        // Surface normal Z at strip center:
+        // z = DEPTH*(u²-v²) → ∂z/∂u = 2*DEPTH*u, ∂z/∂v = -2*DEPTH*v
+        // N = (-2Du, 2Dv, 1) normalized → N_z = 1/√(1+4D²u²+4D²v²)
+        // Approximate by averaging over v ≈ ignore v term (v≈0 at centroid):
+        const nz = 1.0 / Math.sqrt(1 + 4 * DEPTH * DEPTH * umid * umid);
+        // Raise to power to push contrast: faces pointing at you glow, edges fade
+        const stripAlpha = Math.pow(nz, 1.4) * 0.52 * orbAlpha;
+
+        const tl = saddlePt(u0, -h0, pr);
+        const bl = saddlePt(u0,  h0, pr);
+        const tr = saddlePt(u1, -h1, pr);
+        const br = saddlePt(u1,  h1, pr);
+
+        ctx.beginPath();
+        ctx.moveTo(tl[0], tl[1]);
+        ctx.lineTo(tr[0], tr[1]);
+        ctx.lineTo(br[0], br[1]);
+        ctx.lineTo(bl[0], bl[1]);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${r},${g},${b},${stripAlpha.toFixed(3)})`;
+        ctx.fill();
+        // No separate stroke — strip edge IS the visual boundary, same alpha as fill ✓
+      }
+      ctx.restore();
+    }
+
+    function drawOrb() {
+      ctx.clearRect(0, 0, W, H);
+
+      // Dark sphere base — teal-tinted dark at edges like reference
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI*2);
+      const base = ctx.createRadialGradient(cx-4, cy-6, 1, cx, cy, R);
+      base.addColorStop(0,   'rgba(16, 8, 32, 1)');
+      base.addColorStop(0.6, 'rgba(6,  4, 18, 1)');
+      base.addColorStop(1,   'rgba(2,  4, 12, 1)');
+      ctx.fillStyle = base;
+      ctx.fill();
+
+      // Clip everything inside the sphere circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R - 0.5, 0, Math.PI*2);
+      ctx.clip();
+
+      // Tinted ambient pools: teal top-left, pink bottom, purple right — match reference photo
+      ctx.globalCompositeOperation = 'lighter';
+      [
+        { x: cx-12, y: cy-12, br: 28, col: [0,160,170],   a: 0.10 * orbAlpha }, // teal top-left
+        { x: cx+2,  y: cy+14, br: 26, col: [200,40,70],   a: 0.09 * orbAlpha }, // pink bottom
+        { x: cx+14, y: cy-2,  br: 22, col: [80,60,200],   a: 0.07 * orbAlpha }, // purple right
+      ].forEach(({x, y, br, col, a}) => {
+        const dx = Math.sin(t*0.0013 + x*0.09) * 4;
+        const dy = Math.cos(t*0.0010 + y*0.09) * 4;
+        const grd = ctx.createRadialGradient(x+dx, y+dy, 0, x+dx, y+dy, br);
+        grd.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${a})`);
+        grd.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+        ctx.beginPath(); ctx.arc(x+dx, y+dy, br, 0, Math.PI*2);
+        ctx.fillStyle = grd; ctx.fill();
+      });
+
+      // Depth-sort pringles and draw back to front
+      const sorted = [...pringles].sort((a, b) =>
+        rot([0,0,1], a.rx, a.ry, a.rz)[2] - rot([0,0,1], b.rx, b.ry, b.rz)[2]
+      );
+      sorted.forEach(pr => drawPringle(pr));
+
+      // White bloom — the hot center where all pringles converge
+      ctx.globalCompositeOperation = 'lighter';
+      const bloom = ctx.createRadialGradient(cx-1, cy-3, 0, cx, cy, R*0.48);
+      bloom.addColorStop(0,   `rgba(255,255,255,${0.50 * orbAlpha})`);
+      bloom.addColorStop(0.2, `rgba(200,220,255,${0.10 * orbAlpha})`);
+      bloom.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.restore();
+
+      // Sphere rim vignette — very dark edges like reference photo
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI*2);
+      const vignette = ctx.createRadialGradient(cx, cy, R*0.45, cx, cy, R);
+      vignette.addColorStop(0, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, 'rgba(0,2,10,0.92)');
+      ctx.fillStyle = vignette;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fill();
+      ctx.restore();
+
+      // Advance rotations
+      pringles.forEach(pr => {
+        pr.rx += pr.dx * speed;
+        pr.ry += pr.dy * speed;
+        pr.rz += pr.dz * speed;
+      });
+      t++;
+    }
+
+    function loop() {
+      // Faster lerp going up (responsive), slower coming down (physical deceleration)
+      const lerpRate = targetSpeed > speed ? 0.06 : 0.012;
+      speed += (targetSpeed - speed) * lerpRate;
+      drawOrb();
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    window._orbSetSpeed = function(s) { targetSpeed = s; };
+    window._orbSetAlpha = function(a) { orbAlpha = a; };
+
+    window._lastCharCount = 0;
+    // Track the "cruise" speed that we settle at after each burst
+    window._orbCruiseSpeed = 1.0;
+
+    const origUpdate = window.updateOrbTyping;
+    window.updateOrbTyping = function(val) {
+      if (origUpdate) origUpdate(val);
+      const len = val.length;
+      if (len === 0) {
+        window._lastCharCount = 0;
+        window._orbCruiseSpeed = 1.0;
+        window._orbSetSpeed(1.0);
+        return;
+      }
+      if (len > window._lastCharCount) {
+        // Each new character: burst speed grows with character count (max 10.0)
+        const burstSpeed = Math.min(14.0, 2.0 + len * 0.35);
+        const halfBurst  = Math.max(1.0, burstSpeed * 0.5);
+        // Spike to burst immediately, then settle to half after 60ms
+        window._orbCruiseSpeed = halfBurst;
+        window._orbSetSpeed(burstSpeed);
+        clearTimeout(window._orbBurstTimer);
+        window._orbBurstTimer = setTimeout(() => {
+          window._orbSetSpeed(window._orbCruiseSpeed);
+        }, 60);
+      }
+      window._lastCharCount = len;
+    };
+  })();
+
+  // ── DUAL SIDEBAR TOGGLES ──────────────────────────────────────────
+  // ── ICON RAIL / DRAWER CONTROLLER ──
+  // Defined as global immediately so onclick attributes can call it before DOMContentLoaded
+  (function initRail() {
+    let _open = null; // 'chats' | 'tools' | null
+
+    function railOpen(panel) {
+      const drawer   = document.getElementById('drawer');
+      const btnChats = document.getElementById('railBtnChats');
+      const btnTools = document.getElementById('railBtnTools');
+      const pChats   = document.getElementById('panelChats');
+      const pTools   = document.getElementById('panelTools');
+      if (!drawer) return;
+
+      if (_open === panel) {
+        // clicking same icon = close
+        _open = null;
+        drawer.classList.remove('open');
+        btnChats.classList.remove('active');
+        btnTools.classList.remove('active');
+      } else {
+        _open = panel;
+        drawer.classList.add('open');
+        if (panel === 'chats') {
+          btnChats.classList.add('active');
+          btnTools.classList.remove('active');
+          if(pChats) pChats.style.display='flex';
+          if(pTools) pTools.style.display='none';
+        } else {
+          btnTools.classList.add('active','tools');
+          btnChats.classList.remove('active');
+          if(pTools) pTools.style.display='flex';
+          if(pChats) pChats.style.display='none';
+        }
+      }
+      // refresh HG if tools/graph visible
+      if(_open==='tools' && typeof hgRefresh==='function') setTimeout(hgRefresh,80);
+    };
+
+    // Expose globally so HTML onclick can reach it
+    window.railOpen = railOpen;
+    // Legacy aliases so old code doesn't crash
+    window.toggleToolsSidebar  = function() { railOpen('tools'); };
+    window.toggleConvosSidebar = function() { railOpen('chats'); };
+    window.toggleSidebar       = function() { railOpen('tools'); };
+
+    // Open chats by default on load
+    setTimeout(()=>railOpen('chats'), 120);
+  })();
+
+  // ── REPLY BUBBLE BORDER ANIMATION ──────────────────────────────────
+  (function initStreamAnim() {
+    // We draw on a fixed full-screen overlay canvas so we can glow any element
+    const sc = document.createElement('canvas');
+    sc.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9000;';
+    document.body.appendChild(sc);
+    const sctx = sc.getContext('2d');
+
+    function resize() { sc.width = window.innerWidth; sc.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COLS = [
+      [0,   195, 195], // teal
+      [225,  45,  90], // pink
+      [ 90,  80, 230], // blue-violet
+    ];
+
+    let animState  = 'idle'; // 'waiting' | 'fading' | 'idle'
+    let animT      = 0;
+    let rafId      = null;
+    let targetEl   = null; // the AI bubble element to glow around
+
+    // Build perimeter as ordered array of [x,y] points for a rounded rect
+    // radii: [tl, tr, br, bl] or single number for uniform
+    function buildPerimeter(left, top, right, bottom, radii, totalPts) {
+      const [rtl, rtr, rbr, rbl] = Array.isArray(radii)
+        ? radii
+        : [radii, radii, radii, radii];
+      const pts = [];
+      const addArc = (ocx, ocy, r, startA, endA) => {
+        const span = endA - startA;
+        const n    = Math.max(2, Math.round(totalPts * Math.abs(span) / (Math.PI * 2)));
+        for (let i = 0; i <= n; i++) {
+          const a = startA + span * (i / n);
+          pts.push([ocx + Math.cos(a) * r, ocy + Math.sin(a) * r]);
+        }
+      };
+      addArc(left+rtl,  top+rtl,    rtl, Math.PI,       Math.PI*1.5); // top-left
+      addArc(right-rtr, top+rtr,    rtr, Math.PI*1.5,   Math.PI*2  ); // top-right
+      addArc(right-rbr, bottom-rbr, rbr, 0,             Math.PI*0.5); // bottom-right
+      addArc(left+rbl,  bottom-rbl, rbl, Math.PI*0.5,   Math.PI    ); // bottom-left
+      return pts;
+    }
+
+    // Two offscreen canvases:
+    //   maskCv  — the stroke shape drawn ONCE at uniform 1.8px (white)
+    //   colorCv — all the color segments painted at thick width
+    // We combine them with destination-in so colors are clipped to the mask shape.
+    const maskCv   = document.createElement('canvas');
+    const maskCtx  = maskCv.getContext('2d');
+    const colorCv  = document.createElement('canvas');
+    const colorCtx = colorCv.getContext('2d');
+
+    function ensureSize(w, h) {
+      if (maskCv.width !== w || maskCv.height !== h) {
+        maskCv.width  = w; maskCv.height  = h;
+        colorCv.width = w; colorCv.height = h;
+      }
+    }
+
+    function drawBubbleBorder(masterAlpha, phase) {
+      sctx.clearRect(0, 0, sc.width, sc.height);
+      if (!targetEl || masterAlpha < 0.005) return;
+
+      const rect = targetEl.getBoundingClientRect();
+      if (rect.width < 4) return;
+
+      const pts = buildPerimeter(
+        rect.left, rect.top, rect.right, rect.bottom,
+        [4, 16, 16, 16], 300
+      );
+      const N = pts.length;
+      if (N < 3) return;
+
+      const C = [
+        [0,   195, 195],
+        [225,  45,  90],
+        [ 90,  80, 230],
+      ];
+
+      ensureSize(sc.width, sc.height);
+      maskCtx.clearRect(0, 0, maskCv.width, maskCv.height);
+      colorCtx.clearRect(0, 0, colorCv.width, colorCv.height);
+
+      // ── Canvas A (maskCv): stroke the full path ONCE in white at 1.8px ──
+      // This is the shape authority — thickness comes only from here.
+      maskCtx.beginPath();
+      maskCtx.moveTo(pts[0][0], pts[0][1]);
+      for (let j = 1; j < N; j++) maskCtx.lineTo(pts[j][0], pts[j][1]);
+      maskCtx.closePath();
+      maskCtx.lineWidth   = 1.8;
+      maskCtx.lineCap     = 'round';
+      maskCtx.lineJoin    = 'round';
+      maskCtx.strokeStyle = 'white';
+      maskCtx.stroke();
+
+      // ── Canvas B (colorCv): paint color segments at fat width (10px) ──
+      // Overdraw at corners doesn't matter here because this canvas is only
+      // used for color — thickness is controlled by the mask.
+      colorCtx.lineWidth = 10;
+      colorCtx.lineCap   = 'round';
+      colorCtx.lineJoin  = 'round';
+      for (let j = 0; j < N - 1; j++) {
+        const [x0, y0] = pts[j];
+        const [x1, y1] = pts[j + 1];
+        const tPos = ((j / (N - 1)) + phase) % 1;
+        const cIdx = tPos * 3;
+        const ci   = Math.floor(cIdx) % 3;
+        const cf   = cIdx % 1;
+        const [r0, g0, b0] = C[ci];
+        const [r1, g1, b1] = C[(ci + 1) % 3];
+        const cr = Math.round(r0 + (r1 - r0) * cf);
+        const cg = Math.round(g0 + (g1 - g0) * cf);
+        const cb = Math.round(b0 + (b1 - b0) * cf);
+        colorCtx.beginPath();
+        colorCtx.moveTo(x0, y0);
+        colorCtx.lineTo(x1, y1);
+        colorCtx.strokeStyle = `rgb(${cr},${cg},${cb})`;
+        colorCtx.stroke();
+      }
+
+      // ── Clip colorCv to maskCv using destination-in ──
+      // destination-in: keep colorCv pixels only where maskCv has content.
+      colorCtx.globalCompositeOperation = 'destination-in';
+      colorCtx.drawImage(maskCv, 0, 0);
+      colorCtx.globalCompositeOperation = 'source-over';
+
+      // ── Composite onto main canvas: glow pass + crisp pass ──
+      sctx.save();
+      sctx.filter      = 'blur(4px)';
+      sctx.globalAlpha = masterAlpha * 0.55;
+      sctx.drawImage(colorCv, 0, 0);
+      sctx.filter      = 'none';
+      sctx.globalAlpha = masterAlpha;
+      sctx.drawImage(colorCv, 0, 0);
+      sctx.restore();
+    }
+
+    // Continuously incrementing phase — never resets, so colors rotate smoothly always
+    let globalPhase = 0;
+
+    function frame() {
+      animT++;
+      // Phase advances at a constant rate regardless of state
+      globalPhase = (globalPhase + 0.014) % 1;
+
+      if (animState === 'entering') {
+        const p = Math.min(1, animT / 25);
+        const eased = p * p * (3 - 2 * p);
+        drawBubbleBorder(eased * 0.55, globalPhase);
+        if (animT >= 25) { animState = 'waiting'; animT = 0; }
+
+      } else if (animState === 'waiting') {
+        drawBubbleBorder(0.55, globalPhase);
+
+      } else if (animState === 'fading') {
+        const p     = Math.min(1, animT / 35);
+        const eased = p * p * (3 - 2 * p);
+        drawBubbleBorder((1 - eased) * 0.55, globalPhase);
+        if (animT >= 35) {
+          sctx.clearRect(0, 0, sc.width, sc.height);
+          animState = 'idle';
+          rafId     = null;
+          window._orbSetSpeed && window._orbSetSpeed(1.0);
+          window._orbSetAlpha && window._orbSetAlpha(1.0);
+          return;
+        }
+
+      } else {
+        rafId = null; return;
+      }
+
+      rafId = requestAnimationFrame(frame);
+    }
+
+    function startAnim(bubbleEl) {
+      if (bubbleEl) targetEl = bubbleEl;
+      animT     = 0;
+      animState = 'entering';
+      window._orbSetAlpha && window._orbSetAlpha(0.3);
+      if (!rafId) rafId = requestAnimationFrame(frame);
+    }
+
+    function endAnim() {
+      if (animState !== 'waiting' && animState !== 'entering') return;
+      animT     = 0;
+      animState = 'fading';
+      window._orbSetSpeed && window._orbSetSpeed(1.0);
+      window._orbSetAlpha && window._orbSetAlpha(1.0);
+    }
+
+    let _userHasSent = false;
+
+    window._orbAnimSend   = () => {};
+    window._orbAnimReturn = endAnim;
+
+    const _origSendQ2 = window.sendQ;
+    window.sendQ = function() {
+      _userHasSent = true;
+      window._orbSetAlpha && window._orbSetAlpha(0.3);
+      window._orbCruiseSpeed = window._orbCruiseSpeed || 1.0;
+      window._lastCharCount = 0;
+      _origSendQ2 && _origSendQ2();
+    };
+
+    // Patch streamMsg — use a callback injected into the typer for exact timing
+    const _origStream2 = window.streamMsg;
+    window.streamMsg = function(text, meta) {
+      if (!_origStream2) return;
+      if (!_userHasSent) { _origStream2(text, meta); return; }
+
+      // Set callback BEFORE calling original — the typer will fire it when done
+      window._orbStreamDone = function() {
+        window._orbStreamDone = null;
+        endAnim();
+      };
+
+      _origStream2(text, meta);
+
+      // Start border on next frame (bubble now in DOM)
+      requestAnimationFrame(() => {
+        const bubbles = document.querySelectorAll('.msg-bubble.ai');
+        const latest  = bubbles[bubbles.length - 1];
+        if (latest) startAnim(latest);
+      });
+
+      // Ramp pringles down exactly over the typing duration
+      const charSpd    = Math.max(5, Math.min(20, 1600 / (text.length || 1)));
+      const totalMs    = (text.length + 1) * charSpd;
+      const startSpeed = window._orbCruiseSpeed || 2.0;
+      const rampSteps  = 40;
+      const stepMs     = totalMs / rampSteps;
+      for (let s = 0; s <= rampSteps; s++) {
+        ((step) => {
+          setTimeout(() => {
+            const frac = step / rampSteps;
+            window._orbSetSpeed && window._orbSetSpeed(
+              startSpeed + (1.0 - startSpeed) * frac
+            );
+          }, step * stepMs);
+        })(s);
+      }
+    };
+
+    const igc = document.getElementById('inputGlowCanvas');
+    if (igc) igc.style.display = 'none';
+  })();
+
+
+  // ── V12: ASYNC NEURAL BOOT SEQUENCE ──
+  // Non-blocking: symbolic engine starts immediately, neural layers init in background
+  (async () => {
+    // Phase 0: Symbolic engine (already done by Engine constructor)
+    updateBootBar(0.08, 'Symbolic core ready ✓');
+    setBootPhase(0, true);
+    setBootPhase(1, false);
+    document.getElementById('bootSkipBtn').style.display = 'block';
+    await new Promise(r => setTimeout(r, 200));
+
+    // Phase 1: NanoCortex (Transformers.js)
+    updateBootBar(0.12, 'Loading NanoCortex (Transformers.js)...');
+    updateSLMStatusUI('loading', 'Loading NanoCortex...', 'all-MiniLM-L6-v2');
+    try {
+      await engine.nanoCortex.init((msg) => {
+        updateBootBar(0.12 + 0.28 * (engine.nanoCortex.ready ? 1 : 0.5), msg);
+        document.getElementById('bootStatus').textContent = msg;
+      });
+      window._nanoCortex = engine.nanoCortex;
+      setBootPhase(1, true);
+      setBootPhase(2, false);
+      updateBootBar(0.40, 'NanoCortex ready ✓');
+      if (engine.nanoCortex.ready) {
+        updateSLMStatusUI('loading', 'NanoCortex ✓ — Loading NeuralMouth...', 'all-MiniLM-L6-v2');
+      } else {
+        updateSLMStatusUI('error', 'NanoCortex unavailable — symbolic fallback', '—');
+      }
+    } catch(e) {
+      setBootPhase(1, false);
+      updateBootBar(0.40, 'NanoCortex failed — continuing...');
+    }
+
+    await new Promise(r => setTimeout(r, 100));
+
+    // Phase 2: NeuralMouth (WebLLM)
+    // Emit diagnostics so we can always debug from console
+    console.group('[NeuralMouth] Boot diagnostics');
+    console.log('WebAssembly available:', typeof WebAssembly !== 'undefined');
+    console.log('crossOriginIsolated:', typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : 'undefined');
+    console.log('Backend: Transformers.js text2text-generation (replaces WebLLM)');
+    console.log('User agent:', navigator.userAgent.slice(0, 100));
+    console.groupEnd();
+    updateBootBar(0.45, 'Initializing NeuralMouth (Transformers.js)...');
+    try {
+      const webllmOk = await engine.neuralMouth.init((msg) => {
+        document.getElementById('bootStatus').textContent = msg;
+      });
+      window._neuralMouth = engine.neuralMouth;
+      // Also set on curiosity engine for N3 bridge access
+      if (webllmOk) {
+        engine._neuralReady = true;
+        setBootPhase(2, true);
+        setBootPhase(3, false);
+        updateBootBar(0.95, 'NeuralMouth ready ✓');
+        updateSLMStatusUI('ready', 'NeuralMouth ready (Transformers.js)', engine.neuralMouth.modelId);
+      } else {
+        setBootPhase(2, false);
+        updateBootBar(0.95, 'Transformers.js unavailable — symbolic fallback active');
+        if (engine.nanoCortex.ready) {
+          updateSLMStatusUI('error', 'Transformers.js unavailable — NanoCortex active', engine.neuralMouth.modelId);
+        } else {
+          updateSLMStatusUI('error', 'Neural layers unavailable — full symbolic mode', '—');
+        }
+      }
+    } catch(e) {
+      updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
+      updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
+      console.error('[Lexica 4.0 boot]', e);
+    }
+
+    // Phase 3: Done
+    setBootPhase(3, true);
+    updateBootBar(1.0, 'Lexica 4.0 ready ✓');
+    await new Promise(r => setTimeout(r, 300));
+    hideBootOverlay();
+
+    // ── PERSISTENT MEMORY RESTORE ──
+    // Load previously saved knowledge — Lexica remembers across sessions!
+    updateBootBar(1.0, 'Restoring persistent memory...');
+    const memRestored = engine.loadFromMemory();
+    if (memRestored) {
+      updateUI();
+      addMsg('system', `🧠 <strong>Persistent Memory Restored</strong>: ${memRestored.sources} source${memRestored.sources!==1?'s':''} · ${memRestored.triples} triples · ${memRestored.sentences} sentences. Lexica remembers! <button onclick="engine.clearMemory();engine.resetAll&&resetAll();addMsg('system','Memory cleared.')" style="background:none;border:1px solid rgba(255,85,120,.3);color:var(--red);border-radius:5px;padding:2px 8px;font-size:8px;cursor:pointer;font-family:JetBrains Mono,monospace;margin-left:6px">clear memory</button>`);
+      setStatus(true, `memory restored · ${engine.bm25.ss.length} sentences`);
+      // Trigger inner monologue about restored knowledge
+      setTimeout(() => {
+        if (engine.kg.count() > 5) {
+          showInnerMonologue('Memory restored from previous session. I have ' + engine.kg.count() + ' triples across ' + engine.sm.s.length + ' sources. Picking up where I left off...', null, null);
+        }
+      }, 2000);
+    }
+
+    // Post-boot: show a real fact from KG if available — no template strings, ever
+    const _activeConvo = window.ConvoManager && window.ConvoManager.getActive();
+    const _hasHistory = _activeConvo && _activeConvo.messages && _activeConvo.messages.length > 0;
+    if (!_hasHistory) {
+      const n0 = engine.bm25.ss.length, s0 = engine.sm.s.length;
+      if (n0 > 0) {
+        // Surface a real synthesized fact from the most central entity in the KG
+        // This proves Lexica actually has knowledge rather than announcing it exists
+        let bootText = '';
+        try {
+          const topTriple = engine.kg.triples.find(t => t.p === 'is_a' && t.alive !== false);
+          if (topTriple) {
+            const subj = topTriple.s;
+            const facts = engine.kg.query(subj);
+            if (facts.length) {
+              bootText = engine.synthesis.synthesize(subj, 'factoid', subj, facts.slice(0,3), [], [], engine.semVec, engine.wordProfiler, engine.kg) || '';
+            }
+          }
+          if (!bootText) {
+            // Fall back to BM25 top sentence for most central topic
+            const topSrc = engine.sm.s[0]?.title;
+            if (topSrc) {
+              const hits = engine.bm25.query(topSrc, [], 1, topSrc);
+              bootText = hits?.[0]?.s || '';
+            }
+          }
+        } catch(_) {}
+        if (bootText && bootText.length > 10) {
+          streamMsg(bootText, {strategy:'social',conf:{l:'high',lbl:'social',cls:'conf-high'},synthesized:true,kgUsed:true,ctxUsed:false,conflict:null,cached:false,evidence:null,src:null,srcTitle:'',intent:'greeting'});
+        }
+        // If no fact could be derived, say nothing — silence is better than a template
+      }
+      // If n0 === 0, say nothing — Lexica has nothing to say yet
+    }
+    updateUI();
+  })();
+});

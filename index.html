@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEXICA V0</title>
+<script type="module">
+  // Pre-declare module-loaded globals for non-module access
+  window._transformersReady = false;
+  window._webllmReady = false;
+  window._nanoCortex = null;
+  window._neuralMouth = null;
+</script>
+<script>
+// Cross-origin isolation is no longer required — NeuralMouth uses Transformers.js
+// (same as NanoCortex) which runs on WebAssembly without SharedArrayBuffer threading.
+// Removing the previous COOP/COEP service worker shim which caused reload loops.
+console.log('[Lexica 4.0] Runtime:', navigator.userAgent.slice(0,60));
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lexica.css">
+</head>
+<body>
+
+<!-- V12 NEURAL BOOT OVERLAY -->
+<div class="boot-overlay" id="bootOverlay">
+  <div class="boot-logo">LEXICA</div>
+  <div class="boot-sub">V0 · Neuro-Symbolic</div>
+  <div class="boot-bar-wrap"><div class="boot-bar" id="bootBar"></div></div>
+  <div class="boot-status" id="bootStatus">Initializing symbolic core...</div>
+  <div class="boot-phase-list">
+    <div class="boot-phase active" id="bphase0">Symbolic Engine (CFG · Morphology · Graph)</div>
+    <div class="boot-phase" id="bphase1">NanoCortex (Transformers.js · all-MiniLM-L6-v2)</div>
+    <div class="boot-phase" id="bphase2">NeuralMouth (Transformers.js · SLM)</div>
+    <div class="boot-phase" id="bphase3">Ready</div>
+  </div>
+  <button class="boot-skip" id="bootSkipBtn" onclick="skipBoot()" style="display:none">Skip Neural Init →</button>
+</div>
+
+
+<div class="inner-monologue" id="innerMonologue">
+  <button class="im-close" onclick="closeMonologue()">✕</button>
+  <div class="im-label">Inner Monologue · Idle Thought</div>
+  <div class="im-text" id="imText"></div>
+  <div class="im-nodes" id="imNodes"></div>
+</div>
+
+<div class="train-overlay" id="trainOverlay">
+  <div class="train-panel">
+    <div class="tp-corner tl"></div><div class="tp-corner tr"></div>
+    <div class="tp-corner bl"></div><div class="tp-corner br"></div>
+    <div class="scan-line"></div>
+    <div class="train-title" id="trainTitle">Initializing...</div>
+    <div class="train-subtitle" id="trainSubtitle">Preparing knowledge substrate</div>
+    <div class="phases" id="trainPhases">
+      <div class="phase-item" id="ph0"><div class="phase-dot"></div>PARSE</div>
+      <div class="phase-item" id="ph1"><div class="phase-dot"></div>INDEX</div>
+      <div class="phase-item" id="ph2"><div class="phase-dot"></div>KG</div>
+      <div class="phase-item" id="ph3"><div class="phase-dot"></div>PMI</div>
+      <div class="phase-item" id="ph4"><div class="phase-dot"></div>WORDS</div>
+      <div class="phase-item" id="ph5"><div class="phase-dot"></div>DONE</div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
+    <div class="train-counters">
+      <div class="train-counter"><span class="counter-val" id="cSent">0</span><span class="counter-lbl">Sentences</span></div>
+      <div class="train-counter"><span class="counter-val" id="cTrip">0</span><span class="counter-lbl">KG Triples</span></div>
+      <div class="train-counter"><span class="counter-val" id="cVoc">0</span><span class="counter-lbl">Vocab</span></div>
+      <div class="train-counter"><span class="counter-val" id="cWords">0</span><span class="counter-lbl">Word Profiles</span></div>
+    </div>
+    <div class="train-log" id="trainLog">Awaiting data stream...</div>
+  </div>
+</div>
+
+<div class="kg-modal" id="kgModal">
+  <div class="kg-modal-panel">
+    <div class="kg-modal-header">
+      <div class="kg-modal-title" id="kgModalTitle">Knowledge Graph</div>
+      <button class="kg-close" onclick="closeKgModal()">✕</button>
+    </div>
+    <div class="kg-modal-body" id="kgModalBody"></div>
+  </div>
+</div>
+
+<div class="icon-rail" id="iconRail">
+  <div class="rail-logo"><span>Lx</span></div>
+  <button class="rail-btn" id="railBtnChats" onclick="railOpen('chats')" title="Conversations">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 3h14v10H2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5 16l2-3h4l2 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="rail-btn" id="railBtnTools" onclick="railOpen('tools')" title="Knowledge Tools">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 5v4l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+  <div class="rail-spacer"></div>
+  <div class="rail-version">V0</div>
+</div>
+
+<div class="drawer" id="drawer">
+  <div class="drawer-inner">
+
+    <!-- CHATS PANEL -->
+    <div class="drawer-panel" id="panelChats">
+      <div class="chats-head">
+        <span class="chats-head-title">Conversations</span>
+        <button class="chats-new-btn" onclick="window.ConvoManager.createNew()" title="New chat">＋</button>
+      </div>
+      <div class="chats-list" id="convoList"></div>
+      <div class="chats-foot">
+        <div class="knowledge-badge">
+          <div class="kb-dot"></div>
+          <span class="kb-lbl">Shared knowledge:&nbsp;</span>
+          <span id="kbCount">0 sentences</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOLS PANEL -->
+    <div class="drawer-panel" id="panelTools" style="display:none">
+      <div class="tools-head">
+        <div class="tools-brand">LEXICA <span>V0</span></div>
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
+          <button class="tab-btn" onclick="switchTab('paste')">📝</button>
+          <button class="tab-btn" onclick="switchTab('sources')">📚</button>
+          <button class="tab-btn" onclick="switchTab('data')">💾</button>
+          <button class="tab-btn" onclick="switchTab('words')">🔍</button>
+          <button class="tab-btn" onclick="switchTab('cognition')">🧠</button>
+          <button class="tab-btn" onclick="switchTab('graph')">⬡</button>
+
+          <button class="tab-btn" onclick="switchTab('kgedit')" title="KG Editor">🗄</button>
+        </div>
+      </div>
+      <div class="tab-pane active" id="tab-wiki">
+        <div class="section">
+          <div class="lbl">Wikipedia Search</div>
+          <div class="wiki-input-wrap" style="position:relative">
+            <input class="wiki-input" id="wikiSearch" placeholder="Any topic..." autocomplete="off" oninput="onWikiInput(this.value)" onkeypress="if(event.key==='Enter')doWikiSearch()">
+            <button class="wiki-search-btn" onclick="doWikiSearch()">→</button>
+            <div class="wiki-suggestions" id="wikiSuggestions"></div>
+          </div>
+          <div class="wiki-status" id="wikiStatus"></div>
+        </div>
+        <div class="section">
+          <div class="lbl">Quick Fetch <span id="quickFetchRefresh" title="Refresh topics" style="cursor:pointer;opacity:.5;transition:opacity .2s;font-size:10px" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.5" onclick="refreshQuickTopics()">↻</span></div>
+          <div class="quick-btns" id="quickBtns"></div>
+        </div>
+        <div class="section" id="topicSection" style="display:none">
+          <div class="lbl">Learned Topics</div>
+          <div class="topic-cloud" id="topicCloud"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-paste">
+        <div class="section">
+          <div class="lbl">Training Text <span id="charCount" style="color:var(--text-dim)"></span></div>
+          <textarea id="trainText" rows="10" placeholder="Paste any text to train Lexica..."></textarea>
+          <div class="file-drop" onclick="document.getElementById('fileUp').click()">
+            <input type="file" id="fileUp" accept=".txt,.md,.pdf">
+            <div class="fi">📄</div><p>Drop .txt or .md file</p>
+          </div>
+          <div style="margin-top:8px"><input type="text" id="pasteTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
+          <button class="btn-primary" onclick="trainFromPaste()">⚡ Train on This</button>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-sources">
+        <div class="section">
+          <div class="lbl">Active Sources <span id="srcCount" style="color:var(--gold)">0</span></div>
+          <div id="srcList"><div class="no-sources">No sources yet.</div></div>
+        </div>
+        <div class="section" id="statsSection" style="display:none">
+          <div class="lbl">Knowledge Stats</div>
+          <div class="stats-grid">
+            <div class="stat-card"><div class="val" id="stSent">0</div><div class="slbl">Sentences</div></div>
+            <div class="stat-card"><div class="val" id="stTrip">0</div><div class="slbl">KG Triples</div></div>
+            <div class="stat-card"><div class="val" id="stVoc">0</div><div class="slbl">Vocabulary</div></div>
+            <div class="stat-card"><div class="val" id="stWord">0</div><div class="slbl">Word Profiles</div></div>
+            <div class="stat-card"><div class="val" id="stSynth">0</div><div class="slbl">Synthesized</div></div>
+            <div class="stat-card"><div class="val" id="stHyper">0</div><div class="slbl">HyperEdges</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-data">
+        <div class="section">
+          <div class="lbl">Export</div>
+          <button class="btn-sm" style="width:100%;padding:11px" onclick="exportData()">⬇ Export lexica-v14.json</button>
+        </div>
+        <div class="section">
+          <div class="lbl">Import</div>
+          <div class="file-drop" onclick="document.getElementById('importFile').click()">
+            <input type="file" id="importFile" accept=".json">
+            <div class="fi">📥</div><p>Load .json export</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="lbl">Reset</div>
+          <button class="btn-danger" onclick="resetAll()">✕ Clear All Training Data</button>
+        </div>
+      </div>
+      <!-- PDF INGESTION TAB -->
+      <div class="tab-pane" id="tab-pdf">
+        <div class="section">
+          <div class="lbl">PDF Ingestion <span style="font-size:9px;color:var(--text-muted)">(browser-local, no upload)</span></div>
+          <div class="file-drop" id="pdfDrop" onclick="document.getElementById('pdfFileUpHidden').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold)'" ondragleave="this.style.borderColor=''" ondrop="onPdfDrop(event)">
+            <input type="file" id="pdfFileUp" accept=".pdf" onchange="onPdfFileSelect(this)">
+            <div class="fi">📄</div>
+            <p>Drop PDF or click to select</p>
+          </div>
+          <div id="pdfStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);min-height:16px"></div>
+          <div style="margin-top:8px"><input type="text" id="pdfTitle" placeholder="Source title (optional)" style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">
+              Pages: <span id="pdfPages">—</span>
+            </div>
+            <div style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim)">
+              Chars: <span id="pdfChars">—</span>
+            </div>
+          </div>
+          <div id="pdfPreview" style="margin-top:8px;max-height:80px;overflow:hidden;font-size:9.5px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;line-height:1.5;white-space:pre-wrap;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;padding:8px;display:none"></div>
+          <button class="btn-primary" id="pdfTrainBtn" onclick="trainFromPDF()" style="opacity:0.5;pointer-events:none">⚡ Train on PDF</button>
+        </div>
+      </div>
+      <!-- KG TRIPLE EDITOR TAB -->
+      <div class="tab-pane" id="tab-kgedit">
+        <div class="section">
+          <div class="lbl">Knowledge Graph Editor <span id="kgEditCount" style="color:var(--gold);font-size:10px"></span></div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input type="text" id="kgSearchInput" placeholder="Search triples..." style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:7px 11px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10.5px;outline:none" oninput="kgEditSearch(this.value)">
+            <button class="btn-sm" onclick="kgEditSearch(document.getElementById('kgSearchInput').value)">→</button>
+          </div>
+          <div id="kgEditList" style="max-height:420px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-words">
+        <div class="section">
+          <div class="lbl">Word Inspector</div>
+          <input class="word-lookup-input" id="wordInput" placeholder="Type any word from your data..." oninput="onWordInput(this.value)" onkeypress="if(event.key==='Enter')lookupWord(this.value)">
+          <div id="wordArea"></div>
+        </div>
+        <div class="section" id="wordBrowseSection" style="display:none">
+          <div class="lbl">Top Content Words</div>
+          <div id="wordBrowseTags"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="tab-cognition">
+
+        <!-- ── SECTION 1: NEURAL ENGINE ── -->
+        <div class="cog-section">
+          <div class="lbl">Neural Engine</div>
+          <div class="slm-status-bar" id="slmStatusBar">
+            <div class="slm-dot loading" id="slmDot"></div>
+            <div class="slm-label" id="slmLabel">Initializing...</div>
+            <div class="slm-model-name" id="slmModelName">—</div>
+            <button id="slmRetryBtn" onclick="window._retryNeuralInit && window._retryNeuralInit()" style="display:none;margin-left:auto;padding:2px 8px;background:rgba(110,168,255,.12);border:1px solid rgba(110,168,255,.3);border-radius:6px;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(110,168,255,.22)'" onmouseout="this.style.background='rgba(110,168,255,.12)'">↻ retry</button>
+          </div>
+          <!-- SLM Ensemble roster -->
+          <div id="slmEnsemblePanel" style="margin-top:8px;display:none">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:5px;letter-spacing:.04em">ENSEMBLE ROLES</div>
+            <div id="slmEnsembleRoles"></div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 2: INNER STATE (Qualia + Drives unified) ── -->
+        <div class="cog-section">
+          <div class="lbl">Inner State</div>
+          <!-- Brief explanation row -->
+          <div style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;line-height:1.5;padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;margin-bottom:8px">
+            <span style="color:var(--gold)">Qualia</span> = what Lexica <em>feels</em> right now (emergent)<br>
+            <span style="color:var(--cyan)">Drives</span> = the underlying forces that <em>produce</em> that feeling<br>
+            <span style="opacity:.6">e.g. high Curiosity drive → Lexica feels curious · asks questions</span>
+          </div>
+          <!-- Qualia: current mood label -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.05em">QUALIA · CURRENT MOOD</div>
+          <div id="qualiaStateDisplay" style="padding:8px 10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:4px">Awaiting first thought...</div>
+          <!-- Qualia numeric metrics -->
+          <div class="cog-state-row" id="qualiaMetrics" style="margin-bottom:10px"></div>
+          <!-- Drive bars: the underlying mechanics that produce the qualia -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">HOMEOSTATIC DRIVES · FUEL FOR QUALIA</div>
+          <div id="drivePanel" class="drive-panel">
+            <div class="drive-row">
+              <span class="drive-label">Curiosity</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill curiosity" id="drCuriosity" style="width:0%"></div></div>
+              <span class="drive-val" id="drCurVal">0</span>
+              <span class="drive-action-badge active" id="drCurBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Discomfort</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill discomfort" id="drDiscomfort" style="width:0%"></div></div>
+              <span class="drive-val" id="drDisVal">0</span>
+              <span class="drive-action-badge active" id="drDisBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Expression</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill expression" id="drExpression" style="width:0%"></div></div>
+              <span class="drive-val" id="drExpVal">0</span>
+              <span class="drive-action-badge active" id="drExpBadge">idle</span>
+            </div>
+            <div class="drive-row">
+              <span class="drive-label">Satiation</span>
+              <div class="drive-bar-track"><div class="drive-bar-fill satiation" id="drSatiation" style="width:0%"></div></div>
+              <span class="drive-val" id="drSatVal">0</span>
+              <span class="drive-action-badge active" id="drSatBadge">idle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 3: ACTIVE MIND (live cognition) ── -->
+        <div class="cog-section">
+          <div class="lbl">Active Mind</div>
+          <!-- Inner monologue -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">INNER MONOLOGUE</div>
+          <div id="monologueLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Idle...</div></div>
+          <!-- Society of Mind -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin:10px 0 3px;letter-spacing:.04em;cursor:pointer;display:flex;justify-content:space-between" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <span>SOCIETY OF MIND · LAST DEBATE</span><span style="font-size:9px">▾</span>
+          </div>
+          <div id="debateLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No debates yet.</div></div>
+          <!-- N3 Bridge -->
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin:10px 0 3px;letter-spacing:.04em;cursor:pointer;display:flex;justify-content:space-between" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <span>N3 BRIDGE</span><span style="font-size:9px">▾</span>
+          </div>
+          <div id="n3Log"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No bridges yet.</div></div>
+        </div>
+
+        <!-- ── SECTION 4: SELF & CONTEXT ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Self &amp; Context <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="selfContextGroup">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GOALS</div>
+            <div id="goalStack" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No goals yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">SELF-MODEL</div>
+            <div id="selfModelPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Builds from reasoning history.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">USER MODEL</div>
+            <div id="userModelPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Modeling begins after first message.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">PREFERENCES</div>
+            <div id="preferencePanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Form after successful syntheses.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">EPISODIC MEMORY</div>
+            <div id="episodicPanel"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Conversation arc builds as you talk.</div></div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 5: KNOWLEDGE STRUCTURE ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Knowledge Structure <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="knowledgeStructGroup">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GRAPH CENTRALITY</div>
+            <div id="centralityPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Train to see centrality.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">ONTOLOGY</div>
+            <div id="ontologyPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No nodes classified yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">COREF MERGES</div>
+            <div id="corefLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Appear after training.</div></div>
+          </div>
+        </div>
+
+
+        <!-- ── AGI SECTION A: CAUSAL REASONING ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--cyan)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">⚡ Causal Graph <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="causalSection">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">WHY-CHAINS · CAUSE→EFFECT</div>
+            <div id="causalEdgeLog" style="max-height:120px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No causal edges learned yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin:8px 0 4px;letter-spacing:.05em">LAST COUNTERFACTUAL</div>
+            <div id="counterfactualLog" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;min-height:24px">—</div>
+          </div>
+        </div>
+
+        <!-- ── AGI SECTION B: WORLD MODEL ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--gold)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">🌍 World Model <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="worldModelSection">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">OBJECTS · PROPERTIES · STATES</div>
+            <div id="worldObjectLog" style="max-height:110px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No objects registered.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin:8px 0 4px;letter-spacing:.05em">LAST SIMULATION</div>
+            <div id="worldSimLog" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;min-height:24px">—</div>
+          </div>
+        </div>
+
+        <!-- ── AGI SECTION C: SYSTEM 2 DELIBERATE REASONING ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer;color:var(--purple)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">🧮 System 2 <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="system2Section">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-bottom:4px;letter-spacing:.05em">PROOF STEPS · VERIFIED LOGIC</div>
+            <div id="sys2ProofLog" style="max-height:120px;overflow-y:auto"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No proofs run yet.</div></div>
+            <div style="display:flex;gap:8px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:9px">
+              <span style="color:var(--green)">✓ <span id="sys2Verified">0</span> verified</span>
+              <span style="color:var(--red)">✗ <span id="sys2Refuted">0</span> refuted</span>
+              <span style="color:var(--gold)">∑ <span id="sys2MathCalls">0</span> math ops</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION 6: SYSTEM LOGS ── -->
+        <div class="cog-section">
+          <div class="lbl" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">System Logs <span style="font-size:9px;color:var(--text-muted)">▾</span></div>
+          <div id="systemLogsGroup" style="display:none">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">INGESTION QUEUE</div>
+            <div id="ingestionPanel" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">Idle.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">GÖDELIAN SELF-MODIFICATIONS</div>
+            <div id="godelLog" style="margin-bottom:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No self-modifications yet.</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);margin-bottom:3px;letter-spacing:.04em">FAILURE LOG</div>
+            <div id="failureLog"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);padding:4px 0">No failures recorded.</div></div>
+          </div>
+        </div>
+
+      </div>
+      <div class="tab-pane" id="tab-graph">
+        <div class="hg-wrap" style="margin:-16px -16px 0;border-radius:0;border-left:none;border-right:none;border-top:none">
+          <canvas class="hg-canvas" id="hgCanvas" height="360"></canvas>
+          <div id="hgEmpty" class="hg-empty">Train on a source to visualize the knowledge graph.</div>
+        </div>
+        <div class="hg-controls" style="margin:0 -16px;padding:8px 14px">
+          <button class="hg-ctrl-btn active" id="hgBtnForce" onclick="hgSetLayout('force')">Force</button>
+          <button class="hg-ctrl-btn" id="hgBtnCircle" onclick="hgSetLayout('circle')">Circle</button>
+          <button class="hg-ctrl-btn" onclick="hgReset()">Reset</button>
+          <button class="hg-ctrl-btn" onclick="hgRefresh()">↻</button>
+          <span class="hg-node-count" id="hgStats"></span>
+        </div>
+        <div id="hgNodeCount" style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--text-muted);padding:8px 0 0"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<main class="chat-area">
+  <header class="chat-header">
+    <div class="model-info">
+      <div class="model-avatar">Lx</div>
+      <div>
+        <div class="model-name">LEXICA V0
+          <span class="qualia-badge qualia-neutral" id="qualiaBadge">○ Neutral</span>
+        </div>
+        <div class="model-status" id="modelStatus"><div class="pulse"></div><span id="statusTxt">awaiting training</span></div>
+      </div>
+    </div>
+    <div class="header-btns">
+      <button class="btn-clear" onclick="clearCtx()">↺ Context</button>
+      <button class="btn-clear" onclick="clearChat()">↺ Chat</button>
+    </div>
+  </header>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <!-- Expert Panel: appears above input row when Expert mode is active -->
+    <div id="expertPanel">
+      <div class="expert-header">
+        <span class="expert-header-lbl">⚡ Ensemble Reasoning</span>
+        <span id="expertStatusLbl" style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);margin-left:auto">idle</span>
+      </div>
+      <div class="expert-agents">
+        <div class="expert-agent-col">
+          <div class="expert-agent-name" style="color:var(--red)">
+            <div class="agent-dot" id="dot-Analyst" style="background:var(--red)"></div>Analyst
+          </div>
+          <div class="expert-agent-output pending" id="out-Analyst">Waiting for query...</div>
+        </div>
+        <div class="expert-agent-col">
+          <div class="expert-agent-name" style="color:var(--cyan)">
+            <div class="agent-dot" id="dot-Reasoner" style="background:var(--cyan)"></div>Reasoner
+          </div>
+          <div class="expert-agent-output pending" id="out-Reasoner">Waiting for query...</div>
+        </div>
+        <div class="expert-agent-col">
+          <div class="expert-agent-name" style="color:var(--gold)">
+            <div class="agent-dot" id="dot-Critic" style="background:var(--gold)"></div>Critic
+          </div>
+          <div class="expert-agent-output pending" id="out-Critic">Waiting for query...</div>
+        </div>
+      </div>
+      <div class="expert-synthesis-row">
+        <div class="expert-synthesis-lbl">◈ Synthesizer</div>
+        <div class="expert-synthesis-text" id="out-Synthesizer">—</div>
+      </div>
+    </div>
+
+    <div class="input-row">
+      <div style="position:relative">
+        <button class="attach-btn" id="attachBtn" onclick="toggleAttachPopover()" title="Attach file">+</button>
+        <div class="attach-popover" id="attachPopover">
+          <div class="attach-option" onclick="attachPickPDF()">
+            <span class="attach-option-icon">📄</span>
+            <span>Upload PDF</span>
+          </div>
+        </div>
+        <input type="file" id="pdfFileUpHidden" accept=".pdf" style="display:none" onchange="onPdfFileSelect(this);closeAttachPopover()">
+      </div>
+      <div class="input-wrap">
+        <canvas id="inputGlowCanvas"></canvas>
+        <input type="text" class="input-field" id="qInput" placeholder="Ask anything about your sources..." onkeypress="if(event.key==='Enter')sendQ()" oninput="resetIdleTimer();updateOrbTyping(this.value)">
+      </div>
+      <!-- Mode toggle: sits between input and send orb -->
+      <div class="mode-toggle" id="modeToggle">
+        <button class="mode-btn active" id="modeNormal" onclick="setQueryMode('normal')">Normal</button>
+        <button class="mode-btn expert" id="modeExpert" onclick="setQueryMode('expert')">Expert</button>
+      </div>
+      <button class="btn-send" id="sendBtn" onclick="sendQ()">
+        <div class="orb-wrap">
+          <canvas id="orbCanvas" width="208" height="208" style="width:52px;height:52px;display:block;border-radius:50%"></canvas>
+        </div>
+      </button>
+    </div>
+    <div class="input-hint">LEXICA V0 · ENSEMBLE SYNTHESIS · HOMEOSTATIC DRIVES · GOAL STACK · EPISODIC MEMORY · NEURO-SYMBOLIC</div>
+  </div>
+</main>
+
+<script src="lexica.js"></script>
+</body>
+</html>
