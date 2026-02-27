@@ -15,7 +15,7 @@
 // Cross-origin isolation is no longer required — NeuralMouth uses Transformers.js
 // (same as NanoCortex) which runs on WebAssembly without SharedArrayBuffer threading.
 // Removing the previous COOP/COEP service worker shim which caused reload loops.
-console.log('[Lexica V0] Runtime:', navigator.userAgent.slice(0,60));
+console.log('[Lexica 4.0] Runtime:', navigator.userAgent.slice(0,60));
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -788,7 +788,7 @@ textarea:focus{border-color:rgba(232,184,75,.35)}textarea::placeholder{color:var
   border-radius:20px;padding:36px 42px;position:relative;overflow:hidden;
   box-shadow:0 0 80px rgba(110,168,255,.06), 0 0 40px rgba(176,148,255,.04), inset 0 1px 0 rgba(255,255,255,.08);
 }
-.train-panel::before{content:'LEXICA V0 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
+.train-panel::before{content:'LEXICA V12 // KNOWLEDGE SUBSTRATE';position:absolute;top:14px;left:18px;font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:.25em;color:rgba(255,255,255,.15)}
 .tp-corner{position:absolute;width:16px;height:16px;border-color:rgba(110,168,255,.3)}
 .tp-corner.tl{top:8px;left:8px;border-top:1.5px solid;border-left:1.5px solid}
 .tp-corner.tr{top:8px;right:8px;border-top:1.5px solid;border-right:1.5px solid}
@@ -1031,7 +1031,7 @@ async function generate(taskPrefix,contentPrompt,maxTokens,history){
     ]);
     const userMsg=(taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
     const msgs=[{role:'system',content:sys},...hist,{role:'user',content:userMsg.slice(0,600)}];
-    const res=await _pipe(msgs,{max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+    const res=await _pipe(msgs,{max_new_tokens:Math.min(maxTokens,250),do_sample:false,temperature:1.0,repetition_penalty:1.15,return_full_text:false});
     const g=res?.[0]?.generated_text;
     if(Array.isArray(g))raw=(g[g.length-1]?.content??'').trim();
     else{raw=(g??'').trim();const ai=raw.lastIndexOf('<|im_start|>assistant');if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim();}
@@ -1045,7 +1045,7 @@ async function generate(taskPrefix,contentPrompt,maxTokens,history){
 
 async function generateMessages(messages,maxTokens){
   if(!_ready||!_isDecoder)throw new Error('decoder not ready');
-  const res=await _pipe(messages,{max_new_tokens:Math.min(maxTokens||120,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+  const res=await _pipe(messages,{max_new_tokens:Math.min(maxTokens||120,250),do_sample:false,temperature:1.0,repetition_penalty:1.15,return_full_text:false});
   const g=res?.[0]?.generated_text;
   let raw='';
   if(Array.isArray(g))raw=(g[g.length-1]?.content??'').trim();
@@ -1072,7 +1072,7 @@ self.onmessage=async function(e){
 <!-- V12 NEURAL BOOT OVERLAY -->
 <div class="boot-overlay" id="bootOverlay">
   <div class="boot-logo">LEXICA</div>
-  <div class="boot-sub">4.0 · Neuro-Symbolic Ascension</div>
+  <div class="boot-sub">V0 · Neuro-Symbolic</div>
   <div class="boot-bar-wrap"><div class="boot-bar" id="bootBar"></div></div>
   <div class="boot-status" id="bootStatus">Initializing symbolic core...</div>
   <div class="boot-phase-list">
@@ -1137,7 +1137,7 @@ self.onmessage=async function(e){
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M9 5v4l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
   </button>
   <div class="rail-spacer"></div>
-  <div class="rail-version">4.0</div>
+  <div class="rail-version">V0</div>
 </div>
 
 <div class="drawer" id="drawer">
@@ -1162,7 +1162,7 @@ self.onmessage=async function(e){
     <!-- TOOLS PANEL -->
     <div class="drawer-panel" id="panelTools" style="display:none">
       <div class="tools-head">
-        <div class="tools-brand">LEXICA <span>4.0</span></div>
+        <div class="tools-brand">LEXICA <span>V0</span></div>
         <div class="tab-bar">
           <button class="tab-btn active" onclick="switchTab('wiki')">🌐</button>
           <button class="tab-btn" onclick="switchTab('paste')">📝</button>
@@ -1570,7 +1570,7 @@ const yieldToMain = (typeof scheduler !== 'undefined' && scheduler.yield)
 //  L10 — NanoCortex (Transformers.js coref merging via cosine sim)
 //  L11 — NeuralMouth (Transformers.js — SLM across all layers L2–L5, social, N3 bridge)
 //  L12 — N3 Entropy Resolution (SLM bridge query on gap nodes)
-//  ── LEXICA V0 ADDITIONS ──
+//  ── LEXICA 4.0 ADDITIONS ──
 //  L13 — HomeostaticDriveSystem (curiosity/discomfort/expression/satiation with behavioral teeth)
 //  L14 — GoalStack (self-authored objectives generated from drive pressures + KG structure)
 //  L15 — SelfModel (reasoning history, knowledge boundary, mental simulation loop)
@@ -1635,8 +1635,9 @@ function _isSentenceClean(s) {
   // catches "millions user erik games" and similar KG-poisoning fragments
   const startsLower = s.match(/^([a-z][a-z]+ ){4}/);
   if (startsLower) return false;
-  // Must have at least one verb
-  if (!/\b(is|are|was|were|has|have|had|can|will|would|does|did|been|makes|made|created|developed|allows|includes|features|provides|uses|contains|represents|consists|enables|produces|serves|became|remains|known|called|found|located|named|started|won|lost|built|designed|wrote|published|released|launched|established|founded|acquired|sold|bought|operates|refers|derives|consists|occurs|appears|became|played|fought|occurred)\b/i.test(s)) return false;
+  // Must have at least one clause-forming word (verb, modal, or state)
+  // Keep broad: many valid sentences use verbs not in a short list
+  if (!/\b(is|are|was|were|has|have|had|can|could|will|would|should|may|might|must|shall|does|did|do|been|be|being|made|makes|make|creates|created|create|uses|use|used|contains|contain|includes|include|features|feature|provides|provide|allows|allow|enables|enable|produces|produce|serves|serve|consists|consist|occurs|occur|appears|appear|represents|represent|became|becomes|become|remains|remain|helps|help|gives|give|takes|take|shows|show|plays|play|runs|run|comes|come|goes|go|gets|get|puts|put|keeps|keep|leads|lead|works|work|moves|move|changes|change|requires|require|supports|support|forms|form|holds|hold|covers|cover|measures|measure|weighs|weigh|means|mean|refers|refer|derives|derive|develops|develop|releases|release|describes|describe|defines|define|explains|explain|affects|affect|causes|cause|results|result|depends|depend|known|found|located|named|called|born|died|won|lost|sold|bought|built|written|published|launched|established|founded|acquired|fought|occurred|played|spread|increased|decreased|grew|fell|rose|dropped|returned|became|stayed|remained)\b/i.test(s)) return false;
   return true;
 }
 function splitSentences(text){const c=cleanText(text),toks=c.match(/\S+/g)||[],res=[];let buf=[];for(let i=0;i<toks.length;i++){const tok=toks[i];buf.push(tok);if(/[.!?]["']?\s*$/.test(tok)){const cl=tok.toLowerCase().replace(/[.!?'"]+$/,'').replace(/[^a-z.]/g,'');const isAbbr=ABBREVS.has(cl)||(cl.length===1&&/[a-z]/.test(cl))||/[A-Z]\./.test(tok);if(!isAbbr&&!/^[a-z]/.test(toks[i+1]||'')){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);buf=[];}}}if(buf.length>=5){const s=buf.join(' ').trim();if(_isSentenceClean(s))res.push(s);}const seen=new Set();return res.filter(s=>{const fp=s.slice(0,55).toLowerCase().replace(/\s+/g,'');if(seen.has(fp))return false;seen.add(fp);return true;});}
@@ -4360,10 +4361,17 @@ class CuriosityEngine {
       // Use factual graph data directly — T5 hallucinates on "write a sentence" tasks
       const aAct = Math.round(freq.get(nodeA)||0);
       const bAct = Math.round(freq.get(nodeB)||0);
-      const bridgeThought = kgCtx
-        ? `"${nodeA}" and "${nodeB}" — no direct path found. Related: ${kgCtx.slice(0,120)}`
-        : `"${nodeA}" (${aAct} activations) and "${nodeB}" (${bAct}) have no graph path at depth 2.`;
-      _this.onThought(bridgeThought, nodeA, nodeB);
+      // Use SLM to generate a genuine thought about the graph gap
+      nm._generateMessages([
+        { role:'system', content:'You are the inner voice of an AI knowledge engine. Generate ONE short, curious observation about a gap in your knowledge. 1 sentence, specific, no fluff.' },
+        { role:'user', content:kgCtx
+          ? `You know: ${kgCtx.slice(0,200)}. But "${nodeA}" and "${nodeB}" have no direct connection. What does this gap suggest?`
+          : `"${nodeA}" has ${aAct} mentions and "${nodeB}" has ${bAct} mentions, but they don't connect. Why might that be?` }
+      ], 50).then(thought => {
+        _this.onThought(thought && thought.length>8 ? thought : `No path found between "${nodeA}" and "${nodeB}" — knowledge gap detected.`, nodeA, nodeB);
+      }).catch(() => {
+        _this.onThought(`Noticed: "${nodeA}" and "${nodeB}" have no graph connection.`, nodeA, nodeB);
+      });
     } else {
       // No SLM: emit factual observation, no templates
       const aAct = Math.round(freq.get(nodeA)||0);
@@ -4435,6 +4443,11 @@ function classifyIntent(q){
   if(/\b(bored|boring|suggest|recommend|entertain|something to do|amuse me|what (should|can) i)\b/i.test(ql))return'abstract_need';
   // ── FUZZY GREETINGS — catch "Hellooo?", "Heyyy" etc. before anything else ──
   if(/^h+[ae]+l+[oa]*[!? ]*$|^h+e+y+[!? ]*$|^h+o+l+[ao]+[!? ]*$/i.test(ql.trim()))return'greeting';
+  // ── SOCIAL / CONVERSATIONAL SIGNALS ──
+  if(/\b(acknowledge me|respond|answer me|hear me|are you there|still there|you there|you alive|you dead|you broken)\b/i.test(ql))return'social';
+  if(/^(screw you|go away|you suck|you're useless|you are useless|stop it|shut up|whatever|ugh|smh|bruh|bro|lmao|lol|wtf|haha|tf|tfym|what the hell)\b/i.test(ql))return'social';
+  if(/^(are you okay|are you ok|u ok|you ok\??)\s*[?!]*$/i.test(ql.trim()))return'social';
+  if(/^(i have no idea|i don'?t (know|understand|get it)|i'?m confused|what are you (on about|saying|talking about|trying to say))\b/i.test(ql))return'social';
   // ── SELF-DIRECTED / META INTENTS — catch before factual routing ──
   if(/\b(who|what)\s+(are|is)\s+you\b/i.test(ql))return'self_status';
   if(/\bwhat\s+(are\s+you|do\s+you)\s+(thinking|doing|feeling|knowing|learning|working)\b/i.test(ql))return'self_status';
@@ -4471,6 +4484,7 @@ function classifyIntent(q){
   if(/^(?:can|could|does|do|did)\s+you\b/.test(ql))return'self_status'; // "can you X" = self
   if(/\b(vs|versus|compare|difference between|better than|same as|similar to)\b/.test(ql))return'comparative';
   if(/\bwhy\b|\bbecause\b|\bcause of\b|\breason\b/.test(ql))return'causal';
+  if(/\b(write|compose|draft)\b.{0,20}\b(essay|report|article|summary|overview|explanation|analysis)\b|\bexplain in detail\b|\btell me everything\b|\bdescribe thoroughly\b|\bin depth\b/i.test(ql))return'essay';
   if(/^tell me about\b|^describe\b|^explain\b|^who is\b|^who's\b|^what is\b|^what's\b/.test(ql))return'biographical';
   if(/\b(list|all|every|types|versions|editions|examples|give me)\b/.test(ql))return'list';
   if(/\b(when|what year|what date)\b/.test(ql))return'temporal';
@@ -5399,6 +5413,7 @@ class NeuralMouth {
           this.ready = true;
           this.loading = false;
           window._webllmReady = true;
+          window.dispatchEvent(new CustomEvent('lexicaReady'));
           onProgress('NeuralMouth: SLM ready ✓ (' + msg.model.split('/').pop() + ') [Web Worker]');
           console.log('[NeuralMouth] Worker ready:', msg.model, 'decoder:', msg.isDecoder);
           // Update cognition tab UI
@@ -5542,9 +5557,9 @@ class NeuralMouth {
       const speakerMsgs = [
         { role: 'system', content: 'You are Lexica, a concise knowledge assistant. Answer the question in 1-2 clear sentences using only the given facts. No lists, no markdown, no caveats.' },
         ...historyMsgs,
-        { role: 'user', content: `${traceHint}Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}` },
+        { role: 'user', content: `${traceHint}Facts: ${facts}\n\nQuestion: ${query.slice(0,100)}${intent === 'essay' ? '\n\nProvide a detailed, multi-sentence answer.' : ''}` },
       ];
-      answer = await this._generateMessages(speakerMsgs, 120) || '';
+      answer = await this._generateMessages(speakerMsgs, intent==='essay' ? 220 : 130) || '';
     } catch(e) { return null; }
 
     if (!answer || answer.length < 8) return null;
@@ -5600,43 +5615,49 @@ class NeuralMouth {
 
   async graphRAG(kgFacts, query, intent, evidenceSentences=[], conversationHistory=[]) {
     if (!this.ready) return null;
+    const isEssay = intent === 'essay' || /\b(essay|report|explain in detail|everything about|tell me all)\b/i.test(query);
     // Filter for quality triples before feeding to SLM
     const goodTriples = kgFacts.filter(f => NeuralMouth._tripleQuality(f));
-    const triples = goodTriples.slice(0, 6)
+    const triples = goodTriples.slice(0, isEssay ? 10 : 6)
       .map(f => `${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`)
       .join('; ');
-    // Evidence: prefer shorter, clear factual sentences; avoid KB-internal fragments
+    // Evidence: more sentences for essays
     const evidence = evidenceSentences
       .filter(s => s && s.length > 20 && s.length < 200 && !/</.test(s) && /[.!?]$/.test(s.trim()))
-      .slice(0, 3).join(' ');
+      .slice(0, isEssay ? 6 : 3).join(' ');
     if (!triples && !evidence) return null;
-    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, 320);
+    const facts = [triples, evidence].filter(Boolean).join(' | ').slice(0, isEssay ? 600 : 320);
+    const maxToks = isEssay ? 220 : (this._isDecoder ? 130 : 90);
 
-    if (this._isDecoder && conversationHistory.length > 0) {
+    if (this._isDecoder) {
       // SmolLM2: use full chat template with conversation history
-      const systemMsg = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct. No lists, no markdown.';
-      const historyMsgs = conversationHistory.slice(-4).flatMap(turn => [
+      const sysContent = isEssay
+        ? 'You are Lexica, a knowledgeable assistant. Write a thorough, well-structured explanation using the given facts. Use multiple sentences. Be specific and informative.'
+        : 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct. No lists, no markdown.';
+      const historyMsgs = (conversationHistory||[]).slice(-4).flatMap(turn => [
         { role: 'user',      content: turn.q.slice(0, 120) },
         { role: 'assistant', content: turn.a.slice(0, 150) },
       ]);
-      const userMsg = `Facts: ${facts}\n\nQuestion: ${query.slice(0, 100)}`;
+      const userMsg = `Facts: ${facts}\n\nQuestion: ${query.slice(0, 150)}`;
       const messages = [
-        { role: 'system', content: systemMsg },
+        { role: 'system', content: sysContent },
         ...historyMsgs,
         { role: 'user',   content: userMsg },
       ];
       try {
-        const raw = await this._generateMessages(messages, 120);
+        const raw = await this._generateMessages(messages, maxToks);
         if (raw && raw.length > 10)
           return raw.replace(/^(Answer:|Facts:|Question:|Sure[,!]\s*)/i, '').replace(/\n/g,' ').trim();
       } catch(e) { /* fall through to task-prefix path */ }
     }
 
     // Flan-T5 or decoder fallback: task-prefix format
-    const task = `Answer the question in 1-2 sentences using only the given facts. Be direct and specific.`;
-    const content = `Facts: ${facts}\nQuestion: ${query.slice(0, 80)}\nAnswer:`;
+    const task = isEssay
+      ? `Write a detailed explanation (3-5 sentences) using only the given facts. Cover the key points thoroughly.`
+      : `Answer the question in 1-2 sentences using only the given facts. Be direct and specific.`;
+    const content = `Facts: ${facts}\nQuestion: ${query.slice(0, 100)}\nAnswer:`;
     try {
-      const result = await this._generate(task, content, 90);
+      const result = await this._generate(task, content, maxToks);
       if (!result || result.length < 10) return null;
       return result.replace(/^(Answer:|Facts:|Question:)\s*/i, '').replace(/\n/g,' ').trim() || null;
     } catch(e) { return null; }
@@ -6169,7 +6190,8 @@ class WorldModel {
       this.lastSimulation = { object:key, action:actionKey, description:desc };
       return { success:false, description:desc };
     }
-    return { success:false, description:`"${objectName}" is not in the world model. Train on relevant sources to simulate it.` };
+    // Don't surface "not in world model" to user — return null and let KG/SLM handle it
+    return { success:false, description:null };
   }
 
   // ── Spatial inference: where is X? What contains X? ──
@@ -7163,19 +7185,28 @@ class Engine {
     // Teach it something now, it remembers forever (or until cleared).
     setTimeout(() => {
       if (this.saveToMemory()) {
-        console.log('[Lexica V0] Knowledge saved to persistent memory.');
+        console.log('[Lexica 4.0] Knowledge saved to persistent memory.');
       }
     }, 2000); // slight delay so UI updates first
 
-    // ── INNER MONOLOGUE: post-training reflection ──
+    // ── INNER MONOLOGUE: post-training reflection (SLM-generated) ──
     setTimeout(() => {
       if (typeof showInnerMonologue === 'function' && this.kg.count() > 5) {
-        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 5);
-        const nodeNames = topNodes.slice(0,3).map(n => n.node).filter(Boolean);
-        if (nodeNames.length >= 2) {
-          // Use factual data directly — T5 hallucinates on open-ended "write a sentence" tasks
-          const thought = `Absorbed "${title}": ${this.kg.count()} triples indexed. Central concepts: ${nodeNames.join(', ')}.`;
-          showInnerMonologue(thought, nodeNames[0], nodeNames[1]);
+        const nm = window._neuralMouth;
+        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 8);
+        const nodeNames = topNodes.slice(0,5).map(n => n.node).filter(n => n && n.length > 2 && n.length < 40);
+        const recentTriples = this.kg.triples.slice(-8).map(t=>`${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+        if (nm?.ready && nodeNames.length >= 1) {
+          nm._generateMessages([
+            { role:'system', content:'You are the inner voice of Lexica. After learning something new, generate ONE short, genuine thought (1 sentence) about what you just absorbed. Be specific about the content, curious, not generic.' },
+            { role:'user', content:`Just learned: "${title}" (${this.kg.count()} total KG triples). Key facts: ${recentTriples.slice(0,250)}. Key entities: ${nodeNames.join(', ')}. What strikes you?` }
+          ], 60).then(thought => {
+            if (thought && thought.length > 10) showInnerMonologue(thought, nodeNames[0], nodeNames[1]||null);
+          }).catch(() => {
+            if (nodeNames.length >= 1) showInnerMonologue(`Absorbed "${title}": ${this.kg.count()} triples. Entities: ${nodeNames.slice(0,3).join(', ')}.`, nodeNames[0], nodeNames[1]||null);
+          });
+        } else if (nodeNames.length >= 1) {
+          showInnerMonologue(`Absorbed "${title}": ${this.kg.count()} triples. Entities: ${nodeNames.slice(0,3).join(', ')}.`, nodeNames[0], nodeNames[1]||null);
         }
       }
     }, 1500);
@@ -7422,12 +7453,11 @@ class Engine {
       if (this.neuralMouth?.ready) {
         const fallbackCtx = `Sources I know: ${srcList}. User asked: "${question.slice(0,80)}"`;
         const slmFallback = await Promise.race([
-          this.neuralMouth._generate(
-            'Tell the user in one sentence that no relevant information was found and suggest fetching Wikipedia.',
-            `Question: ${question.slice(0,60)}. Sources: ${srcList}. Sentence:`,
-            65
-          ).catch(() => null),
-          new Promise(res => setTimeout(() => res(null), 2500))
+          this.neuralMouth._generateMessages([
+            { role:'system', content:`You are Lexica, a knowledge assistant. Your loaded sources: ${srcList}. You have no information about the user's question. Be honest and helpful. 1-2 sentences.` },
+            { role:'user', content: question.slice(0, 150) }
+          ], 80).catch(() => null),
+          new Promise(res => setTimeout(() => res(null), 5000))
         ]);
         if (slmFallback) {
           return {text:slmFallback,strategy:'fallback',conf:{l:'low',lbl:'no match',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:true,conflict:null,cached:false,evidence:null,intent};
@@ -7436,7 +7466,15 @@ class Engine {
       if (activeState&&this.userCtx.valence(activeState.adj)==='negative') {
         return {text:`Still learning about that. I know about ${randomSubject||this.sm.s[0]?.title||'the loaded topics'}.`,strategy:'semantic-fallback',conf:{l:'low',lbl:'semantic fallback',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent};
       }
-      return {text:`No relevant match found. Sources: ${srcList}. Try fetching a relevant Wikipedia article.`,strategy:'fallback',conf:{l:'low',lbl:'no match',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:false,conflict:null,cached:false,evidence:null,intent};
+      // Last resort — use SLM conversationally rather than a template string
+      const lastResort = this.neuralMouth?.ready ? await Promise.race([
+        this.neuralMouth._generateMessages([
+          { role:'system', content:`You are Lexica. You have loaded: ${srcList}. Answer honestly if you can't help.` },
+          { role:'user', content: question.slice(0,120) }
+        ], 60).catch(()=>null),
+        new Promise(res=>setTimeout(()=>res(null),4000))
+      ]) : null;
+      return {text: lastResort || `I don't have information on that yet. Try loading a relevant source first.`, strategy:'fallback',conf:{l:'low',lbl:'no match',cls:'conf-low'},src:null,srcTitle:'',ctxUsed:used,kgUsed:false,synthesized:!!lastResort,conflict:null,cached:false,evidence:null,intent};
     }
 
     // KG retrieval — for comparative queries gather both subjects
@@ -7524,8 +7562,8 @@ class Engine {
     // WORLD MODEL: physical simulation queries
     if (_agiPrimary === 'worldmodel' || _agiPrimary === 'worldmodel_spatial') {
       const worldAns = this.worldModel.spatialQuery(r);
-      if (worldAns) {
-        _agiAnswer = worldAns;
+      if (worldAns && worldAns.description) {
+        _agiAnswer = worldAns.description;
         _agiSystem = 'worldmodel';
         _agiEvidence = `World model simulation (${this.worldModel.simCount} total)`;
         this._agiStats.worldAnswers++;
@@ -7648,27 +7686,24 @@ class Engine {
           // Decoder: try ensemble (3 parallel roles, best wins)
           // Seq2seq: single graphRAG call
           this.neuralMouth._isDecoder
-            ? this.neuralMouth.ensembleGraphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)).then(e => e?.text || null)
-            : this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,4), this.ctx.h.slice(-5)),
+            ? this.neuralMouth.ensembleGraphRAG(kgFacts, r, intent, evidenceSentences.slice(0,6), this.ctx.h.slice(-5)).then(e => e?.text || null)
+            : this.neuralMouth.graphRAG(kgFacts, r, intent, evidenceSentences.slice(0,6), this.ctx.h.slice(-5)),
           new Promise(res => setTimeout(() => res(null), slmTimeout))
         ]);
-        // Quality gate: must be > 20 chars AND not just regurgitate input facts verbatim
+        // Quality gate: must be > 15 chars and not be pure verbatim echo (identical copy)
+        // NOTE: Do NOT reject answers that share phrases with source — that's correct grounding.
+        // Only reject if output is character-for-character identical to a source sentence (not natural language).
         const isGoodOutput = ragText && ragText.length > 15 && (() => {
-          // Echo detection: reject if output is character-for-character identical to any evidence sentence
-          // Use char-level substring check (>25 consecutive chars) rather than word overlap
-          // — word overlap was rejecting valid answers that naturally reuse entity names from facts
-          const rl = ragText.toLowerCase().replace(/\s+/g,' ');
-          // Check for exact long substring match (verbatim copy)
+          if (ragText.length < 15) return false;
+          const rl = ragText.toLowerCase().replace(/\s+/g,' ').trim();
+          // Only reject if output IS essentially an exact copy of a source sentence (>85 char match)
           for (const sent of evidenceSentences.slice(0,3)) {
-            if (!sent || sent.length < 40) continue;
-            const sl = sent.toLowerCase().replace(/\s+/g,' ');
-            // If ragText contains >30 consecutive chars from the evidence, it's an echo
-            for (let i = 0; i < sl.length - 30; i++) {
-              if (rl.includes(sl.slice(i, i+30))) return false; // echo detected
-            }
+            if (!sent || sent.length < 60) continue;
+            const sl = sent.toLowerCase().replace(/\s+/g,' ').trim();
+            // Reject only if ragText is >90% the same as a single source sentence
+            if (sl.length > 80 && rl === sl) return false;
+            if (sl.length > 80 && rl.includes(sl.slice(0, Math.min(sl.length, 90)))) return false;
           }
-          // Also reject pure garbage: all-lowercase single sentence with no punctuation
-          if (ragText.length < 20) return false;
           return true;
         })();
         if (isGoodOutput) {
@@ -7689,9 +7724,36 @@ class Engine {
       } catch(e) { console.warn('[L5 SLM]', e); }
     }
 
-    // ── AGI PRE-ANSWER: if AGI found something and SLM is empty, use it ──
-    if (_agiAnswer && !ansText) {
-      ansText = _agiAnswer;
+    // ── AGI PRE-ANSWER: inject AGI evidence into SLM context rather than raw output ──
+    // If SLM failed AND we have an AGI symbolic answer, run one more SLM pass using the AGI insight as grounding.
+    // This prevents "Causal chain: you not reply." style raw symbolic outputs.
+    if (_agiAnswer && !ansText && this.neuralMouth?.ready) {
+      try {
+        const agiContext = `[Symbolic reasoning found: ${_agiAnswer.slice(0,200)}]`;
+        const agiKgFacts = _agiEvidence ? [{ s: subject || 'context', p: 'relates_to', o: _agiEvidence.slice(0,100), raw: _agiEvidence, conf: 0.7 }] : [];
+        const augFacts = [...agiKgFacts, ...kgFacts.slice(0,5)];
+        const augEvidence = [agiContext, ...evidenceSentences.slice(0,2)];
+        const agiSLM = await Promise.race([
+          this.neuralMouth._isDecoder
+            ? this.neuralMouth.ensembleGraphRAG(augFacts, r, intent, augEvidence, this.ctx.h.slice(-3))
+            : this.neuralMouth.graphRAG(augFacts, r, intent, augEvidence, this.ctx.h.slice(-3)),
+          new Promise(res => setTimeout(() => res(null), 10000))
+        ]);
+        if (agiSLM?.text && agiSLM.text.length > 15) {
+          ansText = agiSLM.text;
+          usedSLM = true;
+        } else {
+          // SLM still failed — only then use raw symbolic output, preferring evidence sentences to raw causal fragments
+          ansText = _agiAnswer.startsWith('Causal chain:') || _agiAnswer.startsWith('leads to:')
+            ? (evidenceSentences[0] || _agiAnswer)  // prefer a real sentence
+            : _agiAnswer;
+        }
+      } catch(e) { ansText = _agiAnswer; }
+    } else if (_agiAnswer && !ansText) {
+      // SLM not ready — use raw AGI output but prefer real sentences over causal fragments
+      ansText = _agiAnswer.startsWith('Causal chain:') && evidenceSentences.length
+        ? evidenceSentences[0]
+        : _agiAnswer;
     }
 
     // ── SYSTEM 2 VERIFICATION: verify SLM output against KG ──
@@ -7723,12 +7785,46 @@ class Engine {
       } catch(e) { console.warn('Society of Mind error:', e); }
     }
 
-    // ── SYMBOLIC SYNTHESIS ── Final fallback — always works
+    // ── SYMBOLIC SYNTHESIS ── Fallback when SLM produced nothing
     try {
       if (!ansText) {
         ansText = this.synthesis.synthesize(r, intent, subject, kgFacts, kgDerived, evidenceSentences, this.semVec, this.wordProfiler, this.kg, this.mood.current(), this.recentTripleWindow);
       }
     } catch(e) { console.warn('Synthesis error:', e); }
+
+    // ── SLM CONVERSATIONAL FALLBACK ── When symbolic has nothing or produces garbage
+    // If ansText is still empty OR looks like a raw symbolic fragment, run SLM with just the question
+    const _looksSymbolic = (t) => !t || t.length < 12 ||
+      /^Causal chain:|^leads to:|^".*" is not in the world model|^No relevant match|^Nothing to shorten/i.test(t) ||
+      (t.split(' ').length <= 4 && !/[.!?]/.test(t));  // < 4 words with no punctuation = fragment
+
+    if (_looksSymbolic(ansText) && this.neuralMouth?.ready) {
+      try {
+        const sources = this.sm.s.map(s=>s.title).join(', ') || 'none';
+        const ctxFacts = kgFacts.slice(0,5).map(f=>`${f.s} ${f.p.replace(/_/g,' ')} ${f.o}`).join('; ') || '';
+        const ctxSents = evidenceSentences.slice(0,2).join(' ') || '';
+        const sysMsg = `You are Lexica, a knowledge assistant. Your training sources: ${sources}. Be conversational and direct. 1-3 sentences max. If you don't know, say what you DO know from your sources.`;
+        const userMsg = ctxFacts || ctxSents
+          ? `Context: ${(ctxFacts+' '+ctxSents).slice(0,300)}\n\nQuestion: ${r.slice(0,150)}`
+          : r.slice(0,200);
+        const fallbackMsgs = [
+          { role:'system', content:sysMsg },
+          ...(this.ctx.h||[]).slice(-2).flatMap(t=>[
+            {role:'user', content:t.q.slice(0,80)},
+            {role:'assistant', content:t.a.slice(0,100)},
+          ]),
+          { role:'user', content:userMsg },
+        ];
+        const fallbackAns = await Promise.race([
+          this.neuralMouth._generateMessages(fallbackMsgs, 120),
+          new Promise(res=>setTimeout(()=>res(null), 12000))
+        ]);
+        if (fallbackAns && fallbackAns.length > 10) {
+          ansText = fallbackAns;
+          usedSLM = true;
+        }
+      } catch(e) { console.warn('[SLM conversational fallback]', e); }
+    }
 
     this.stateTracker.set('idle');
 
@@ -7739,7 +7835,8 @@ class Engine {
     }
 
     const synthesized = !!ansText && ansText.length > 10;
-    if (!ansText||ansText.length<15) ansText = finalize(rel[0].s);
+    // Don't use finalize() template — prefer SLM conversational fallback or silence
+    if (!ansText || ansText.length < 15) ansText = '';
 
     // TOM context: user emotional state (kept but prefix removed)
     const activeState = this.userCtx.activeState();
@@ -8007,7 +8104,7 @@ function updateTrainOverlay(phase,pct,sentences,triples){
   const v=engine.bm25.ti.size;document.getElementById('cVoc').textContent=v>999?Math.round(v/100)/10+'k':v;
   document.getElementById('cWords').textContent=engine.wordProfiler.size;
   document.getElementById('trainLog').textContent=PHASE_LABELS[idx]+'...';
-  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica V0 ready.';}
+  if(phase==='complete'){document.querySelectorAll('.phase-item').forEach(p=>p.classList.add('done'));document.getElementById('trainLog').textContent='Knowledge substrate loaded. Lexica 4.0 ready.';}
 }
 function hideTrainOverlay(){setTimeout(()=>document.getElementById('trainOverlay').classList.remove('visible'),700);}
 
@@ -8338,6 +8435,46 @@ function updateDebateUI() {
 
 // ── INNER MONOLOGUE UI ──
 let _monologueLog = [];
+let _monologueThinkInterval = null;
+
+// ── Continuous SLM thought loop ──
+// Every 8s (when SLM is ready and idle), generate a genuine thought about the KG state.
+// This is the inner monologue running at all times, not just on curiosity triggers.
+function _startMonologueLoop() {
+  if (_monologueThinkInterval) return; // already running
+  _monologueThinkInterval = setInterval(async () => {
+    const nm = window._neuralMouth;
+    if (!nm?.ready || !engine?.kg?.count()) return;
+    if (nm._pendingRequests?.size > 0) return; // SLM is busy — skip this tick
+
+    // Pick a random triple from KG to think about
+    const alive = engine.kg.triples.filter(t => t.alive !== false && t.raw && t.raw.length > 20);
+    if (!alive.length) return;
+    const pick = alive[Math.floor(Math.random() * Math.min(alive.length, 20))];
+    const related = alive.filter(t => t.s === pick.s || t.o === pick.s).slice(0,4)
+      .map(t => `${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+
+    // Also mix in goal stack / drive state for richer monologue
+    const drives = engine.drives ? Object.entries(engine.drives.levels||{})
+      .sort((a,b)=>b[1]-a[1]).slice(0,2)
+      .map(([k,v])=>`${k}:${(v*100).toFixed(0)}%`).join(', ') : '';
+    const goals = engine.goalStack?.peek ? engine.goalStack.peek(2).map(g=>g.topic||g.type).join(', ') : '';
+
+    try {
+      const thought = await nm._generateMessages([
+        { role:'system', content:'You are the inner voice of Lexica, an AI knowledge engine. Generate ONE short, genuine observation (1 sentence) about your knowledge state. Think about patterns, gaps, or connections you notice. Be curious and specific. No fluff.' },
+        { role:'user', content:`Current focus: "${pick.s} ${pick.p.replace(/_/g,' ')} ${pick.o}". Related: ${related.slice(0,120)}. Active drives: ${drives}. Goals: ${goals}. What do you notice?` },
+      ], 60);
+      if (thought && thought.length > 10) {
+        showInnerMonologue(thought, pick.s, pick.o);
+      }
+    } catch(e) {}
+  }, 8000);
+}
+
+// Start loop once engine is ready
+window.addEventListener('lexicaReady', _startMonologueLoop);
+
 function showInnerMonologue(text, nodeA, nodeB) {
   // Use requestIdleCallback to defer ALL DOM work to idle time — prevents lag spikes
   const doWork = () => {
@@ -8934,7 +9071,7 @@ function streamMsg(text, meta) {
 }
 function toggleSrcReveal(btn){const el=btn.closest('.msg-row').querySelector('.source-reveal');if(!el)return;const show=el.style.display!=='none';el.style.display=show?'none':'block';btn.textContent=show?'⟨ source ⟩':'⟨ hide ⟩';}
 function voteFb(btn,fbId,isGood){const row=btn.closest('.msg-row');const bubble=row.querySelector('.msg-bubble.ai');const key=bubble?.getAttribute('data-src')||'';if(key)engine.feedback.vote(key,isGood);const fbRow=document.getElementById(fbId);if(fbRow){fbRow.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('voted-good','voted-bad'));btn.classList.add(isGood?'voted-good':'voted-bad');fbRow.querySelectorAll('.fb-btn').forEach(b=>b.disabled=true);}engine.cache.invalidate();
-// LEXICA V0: Feed vote signal into preference engine + retrieval weight adjustment
+// LEXICA 4.0: Feed vote signal into preference engine + retrieval weight adjustment
 if(engine.preferenceEngine && engine.lastSubject){if(isGood){engine.preferenceEngine.onPositiveEngagement(engine.lastSubject);engine.drives.satiate('discomfort',0.1);// Positive feedback → boost BM25 source weight for the tag
 const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.min(1.8,cur+0.1));}}else{engine.preferenceEngine.onFailure(engine.lastSubject,'user thumbs-down');// Negative feedback → lower source weight, increase curiosity about this gap
 const lastTag=engine.lastResult?._srcTag;if(lastTag&&typeof engine.bm25.setSrcWeight==='function'){const cur=engine.bm25.srcWeights?.get(lastTag)||1.0;engine.bm25.setSrcWeight(lastTag,Math.max(0.3,cur-0.15));}engine.failureTracker&&engine.failureTracker.recordFailure(engine.lastQuery||'',engine.lastSubject,'user thumbs-down','low');engine.drives.frustrate('curiosity',0.15,'thumbs-down on '+engine.lastSubject);}updatePreferenceUI();updateDriveUI();}// Auto-save updated weights to persistent memory
@@ -9193,11 +9330,8 @@ async function sendQ(){
   engine.drives.satiate('expression', 0.3);
   updateUserModelUI();
 
-  // ── Self-modify intercept ──────────────────────────
-  if (window.SelfModify && window.SelfModify.isCodeIntent(q)) {
-    await window.SelfModify.modify(q);
-    return;
-  }
+  // ── Self-modify disabled (intercepts user queries incorrectly) ──
+  // if (window.SelfModify && window.SelfModify.isCodeIntent(q)) { ... }
 
   showThinking();
   await yieldToMain();
@@ -10637,12 +10771,12 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) {
       updateBootBar(0.95, 'Neural init failed — symbolic fallback active');
       updateSLMStatusUI('error', 'Neural init error: ' + (e.message||e).slice(0,40), '—');
-      console.error('[Lexica V0 boot]', e);
+      console.error('[Lexica 4.0 boot]', e);
     }
 
     // Phase 3: Done
     setBootPhase(3, true);
-    updateBootBar(1.0, 'Lexica V0 ready ✓');
+    updateBootBar(1.0, 'Lexica 4.0 ready ✓');
     await new Promise(r => setTimeout(r, 300));
     hideBootOverlay();
 
