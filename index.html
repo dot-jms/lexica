@@ -4841,18 +4841,25 @@ function handleSocialIntent(intent,input,engine){
 }
 
 function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
-  // Symbolic fallback — only fires when SLM unavailable. No static template prose.
+  // Symbolic fallback — fires when SLM unavailable or intent is pure social.
+  // Must return actual conversational text — NEVER raw stats strings.
   if(intent==='greeting'){
     if(n>0){
-      const srcLabel=srcs===1?'"'+engine.sm.s[0].title+'"':srcs+' sources';
-      const kgCount=engine.kg.count();
-      return{...base,conf:socialConf,text:n+' sentence'+(n!==1?'s':'')+' from '+srcLabel+(kgCount?' · '+kgCount+' triples':'')+'.',synthesized:false};
+      // Actual greeting with a knowledge hook — inviting conversation
+      const srcTitle = engine.sm?.s?.[0]?.title || 'some sources';
+      const triples = engine.kg.count();
+      const greetings = [
+        `Hey! I've loaded ${n} sentences${triples?' and '+triples+' knowledge triples':''} — ask me anything.`,
+        `Hi there! I know about ${srcTitle} right now. What do you want to know?`,
+        `Hello! I'm ready — I've got ${n} sentences in memory. What's on your mind?`,
+      ];
+      return{...base,conf:socialConf,text:greetings[Math.floor(Math.random()*greetings.length)],synthesized:false};
     }
-    return{...base,conf:socialConf,text:'',synthesized:false}; // silent until SLM loads
+    return{...base,conf:socialConf,text:"Hey! I don't have any sources loaded yet — try fetching a Wikipedia article first.",synthesized:false};
   }
   if(intent==='farewell'){
-    if(n>0){return{...base,conf:socialConf,text:engine.kg.count()+' triples retained.',synthesized:false};}
-    return{...base,conf:socialConf,text:'',synthesized:false};
+    const farewells = ["See you! Everything I learned stays in memory.", "Later! Knowledge retained.", "Bye! Come back anytime."];
+    return{...base,conf:socialConf,text:farewells[Math.floor(Math.random()*farewells.length)],synthesized:false};
   }
   if(intent==='gratitude'){
     const lastSubj=engine.ctx.lastSubj;
@@ -4863,7 +4870,7 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         if(text)return{...base,conf:socialConf,text,kgUsed:true,synthesized:true,ctxUsed:true};
       }
     }
-    return{...base,conf:socialConf,text:'',synthesized:false};
+    return{...base,conf:socialConf,text:"You're welcome! What else do you want to know?",synthesized:false};
   }
   if(intent==='user_emotion'){
     const adj=extractUserState(input);
@@ -4913,10 +4920,10 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         if(txt&&txt.length>10)return{...base,conf:socialConf,text:txt,synthesized:true,kgUsed:true};
       }
     }
-    return{...base,conf:socialConf,text:'',synthesized:false};
+    return{...base,conf:socialConf,text:"Not sure what you're referring to. What topic do you want to explore?"};
   }
   if(intent==='declarative_statement'){
-    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:''};
+    return handleDeclarativeStatement(input,engine)||{...base,conf:socialConf,text:"Got it. What would you like to know?"};
   }
   if(intent==='statement'){
     const topicM=input.match(/^i (?:like|love|hate|prefer|enjoy|dislike|know about|feel about|want|need)\s+(.+)/i)
@@ -4933,9 +4940,14 @@ function _symbolicSocialFallback(intent,input,engine,base,socialConf,n,srcs){
         }
       }
     }
-    return{...base,conf:socialConf,text:''};
+    return{...base,conf:socialConf,text:"Interesting! Want to ask me something about that?"};
   }
-  return null;
+  const genericReplies = [
+    "I'm not sure what you mean — try asking me a question!",
+    "Could you rephrase that? I'm best at answering questions about topics I've loaded.",
+    "What would you like to know?",
+  ];
+  return{...base,conf:socialConf,text:genericReplies[Math.floor(Math.random()*genericReplies.length)],synthesized:false};
 }
 
 function isFrustrated(q){return/^(ugh|argh|wtf|damn|wrong|no|nope|that's not|thats not|incorrect|bad answer|try again|not right|you're wrong|youre wrong)\b/i.test(q.trim());}
@@ -5374,13 +5386,25 @@ class NeuralMouth {
     }
 
     return new Promise((resolve) => {
-      try {
-        this._worker = new Worker(workerBlobUrl, { type: 'module' });
-      } catch(e) {
-        this.error = 'Worker.new failed: ' + e.message;
+      // Try classic worker first (widest browser support — supports dynamic import() internally)
+      // type:'module' blob workers are blocked in Firefox and some Chrome security contexts.
+      let workerCreated = false;
+      for (const opts of [{}, { type: 'module' }]) {
+        try {
+          this._worker = new Worker(workerBlobUrl, opts);
+          workerCreated = true;
+          console.log('[NeuralMouth] Worker created with opts:', JSON.stringify(opts));
+          break;
+        } catch(e) {
+          console.warn('[NeuralMouth] Worker(opts=' + JSON.stringify(opts) + ') failed:', e.message);
+        }
+      }
+      if (!workerCreated) {
+        this.error = 'Could not create Web Worker in this browser context';
         this.loading = false;
-        onProgress('NeuralMouth: ' + this.error);
-        resolve(false);
+        onProgress('NeuralMouth: Worker unavailable — loading on main thread (may cause brief lag)');
+        // Fall back to main-thread loading (Transformers.js WASM, less ideal but works)
+        this._initMainThread(onProgress).then(resolve);
         return;
       }
 
@@ -5472,13 +5496,74 @@ class NeuralMouth {
     });
   }
 
-  // ── _generate: routes ALL inference through Web Worker — main thread never blocked ──
+  // ── Main-thread fallback — fires when Worker is unavailable ──
+  // Loads Transformers.js directly on the main thread with yieldToMain() between steps.
+  async _initMainThread(onProgress) {
+    const TRANSFORMERS_URLS = [
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0',
+      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.0',
+    ];
+    const MODEL_CASCADE = [
+      { id: 'HuggingFaceTB/SmolLM2-360M-Instruct', type: 'text-generation', isDecoder: true },
+      { id: 'HuggingFaceTB/SmolLM2-135M-Instruct', type: 'text-generation', isDecoder: true },
+      { id: 'Xenova/flan-t5-base', type: 'text2text-generation', isDecoder: false },
+      { id: 'Xenova/flan-t5-small', type: 'text2text-generation', isDecoder: false },
+    ];
+    let pipelineFn = null;
+    for (const url of TRANSFORMERS_URLS) {
+      try {
+        const mod = await import(url);
+        pipelineFn = mod.pipeline ?? mod.default?.pipeline ?? null;
+        const env = mod.env ?? mod.default?.env ?? null;
+        if (env) { try { env.allowLocalModels=false; env.useBrowserCache=true; } catch(_) {} }
+        if (typeof pipelineFn === 'function') break;
+      } catch(e) {}
+    }
+    if (!pipelineFn) { onProgress('NeuralMouth: All CDNs failed'); return false; }
+    for (const { id, type, isDecoder } of MODEL_CASCADE) {
+      try {
+        onProgress(`NeuralMouth (main thread): Loading ${id.split('/').pop()}...`);
+        this._mainPipeline = await pipelineFn(type, id, {
+          progress_callback: info => {
+            if (info.status === 'progress' && info.total) {
+              const pct = Math.round(info.loaded/info.total*100);
+              onProgress(`NeuralMouth: Downloading ${id.split('/').pop()} (${pct}%)`);
+            }
+          }
+        });
+        this._isDecoder = isDecoder; this.modelId = id;
+        this.ready = true; this.loading = false;
+        window._webllmReady = true;
+        this._useMainThread = true;
+        onProgress('NeuralMouth: Ready (main thread) — ' + id.split('/').pop());
+        try { const d=document.getElementById('slmDot'); if(d)d.className='slm-dot ready'; } catch(_){}
+        return true;
+      } catch(e) { console.warn('[NeuralMouth main]', id, 'failed:', e.message); }
+    }
+    onProgress('NeuralMouth: All models failed');
+    return false;
+  }
+
+  // Clean output helper — strips LLM refusal boilerplate and formatting garbage
+  _cleanOutput(raw) {
+    return (raw||'')
+      .replace(/^(I'm sorry[^.!?]*[.!?]\s*)+/gi,'')
+      .replace(/^(As an AI[^.!?]*[.!?]\s*)+/gi,'')
+      .replace(/^(Sure[,!]\s*[^.!?]*[.!?]\s*)/i,'')
+      .replace(/^Lexica:\s*/i,'')
+      .split('\n').filter(l=>!/^\s*[\*\-•]|^\s*\d+\./.test(l)).join(' ')
+      .replace(/\s{2,}/g,' ').split('\n\n')[0].slice(0,500).trim();
+  }
+
+  // ── _generate: worker path (preferred) OR main-thread fallback ──
   async _generate(taskPrefix, contentPrompt, maxTokens=80, conversationHistory=[]) {
     if (!this.ready) throw new Error('NeuralMouth not ready');
+    if (this._useMainThread) return this._generateMainThread(taskPrefix, contentPrompt, maxTokens, conversationHistory);
     return this._workerCall({ type:'generate', taskPrefix, contentPrompt, maxTokens, conversationHistory }, 18000);
   }
 
-  // ── _generateMessages: decoder chat-format inference via worker ──
+  // ── _generateMessages: decoder chat-format via worker or main thread ──
   async _generateMessages(messages, maxTokens=120) {
     if (!this.ready) throw new Error('NeuralMouth not ready');
     if (!this._isDecoder) {
@@ -5486,7 +5571,45 @@ class NeuralMouth {
       const sMsg = messages.find(m=>m.role==='system')?.content || '';
       return this._generate(sMsg.slice(0,80), uMsg.slice(0,380), maxTokens);
     }
+    if (this._useMainThread) {
+      // Main-thread path: call pipeline directly (will block briefly, but works everywhere)
+      try {
+        const res = await this._mainPipeline(messages, {max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+        const g = res?.[0]?.generated_text;
+        let raw = '';
+        if (Array.isArray(g)) raw = (g[g.length-1]?.content??'').trim();
+        else { raw=(g??'').trim(); const ai=raw.lastIndexOf('<|im_start|>assistant'); if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim(); }
+        return this._cleanOutput(raw);
+      } catch(e) { return ''; }
+    }
     return this._workerCall({ type:'messages', messages, maxTokens }, 18000);
+  }
+
+  // ── Main-thread inference path (fallback when Worker unavailable) ──
+  async _generateMainThread(taskPrefix, contentPrompt, maxTokens, conversationHistory) {
+    if (!this._mainPipeline) throw new Error('Main pipeline not loaded');
+    let raw = '';
+    try {
+      if (this._isDecoder) {
+        const sys = 'You are Lexica, a concise knowledge assistant. Answer only from the given facts. Be direct and specific. No lists, no markdown, no disclaimers.';
+        const hist = (conversationHistory||[]).slice(-4).flatMap(t=>[
+          {role:'user',content:t.q.slice(0,120)},{role:'assistant',content:t.a.slice(0,150)}
+        ]);
+        const userMsg = (taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+        const msgs = [{role:'system',content:sys},...hist,{role:'user',content:userMsg.slice(0,600)}];
+        await yieldToMain();
+        const res = await this._mainPipeline(msgs,{max_new_tokens:Math.min(maxTokens,150),do_sample:false,temperature:1.0,repetition_penalty:1.2,return_full_text:false});
+        const g = res?.[0]?.generated_text;
+        if(Array.isArray(g)) raw=(g[g.length-1]?.content??'').trim();
+        else{raw=(g??'').trim();const ai=raw.lastIndexOf('<|im_start|>assistant');if(ai!==-1)raw=raw.slice(ai+21).replace(/<\|im_end\|>[\s\S]*$/,'').trim();}
+      } else {
+        const input = (taskPrefix?taskPrefix+'\n\n':'')+contentPrompt;
+        await yieldToMain();
+        const res = await this._mainPipeline(input.slice(0,480),{max_new_tokens:Math.min(maxTokens,120),do_sample:false,num_beams:1,repetition_penalty:1.3});
+        raw = (res?.[0]?.generated_text??'').trim();
+      }
+    } catch(e) { console.warn('[NeuralMouth main-thread]', e); throw e; }
+    return this._cleanOutput(raw);
   }
   // Runs 3 specialized role prompts in parallel, selects best by grounding score.
   // Thinker: systematic reasoning, links facts. Narrator: fluid prose output. Critic: challenges and refines.
@@ -7189,24 +7312,46 @@ class Engine {
       }
     }, 2000); // slight delay so UI updates first
 
-    // ── INNER MONOLOGUE: post-training reflection (SLM-generated) ──
+    // ── INNER MONOLOGUE: post-training reflection ──
     setTimeout(() => {
       if (typeof showInnerMonologue === 'function' && this.kg.count() > 5) {
         const nm = window._neuralMouth;
-        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 8);
-        const nodeNames = topNodes.slice(0,5).map(n => n.node).filter(n => n && n.length > 2 && n.length < 40);
-        const recentTriples = this.kg.triples.slice(-8).map(t=>`${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+        const topNodes = this.kg.centrality.topNodes(this.kg.triples, 12);
+        // Quality filter: only real entity names (proper nouns, not sentence fragments)
+        const nodeNames = topNodes
+          .map(n => n.node)
+          .filter(n => {
+            if (!n || n.length < 3 || n.length > 35) return false;
+            // Must start with a letter
+            if (!/^[a-zA-Z]/.test(n)) return false;
+            // Reject sentence fragments: >3 words AND all lowercase = fragment, not entity
+            const words = n.split(/\s+/);
+            if (words.length > 3 && words.every(w => /^[a-z]/.test(w))) return false;
+            // Reject stop-word-only strings
+            if (/^(the|a|an|in|on|of|is|are|was|were|it|its|this|that|and|or|but|for|to|from|with|by|at|as|be)\s/i.test(n)) return false;
+            return true;
+          })
+          .slice(0, 5);
+
+        const recentTriples = this.kg.triples.slice(-6)
+          .filter(t => t.s && t.o && t.s.length < 30 && t.o.length < 40)
+          .map(t=>`${t.s} ${t.p.replace(/_/g,' ')} ${t.o}`).join('; ');
+
+        // Symbolic fallback (fires immediately if SLM not ready)
+        const symbolicThought = nodeNames.length >= 1
+          ? `Absorbed "${title}": ${this.kg.count()} triples. Key entities: ${nodeNames.slice(0,3).join(', ')}.`
+          : `Absorbed "${title}": ${this.kg.count()} triples learned.`;
+
         if (nm?.ready && nodeNames.length >= 1) {
           nm._generateMessages([
-            { role:'system', content:'You are the inner voice of Lexica. After learning something new, generate ONE short, genuine thought (1 sentence) about what you just absorbed. Be specific about the content, curious, not generic.' },
-            { role:'user', content:`Just learned: "${title}" (${this.kg.count()} total KG triples). Key facts: ${recentTriples.slice(0,250)}. Key entities: ${nodeNames.join(', ')}. What strikes you?` }
+            { role:'system', content:'You are the inner voice of Lexica, a curious AI. After learning, generate ONE short genuine thought (1 sentence). Be specific about what you learned, curious but concise.' },
+            { role:'user', content:`Just absorbed: "${title}". Key facts: ${recentTriples.slice(0,200)}. Notable entities: ${nodeNames.join(', ')}.` }
           ], 60).then(thought => {
             if (thought && thought.length > 10) showInnerMonologue(thought, nodeNames[0], nodeNames[1]||null);
-          }).catch(() => {
-            if (nodeNames.length >= 1) showInnerMonologue(`Absorbed "${title}": ${this.kg.count()} triples. Entities: ${nodeNames.slice(0,3).join(', ')}.`, nodeNames[0], nodeNames[1]||null);
-          });
-        } else if (nodeNames.length >= 1) {
-          showInnerMonologue(`Absorbed "${title}": ${this.kg.count()} triples. Entities: ${nodeNames.slice(0,3).join(', ')}.`, nodeNames[0], nodeNames[1]||null);
+            else showInnerMonologue(symbolicThought, nodeNames[0]||title, nodeNames[1]||null);
+          }).catch(() => showInnerMonologue(symbolicThought, nodeNames[0]||title, nodeNames[1]||null));
+        } else {
+          showInnerMonologue(symbolicThought, nodeNames[0]||title, null);
         }
       }
     }, 1500);
@@ -10824,4 +10969,3 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
